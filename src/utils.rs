@@ -9,8 +9,8 @@ pub fn clean_folder_name(name: &str) -> String {
     let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
     let cleaned = re_brackets.replace_all(name, "");
     
-    // Remplacer les underscores par des tirets
-    let with_dashes = cleaned.replace('_', "-");
+    // Remplacer les underscores et pipes par des tirets
+    let with_dashes = cleaned.replace('_', "-").replace('|', "-");
     
     // Nettoyer les espaces multiples
     let re_spaces = Regex::new(r"\s+").unwrap();
