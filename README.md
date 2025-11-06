@@ -30,15 +30,23 @@ The application will check for dependencies at startup and offer to install them
 
 ### Installation
 
+#### Option 1: From crates.io (Recommended)
+
+```bash
+cargo install youtube_chapter_splitter
+```
+
+The `ytcs` binary will be installed in `~/.cargo/bin/` (make sure it's in your PATH).
+
+#### Option 2: From source
+
 ```bash
 # Clone the repository
 git clone https://github.com/all3f0r1/youtube-chapter-splitter.git
 cd youtube-chapter-splitter
 
-# Build the project
-cargo build --release
-
-# The binary will be in target/release/ytcs
+# Build and install
+cargo install --path .
 ```
 
 ### Usage
