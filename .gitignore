@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output
+/output/
+*.mp3
+*.mp4
+*.webm
+
+# Logs
+*.log
+
+# Temporary files
+temp_*
+.tmp/
