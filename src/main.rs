@@ -1,87 +1,32 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use colored::Colorize;
-use std::path::PathBuf;
-use youtube_chapter_splitter::{
-    audio, chapters, downloader, utils, Result, YtcsError,
-};
+use youtube_chapter_splitter::{audio, downloader, utils, Result};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
-#[command(about = "YouTube Chapter Splitter - Download YouTube videos and split them into MP3 tracks", long_about = None)]
+#[command(about = "YouTube Chapter Splitter - Download and split YouTube videos into MP3 tracks", long_about = None)]
+#[command(version)]
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
+    /// YouTube video URL
+    url: String,
+
+    /// Output directory (default: ./output)
+    #[arg(short, long, default_value = "./output")]
+    output: String,
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Download a YouTube video and split it into tracks based on chapters
-    Download {
-        /// YouTube video URL
-        #[arg(short, long)]
-        url: String,
-
-        /// Output directory (default: ./output)
-        #[arg(short, long, default_value = "./output")]
-        output: PathBuf,
-
-        /// Use silence detection if no chapters are found
-        #[arg(short, long, default_value = "true")]
-        detect_silence: bool,
-
-        /// Silence threshold in dB (for automatic detection)
-        #[arg(long, default_value = "-30")]
-        silence_threshold: f64,
-
-        /// Minimum silence duration in seconds
-        #[arg(long, default_value = "2.0")]
-        min_silence_duration: f64,
-    },
-
-    /// Split an existing audio file based on timestamps
-    Split {
-        /// Path to the audio file to split
-        #[arg(short, long)]
-        input: PathBuf,
-
-        /// Output directory
-        #[arg(short, long, default_value = "./output")]
-        output: PathBuf,
-
-        /// JSON file containing chapters
-        #[arg(short, long)]
-        chapters: Option<PathBuf>,
-
-        /// Use silence detection
-        #[arg(short, long)]
-        detect_silence: bool,
-
-        /// Silence threshold in dB
-        #[arg(long, default_value = "-30")]
-        silence_threshold: f64,
-
-        /// Minimum silence duration in seconds
-        #[arg(long, default_value = "2.0")]
-        min_silence_duration: f64,
-
-        /// Album name for metadata
-        #[arg(short, long, default_value = "Album")]
-        album: String,
-    },
-
-    /// Display information about a YouTube video
-    Info {
-        /// YouTube video URL
-        #[arg(short, long)]
-        url: String,
-    },
-
-    /// Install missing dependencies
-    Install {
-        /// Tool to install (yt-dlp or ffmpeg)
-        #[arg(short, long)]
-        tool: String,
-    },
+fn clean_url(url: &str) -> String {
+    // Extract only the video ID, remove playlist and other parameters
+    if let Some(id_start) = url.find("v=") {
+        let id_part = &url[id_start + 2..];
+        if let Some(amp_pos) = id_part.find('&') {
+            format!("https://www.youtube.com/watch?v={}", &id_part[..amp_pos])
+        } else {
+            format!("https://www.youtube.com/watch?v={}", id_part)
+        }
+    } else {
+        url.to_string()
+    }
 }
 
 #[tokio::main]
@@ -98,7 +43,6 @@ async fn main() -> Result<()> {
         std::io::stdin().read_line(&mut input).ok();
         
         if input.trim().to_lowercase() == "y" {
-            // Extract tool names from error message
             if e.to_string().contains("yt-dlp") {
                 downloader::install_dependency("yt-dlp")?;
             }
@@ -111,171 +55,82 @@ async fn main() -> Result<()> {
         }
     }
 
-    match cli.command {
-        Commands::Download {
-            url,
-            output,
-            detect_silence,
-            silence_threshold,
-            min_silence_duration,
-        } => {
-            println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
-            println!();
+    // Clean the URL
+    let clean_url = clean_url(&cli.url);
+    
+    println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
+    println!();
 
-            // Get video information
-            println!("{}", "Fetching video information...".yellow());
-            let video_info = downloader::get_video_info(&url)?;
+    // Get video information
+    println!("{}", "Fetching video information...".yellow());
+    let video_info = downloader::get_video_info(&clean_url)?;
 
-            println!("{} {}", "Title:".bold(), video_info.title);
-            println!("{} {}", "Duration:".bold(), utils::format_duration(video_info.duration));
-            println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
-            println!();
+    println!("{} {}", "Title:".bold(), video_info.title);
+    println!("{} {}", "Duration:".bold(), utils::format_duration(video_info.duration));
+    println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
+    println!();
 
-            // Create output directory with cleaned name
-            let clean_title = utils::clean_folder_name(&video_info.title);
-            let output_dir = output.join(&clean_title);
-            std::fs::create_dir_all(&output_dir)?;
+    // Create output directory with cleaned name
+    let clean_title = utils::clean_folder_name(&video_info.title);
+    let output_dir = std::path::PathBuf::from(&cli.output).join(&clean_title);
+    std::fs::create_dir_all(&output_dir)?;
 
-            // Download audio
-            let temp_audio = output_dir.join("temp_audio");
-            println!("{}", "Downloading audio...".yellow());
-            let audio_file = downloader::download_audio(&url, &temp_audio)?;
-            println!("{} {}", "✓ Audio downloaded:".green(), audio_file.display());
-            println!();
-
-            // Determine chapters to use
-            let chapters_to_use = if !video_info.chapters.is_empty() {
-                println!("{}", "Using YouTube tracks".green());
-                video_info.chapters
-            } else if detect_silence {
-                println!("{}", "No tracks found, detecting automatically...".yellow());
-                audio::detect_silence_chapters(&audio_file, silence_threshold, min_silence_duration)?
-            } else {
-                return Err(YtcsError::ChapterError(
-                    "No tracks found and silence detection disabled".to_string()
-                ));
-            };
-
-            // Display chapters
-            println!();
-            println!("{}", "Tracks to create:".bold());
-            for (i, chapter) in chapters_to_use.iter().enumerate() {
-                println!(
-                    "  {}. {} [{}]",
-                    i + 1,
-                    chapter.title,
-                    utils::format_duration_short(chapter.duration())
-                );
-            }
-            println!();
-
-            // Split audio
-            let output_files = audio::split_audio_by_chapters(
-                &audio_file,
-                &chapters_to_use,
-                &output_dir,
-                &clean_title,
-            )?;
-
-            // Clean up temporary file
-            std::fs::remove_file(&audio_file).ok();
-
-            println!();
-            println!("{}", "✓ Processing completed successfully!".bold().green());
-            println!("{} {}", "Files created:".bold(), output_files.len());
-            println!("{} {}", "Directory:".bold(), output_dir.display());
+    // Download thumbnail
+    println!("{}", "Downloading album artwork...".yellow());
+    match downloader::download_thumbnail(&clean_url, &output_dir).await {
+        Ok(thumb_path) => {
+            println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display());
         }
-
-        Commands::Split {
-            input,
-            output,
-            chapters: chapters_file,
-            detect_silence,
-            silence_threshold,
-            min_silence_duration,
-            album,
-        } => {
-            println!("{}", "=== Audio Splitter ===".bold().cyan());
-            println!();
-
-            if !input.exists() {
-                return Err(YtcsError::IoError(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Input file not found",
-                )));
-            }
-
-            let chapters_to_use = if let Some(chapters_path) = chapters_file {
-                let json_content = std::fs::read_to_string(chapters_path)?;
-                chapters::parse_chapters_from_json(&json_content)?
-            } else if detect_silence {
-                println!("{}", "Detecting tracks automatically...".yellow());
-                audio::detect_silence_chapters(&input, silence_threshold, min_silence_duration)?
-            } else {
-                return Err(YtcsError::ChapterError(
-                    "You must provide a chapters file or enable silence detection".to_string()
-                ));
-            };
-
-            println!();
-            println!("{}", "Tracks to create:".bold());
-            for (i, chapter) in chapters_to_use.iter().enumerate() {
-                println!(
-                    "  {}. {} [{}]",
-                    i + 1,
-                    chapter.title,
-                    utils::format_duration_short(chapter.duration())
-                );
-            }
-            println!();
-
-            std::fs::create_dir_all(&output)?;
-            let output_files = audio::split_audio_by_chapters(
-                &input,
-                &chapters_to_use,
-                &output,
-                &album,
-            )?;
-
-            println!();
-            println!("{}", "✓ Processing completed successfully!".bold().green());
-            println!("{} {}", "Files created:".bold(), output_files.len());
-            println!("{} {}", "Directory:".bold(), output.display());
-        }
-
-        Commands::Info { url } => {
-            println!("{}", "=== Video Information ===".bold().cyan());
-            println!();
-
-            let video_info = downloader::get_video_info(&url)?;
-
-            println!("{} {}", "Title:".bold(), video_info.title);
-            println!("{} {}", "ID:".bold(), video_info.video_id);
-            println!("{} {}", "Duration:".bold(), utils::format_duration(video_info.duration));
-            println!("{} {}", "Tracks:".bold(), video_info.chapters.len());
-
-            if !video_info.chapters.is_empty() {
-                println!();
-                println!("{}", "Track list:".bold());
-                for (i, chapter) in video_info.chapters.iter().enumerate() {
-                    println!(
-                        "  {}. {} [{}]",
-                        i + 1,
-                        chapter.title,
-                        utils::format_duration_short(chapter.duration())
-                    );
-                }
-            } else {
-                println!();
-                println!("{}", "No tracks found in this video.".yellow());
-                println!("{}", "Use --detect-silence for automatic detection.".yellow());
-            }
-        }
-
-        Commands::Install { tool } => {
-            downloader::install_dependency(&tool)?;
+        Err(e) => {
+            println!("{} {}", "⚠ Could not download artwork:".yellow(), e);
         }
     }
+    println!();
+
+    // Download audio
+    let temp_audio = output_dir.join("temp_audio");
+    println!("{}", "Downloading audio...".yellow());
+    let audio_file = downloader::download_audio(&clean_url, &temp_audio)?;
+    println!("{} {}", "✓ Audio downloaded:".green(), audio_file.display());
+    println!();
+
+    // Determine chapters to use
+    let chapters_to_use = if !video_info.chapters.is_empty() {
+        println!("{}", "Using YouTube tracks".green());
+        video_info.chapters
+    } else {
+        println!("{}", "No tracks found, detecting automatically...".yellow());
+        audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
+    };
+
+    // Display chapters
+    println!();
+    println!("{}", "Tracks to create:".bold());
+    for (i, chapter) in chapters_to_use.iter().enumerate() {
+        println!(
+            "  {}. {} [{}]",
+            i + 1,
+            chapter.title,
+            utils::format_duration_short(chapter.duration())
+        );
+    }
+    println!();
+
+    // Split audio
+    let output_files = audio::split_audio_by_chapters(
+        &audio_file,
+        &chapters_to_use,
+        &output_dir,
+        &clean_title,
+    )?;
+
+    // Clean up temporary file
+    std::fs::remove_file(&audio_file).ok();
+
+    println!();
+    println!("{}", "✓ Processing completed successfully!".bold().green());
+    println!("{} {}", "Files created:".bold(), output_files.len());
+    println!("{} {}", "Directory:".bold(), output_dir.display());
 
     Ok(())
 }

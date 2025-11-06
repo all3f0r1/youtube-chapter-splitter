@@ -182,3 +182,34 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
 
     Ok(final_path)
 }
+
+
+pub async fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
+    // Get video ID
+    let video_id = extract_video_id(url)?;
+    
+    // YouTube thumbnail URLs (try different qualities)
+    let thumbnail_urls = vec![
+        format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id),
+        format!("https://img.youtube.com/vi/{}/hqdefault.jpg", video_id),
+        format!("https://img.youtube.com/vi/{}/mqdefault.jpg", video_id),
+    ];
+    
+    let output_path = output_dir.join("cover.jpg");
+    
+    // Try each thumbnail URL until one works
+    for thumb_url in thumbnail_urls {
+        match reqwest::get(&thumb_url).await {
+            Ok(response) if response.status().is_success() => {
+                let bytes = response.bytes().await
+                    .map_err(|e| YtcsError::DownloadError(format!("Failed to download thumbnail: {}", e)))?;
+                
+                std::fs::write(&output_path, bytes)?;
+                return Ok(output_path);
+            }
+            _ => continue,
+        }
+    }
+    
+    Err(YtcsError::DownloadError("Could not download thumbnail from any source".to_string()))
+}
