@@ -5,12 +5,16 @@ use regex::Regex;
 /// - Remplace _ par - entre artiste et album
 /// - Capitalise les mots
 pub fn clean_folder_name(name: &str) -> String {
-    // Retirer les [] et () avec leur contenu
-    let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
-    let cleaned = re_brackets.replace_all(name, "");
+    // Retirer tout après (FULL ALBUM) ou [FULL ALBUM] (case insensitive)
+    let re_full_album = Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap();
+    let without_suffix = re_full_album.replace_all(name, "");
     
-    // Remplacer les underscores et pipes par des tirets
-    let with_dashes = cleaned.replace('_', "-").replace('|', "-");
+    // Retirer les [] et () avec leur contenu restants
+    let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
+    let cleaned = re_brackets.replace_all(&without_suffix, "");
+    
+    // Remplacer les underscores, pipes et slashes par des tirets
+    let with_dashes = cleaned.replace('_', "-").replace('|', "-").replace('/', "-");
     
     // Nettoyer les espaces multiples
     let re_spaces = Regex::new(r"\s+").unwrap();
@@ -68,12 +72,17 @@ mod tests {
         
         assert_eq!(
             clean_folder_name("Artist_Name - Album_Title [2024]"),
-            "Artist-Name - Album-Title"
+            "Artist-name - Album-title"
         );
         
         assert_eq!(
             clean_folder_name("test_album (bonus tracks) [remastered]"),
-            "Test-Album"
+            "Test-album"
+        );
+        
+        assert_eq!(
+            clean_folder_name("PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"),
+            "Purple Dreams - Wandering Shadows"
         );
     }
 

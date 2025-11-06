@@ -22,7 +22,13 @@ impl Chapter {
     }
 
     pub fn sanitize_title(&self) -> String {
-        self.title
+        // Retirer les numéros de piste au début (ex: "1 - ", "01. ", "Track 1: ")
+        let title = regex::Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]\s*")
+            .unwrap()
+            .replace(&self.title, "");
+        
+        // Remplacer les caractères invalides
+        title
             .chars()
             .map(|c| match c {
                 '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
