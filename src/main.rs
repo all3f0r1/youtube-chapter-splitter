@@ -13,6 +13,14 @@ struct Cli {
     /// Output directory (default: ./output)
     #[arg(short, long, default_value = "./output")]
     output: String,
+
+    /// Force artist name (overrides auto-detection)
+    #[arg(short, long)]
+    artist: Option<String>,
+
+    /// Force album name (overrides auto-detection)
+    #[arg(short = 'A', long)]
+    album: Option<String>,
 }
 
 fn clean_url(url: &str) -> String {
@@ -70,9 +78,20 @@ async fn main() -> Result<()> {
     println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
     println!();
 
+    // Parse artist and album from title or use forced values
+    let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
+        (a.clone(), al.clone())
+    } else {
+        utils::parse_artist_album(&video_info.title)
+    };
+    
     // Create output directory with cleaned name
-    let clean_title = utils::clean_folder_name(&video_info.title);
-    let output_dir = std::path::PathBuf::from(&cli.output).join(&clean_title);
+    let folder_name = if cli.artist.is_some() || cli.album.is_some() {
+        format!("{} - {}", artist, album)
+    } else {
+        utils::clean_folder_name(&video_info.title)
+    };
+    let output_dir = std::path::PathBuf::from(&cli.output).join(&folder_name);
     std::fs::create_dir_all(&output_dir)?;
 
     // Download thumbnail
@@ -116,12 +135,15 @@ async fn main() -> Result<()> {
     }
     println!();
 
-    // Split audio
+    // Split audio with metadata
+    let cover_path = output_dir.join("cover.jpg");
     let output_files = audio::split_audio_by_chapters(
         &audio_file,
         &chapters_to_use,
         &output_dir,
-        &clean_title,
+        &artist,
+        &album,
+        if cover_path.exists() { Some(&cover_path) } else { None },
     )?;
 
     // Clean up temporary file

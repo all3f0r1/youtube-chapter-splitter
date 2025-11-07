@@ -59,6 +59,36 @@ pub fn format_duration_short(seconds: f64) -> String {
     format!("{}m {:02}s", minutes, secs)
 }
 
+/// Parse le titre de la vidéo pour extraire l'artiste et l'album
+/// Format attendu : "ARTIST - ALBUM [...]" ou "ARTIST | ALBUM [...]"
+pub fn parse_artist_album(title: &str) -> (String, String) {
+    // Retirer tout après (FULL ALBUM) ou [FULL ALBUM]
+    let re_full_album = Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap();
+    let without_suffix = re_full_album.replace_all(title, "");
+    
+    // Retirer les [] et () restants
+    let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
+    let cleaned = re_brackets.replace_all(&without_suffix, "");
+    
+    // Séparer par - ou |
+    let parts: Vec<&str> = if cleaned.contains(" - ") {
+        cleaned.split(" - ").collect()
+    } else if cleaned.contains(" | ") {
+        cleaned.split(" | ").collect()
+    } else {
+        vec![cleaned.trim()]
+    };
+    
+    if parts.len() >= 2 {
+        let artist = clean_folder_name(parts[0].trim());
+        let album = clean_folder_name(parts[1].trim());
+        (artist, album)
+    } else {
+        let cleaned_title = clean_folder_name(cleaned.trim());
+        ("Unknown Artist".to_string(), cleaned_title)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

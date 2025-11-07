@@ -7,7 +7,9 @@ pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
     output_dir: &Path,
-    album_name: &str,
+    artist: &str,
+    album: &str,
+    cover_path: Option<&Path>,
 ) -> Result<Vec<PathBuf>> {
     println!("Splitting audio into {} tracks...", chapters.len());
     
@@ -25,26 +27,45 @@ pub fn split_audio_by_chapters(
 
         let duration = chapter.duration();
         
-        let output = Command::new("ffmpeg")
-            .arg("-i")
-            .arg(input_file)
-            .arg("-ss")
+        let mut cmd = Command::new("ffmpeg");
+        cmd.arg("-i").arg(input_file);
+        
+        // Add cover art if available
+        if let Some(cover) = cover_path {
+            cmd.arg("-i").arg(cover);
+        }
+        
+        cmd.arg("-ss")
             .arg(chapter.start_time.to_string())
             .arg("-t")
             .arg(duration.to_string())
             .arg("-c:a")
             .arg("libmp3lame")
             .arg("-q:a")
-            .arg("0")
-            .arg("-metadata")
+            .arg("0");
+        
+        // Map cover art if available
+        if cover_path.is_some() {
+            cmd.arg("-map").arg("0:a")  // Audio from first input
+               .arg("-map").arg("1:v")  // Video (image) from second input
+               .arg("-c:v").arg("copy")  // Copy image without re-encoding
+               .arg("-id3v2_version").arg("3")  // Use ID3v2.3
+               .arg("-metadata:s:v").arg("title=Album cover")
+               .arg("-metadata:s:v").arg("comment=Cover (front)");
+        }
+        
+        cmd.arg("-metadata")
             .arg(format!("title={}", chapter.title))
             .arg("-metadata")
-            .arg(format!("track={}/{}", track_number, chapters.len()))
+            .arg(format!("artist={}", artist))
             .arg("-metadata")
-            .arg(format!("album={}", album_name))
+            .arg(format!("album={}", album))
+            .arg("-metadata")
+            .arg(format!("track={}/{}", track_number, chapters.len()))
             .arg("-y")
-            .arg(&output_path)
-            .output()
+            .arg(&output_path);
+        
+        let output = cmd.output()
             .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
         if !output.status.success() {
