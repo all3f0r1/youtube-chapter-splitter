@@ -4,17 +4,21 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
-- 🎵 **Download YouTube audio** in high-quality MP3 format
-- 🖼️ **Download album artwork** automatically (cover.jpg)
+- 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps)
+- 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
 - 📑 **Automatic chapter detection** from YouTube video metadata
 - 🔇 **Silence detection fallback** for videos without chapters
-- ✂️ **Smart audio splitting** with proper ID3 metadata tags
-- 🎨 **Clean folder names** with intelligent formatting
+- ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
+- 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
+- 📁 **Smart default output** to ~/Music directory (cross-platform)
+- 🎯 **Force artist/album names** with CLI options
 - ⚡ **Dependency checking** with automatic installation prompts
 - 🧹 **URL cleaning** - automatically removes playlist and extra parameters
+- 🪶 **Lightweight binary** (6.3 MB) with minimal dependencies
 
 ## 🚀 Quick Start
 
@@ -54,20 +58,34 @@ cargo install --path .
 **Simple syntax:**
 
 ```bash
-ytcs <YOUTUBE_URL> [--output <DIR>]
+ytcs <YOUTUBE_URL> [OPTIONS]
 ```
+
+**Options:**
+- `-o, --output <DIR>` - Output directory (default: ~/Music)
+- `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
+- `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
 
 **Examples:**
 
 ```bash
-# Download and split a YouTube video
+# Download and split a YouTube video (saves to ~/Music)
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA"
 
-# Specify output directory
-ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Music
+# Specify custom output directory
+ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
+
+# Force artist and album names
+ytcs "https://www.youtube.com/watch?v=..." -a "Pink Floyd" -A "Dark Side of the Moon"
 
 # URL cleaning works automatically (removes &list=, &start_radio=, etc.)
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA&list=RD28vf7QxgCzA&start_radio=1"
+```
+
+**Important:** Always put URLs in quotes to avoid shell interpretation of special characters:
+```bash
+ytcs "URL"  # ✅ Correct
+ytcs URL    # ❌ May cause issues with & characters
 ```
 
 ## 📊 Example Output
@@ -76,15 +94,15 @@ ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA&list=RD28vf7QxgCzA&start_radio
 === YouTube Chapter Splitter ===
 
 Fetching video information...
-Title: MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)
+Title: Marigold - Oblivion Gate
 Duration: 29m 29s
 Tracks found: 5
 
 Downloading album artwork...
-✓ Artwork saved: output/Marigold - Oblivion Gate/cover.jpg
+✓ Artwork saved: ~/Music/Marigold - Oblivion Gate/cover.jpg
 
 Downloading audio...
-✓ Audio downloaded: output/Marigold - Oblivion Gate/temp_audio.mp3
+✓ Audio downloaded: ~/Music/Marigold - Oblivion Gate/temp_audio.mp3
 
 Using YouTube tracks
 
@@ -105,18 +123,18 @@ Splitting audio into 5 tracks...
 
 ✓ Processing completed successfully!
 Files created: 5
-Directory: output/Marigold - Oblivion Gate
+Directory: ~/Music/Marigold - Oblivion Gate
 ```
 
 **Result:**
 ```
-output/Marigold - Oblivion Gate/
+~/Music/Marigold - Oblivion Gate/
 ├── cover.jpg
-├── 01 - Oblivion Gate.mp3
-├── 02 - Obsidian Throne.mp3
-├── 03 - Crimson Citadel.mp3
-├── 04 - Silver Spire.mp3
-└── 05 - Eternal Pyre.mp3
+├── 01. Oblivion Gate.mp3
+├── 02. Obsidian Throne.mp3
+├── 03. Crimson Citadel.mp3
+├── 04. Silver Spire.mp3
+└── 05. Eternal Pyre.mp3
 ```
 
 ## 🎯 How It Works
@@ -126,30 +144,66 @@ output/Marigold - Oblivion Gate/
 3. **Artwork Download**: Downloads the highest quality thumbnail as `cover.jpg`
 4. **Audio Download**: Extracts audio in MP3 format using yt-dlp
 5. **Track Detection**: Uses YouTube chapters or falls back to silence detection
-6. **Audio Splitting**: Splits audio using ffmpeg with proper metadata
+6. **Audio Splitting**: Splits audio using ffmpeg with proper metadata and embedded cover art
 7. **Cleanup**: Removes temporary files and organizes output
 
 ## 🛠️ Advanced Features
 
+### Default Output Directory
+
+The application automatically saves to your system's Music directory:
+
+- **Linux**: `~/Music` (e.g., `/home/username/Music`)
+- **macOS**: `~/Music` (e.g., `/Users/username/Music`)
+- **Windows**: `%USERPROFILE%\Music` (e.g., `C:\Users\username\Music`)
+
+You can override this with the `-o` flag.
+
 ### Folder Name Cleaning
 
 The application automatically cleans folder names:
-- Removes `[...]` and `(...)` content
-- Replaces `_` with `-` between artist and album
+- Removes `[...]` and `(...)` content and everything after `[FULL ALBUM]`
+- Replaces `_`, `|`, and `/` with `-`
 - Capitalizes words properly
+- Removes duplicate track numbers from chapter titles
 
-**Example:**
+**Examples:**
 ```
 Input:  "MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"
 Output: "Marigold - Oblivion Gate"
+
+Input:  "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
+Output: "Purple Dreams - Wandering Shadows"
 ```
 
-### Metadata Tagging
+### Complete ID3 Metadata Tagging
 
-Each MP3 file includes proper ID3 tags:
-- **Title**: Track name
+Each MP3 file includes comprehensive ID3v2.3 tags:
+- **Title**: Track name (e.g., "Oblivion Gate")
+- **Artist**: Auto-detected or forced (e.g., "Marigold")
+- **Album**: Auto-detected or forced (e.g., "Oblivion Gate")
 - **Track**: Track number / Total tracks (e.g., "1/5")
-- **Album**: Video title (cleaned)
+- **Cover Art**: ✅ Embedded album artwork (if downloaded)
+
+**Music players like iTunes, VLC, foobar2000, and mobile apps will display the album artwork automatically!**
+
+### Force Artist and Album Names
+
+Override automatic detection when video titles are non-standard:
+
+```bash
+# Auto-detection from title
+ytcs "URL"
+
+# Force both artist and album
+ytcs "URL" --artist "Pink Floyd" --album "The Dark Side of the Moon"
+
+# Force only artist (album auto-detected)
+ytcs "URL" -a "Led Zeppelin"
+
+# Force only album (artist auto-detected)
+ytcs "URL" -A "Houses of the Holy"
+```
 
 ### Silence Detection
 
@@ -217,7 +271,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube video downloader
 - [ffmpeg](https://ffmpeg.org/) - Audio processing
 - [clap](https://github.com/clap-rs/clap) - Command line argument parser
-- [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client for thumbnail download
+- [ureq](https://github.com/algesten/ureq) - Lightweight HTTP client for thumbnail download
+- [dirs](https://github.com/dirs-dev/dirs-rs) - Cross-platform directory detection
 
 ## 🐛 Known Issues
 
@@ -226,6 +281,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Download links are valid for 6 hours only
 
 ## ❓ FAQ
+
+**Q: Where are my files saved?**  
+A: By default, files are saved to your Music directory (`~/Music` on Linux/macOS, `%USERPROFILE%\Music` on Windows). You can change this with the `-o` flag.
 
 **Q: Why not use a pure Rust solution instead of ffmpeg?**  
 A: After extensive research, there is no viable pure Rust alternative to ffmpeg for MP3 encoding and audio manipulation. Libraries like Symphonia only support decoding, not encoding. ffmpeg remains the industry standard.
@@ -238,6 +296,35 @@ A: The tool automatically falls back to silence detection to identify track boun
 
 **Q: Can I customize silence detection parameters?**  
 A: Currently, the parameters are fixed (-30 dB threshold, 2.0s minimum duration). Custom parameters may be added in future versions.
+
+**Q: How do I avoid the [1], [2] background job messages?**  
+A: Always put the URL in quotes: `ytcs "URL"` instead of `ytcs URL`. The `&` character in URLs is interpreted by the shell as a background job operator.
+
+**Q: Does the cover art appear in my music player?**  
+A: Yes! Starting from v0.2.3, the album artwork is automatically embedded in each MP3 file using ID3v2.3 tags. It works with iTunes, VLC, foobar2000, Windows Media Player, and most mobile music apps.
+
+## 📈 Changelog
+
+### v0.2.4 (Latest)
+- Default output to ~/Music directory (cross-platform)
+- Lighter binary with ureq instead of reqwest (6.3 MB)
+- Removed tokio async runtime (no longer needed)
+
+### v0.2.3
+- Added `--artist` and `--album` CLI options
+- Embedded album artwork in MP3 ID3 tags
+- Automatic artist/album parsing from video title
+
+### v0.2.2
+- Fixed folder names with slashes (removes content after FULL ALBUM)
+- Removed duplicate track numbers in chapter titles
+
+### v0.2.1
+- Improved folder name cleaning (pipes, capitalizes properly)
+- Better title display
+
+### v0.2.0
+- Initial public release
 
 ## 📞 Support
 
