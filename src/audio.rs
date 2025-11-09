@@ -53,13 +53,12 @@ pub fn split_audio_by_chapters(
             .arg("-q:a")
             .arg("0");
         
-        // Cover art encoding and metadata
+        // Cover art encoding (simplified for Android compatibility)
         if cover_path.is_some() {
             cmd.arg("-c:v").arg("copy")  // Copy image without re-encoding
-               .arg("-id3v2_version").arg("3")  // Use ID3v2.3
-               .arg("-metadata:s:v").arg("title=Album cover")
-               .arg("-metadata:s:v").arg("comment=Cover (front)")
                .arg("-disposition:v").arg("attached_pic");  // Mark as attached picture
+            // Note: Removed -metadata:s:v flags for better Android compatibility
+            // Android doesn't always recognize stream-specific metadata
         }
         
         cmd.arg("-metadata")
