@@ -28,30 +28,38 @@ pub fn split_audio_by_chapters(
         let duration = chapter.duration();
         
         let mut cmd = Command::new("ffmpeg");
-        cmd.arg("-i").arg(input_file);
         
-        // Add cover art if available
+        // Add inputs: audio first, then cover if available
+        cmd.arg("-i").arg(input_file);
         if let Some(cover) = cover_path {
             cmd.arg("-i").arg(cover);
         }
         
+        // Seek and duration
         cmd.arg("-ss")
             .arg(chapter.start_time.to_string())
             .arg("-t")
-            .arg(duration.to_string())
-            .arg("-c:a")
+            .arg(duration.to_string());
+        
+        // Map streams
+        if cover_path.is_some() {
+            cmd.arg("-map").arg("0:a")  // Audio from first input
+               .arg("-map").arg("1:v");  // Video (image) from second input
+        }
+        
+        // Audio encoding
+        cmd.arg("-c:a")
             .arg("libmp3lame")
             .arg("-q:a")
             .arg("0");
         
-        // Map cover art if available
+        // Cover art encoding and metadata
         if cover_path.is_some() {
-            cmd.arg("-map").arg("0:a")  // Audio from first input
-               .arg("-map").arg("1:v")  // Video (image) from second input
-               .arg("-c:v").arg("copy")  // Copy image without re-encoding
+            cmd.arg("-c:v").arg("copy")  // Copy image without re-encoding
                .arg("-id3v2_version").arg("3")  // Use ID3v2.3
                .arg("-metadata:s:v").arg("title=Album cover")
-               .arg("-metadata:s:v").arg("comment=Cover (front)");
+               .arg("-metadata:s:v").arg("comment=Cover (front)")
+               .arg("-disposition:v").arg("attached_pic");  // Mark as attached picture
         }
         
         cmd.arg("-metadata")

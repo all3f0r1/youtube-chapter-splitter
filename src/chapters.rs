@@ -22,8 +22,8 @@ impl Chapter {
     }
 
     pub fn sanitize_title(&self) -> String {
-        // Retirer les numéros de piste au début (ex: "1 - ", "01. ", "Track 1: ")
-        let title = regex::Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]\s*")
+        // Retirer les numéros de piste au début (ex: "1 - ", "01. ", "Track 1: ", "1 sands")
+        let title = regex::Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+")
             .unwrap()
             .replace(&self.title, "");
         
