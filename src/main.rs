@@ -10,9 +10,9 @@ struct Cli {
     /// YouTube video URL
     url: String,
 
-    /// Output directory (default: ./output)
-    #[arg(short, long, default_value = "./output")]
-    output: String,
+    /// Output directory (default: ~/Music)
+    #[arg(short, long)]
+    output: Option<String>,
 
     /// Force artist name (overrides auto-detection)
     #[arg(short, long)]
@@ -37,8 +37,18 @@ fn clean_url(url: &str) -> String {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn get_default_music_dir() -> std::path::PathBuf {
+    if let Some(music_dir) = dirs::audio_dir() {
+        music_dir
+    } else {
+        // Fallback to home directory if audio_dir is not available
+        dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("Music")
+    }
+}
+
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Check system dependencies at startup
@@ -91,12 +101,16 @@ async fn main() -> Result<()> {
     } else {
         utils::clean_folder_name(&video_info.title)
     };
-    let output_dir = std::path::PathBuf::from(&cli.output).join(&folder_name);
+    let base_output = cli.output
+        .as_ref()
+        .map(|p| std::path::PathBuf::from(p))
+        .unwrap_or_else(get_default_music_dir);
+    let output_dir = base_output.join(&folder_name);
     std::fs::create_dir_all(&output_dir)?;
 
     // Download thumbnail
     println!("{}", "Downloading album artwork...".yellow());
-    match downloader::download_thumbnail(&clean_url, &output_dir).await {
+    match downloader::download_thumbnail(&clean_url, &output_dir) {
         Ok(thumb_path) => {
             println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display());
         }

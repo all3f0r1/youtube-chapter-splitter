@@ -184,7 +184,7 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
 }
 
 
-pub async fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
+pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
     // Get video ID
     let video_id = extract_video_id(url)?;
     
@@ -199,10 +199,12 @@ pub async fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Resu
     
     // Try each thumbnail URL until one works
     for thumb_url in thumbnail_urls {
-        match reqwest::get(&thumb_url).await {
-            Ok(response) if response.status().is_success() => {
-                let bytes = response.bytes().await
-                    .map_err(|e| YtcsError::DownloadError(format!("Failed to download thumbnail: {}", e)))?;
+        match ureq::get(&thumb_url).call() {
+            Ok(response) if response.status() == 200 => {
+                let mut reader = response.into_reader();
+                let mut bytes = Vec::new();
+                std::io::Read::read_to_end(&mut reader, &mut bytes)
+                    .map_err(|e| YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e)))?;
                 
                 std::fs::write(&output_path, bytes)?;
                 return Ok(output_path);
