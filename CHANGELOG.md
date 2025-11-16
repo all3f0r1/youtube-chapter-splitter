@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2024-11-16
+
+### Fixed
+- Fixed "Stream map '1:v' matches no streams" error when audio file has no embedded cover art
+- Added automatic detection of embedded cover art using ffprobe before attempting to map video stream
+- Improved cover art handling logic with three scenarios:
+  1. Audio has embedded cover → use dual input mapping from audio file
+  2. Audio has no embedded cover but external cover provided → use external cover image
+  3. No cover at all → skip cover art embedding
+
+### Changed
+- Added `check_for_video_stream()` function to detect presence of video streams in audio files
+- Refactored cover art mapping logic to be conditional based on stream detection
+
 ## [0.3.0] - 2024-11-16
 
 ### Fixed
