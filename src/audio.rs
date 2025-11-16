@@ -15,6 +15,16 @@ pub fn split_audio_by_chapters(
     
     std::fs::create_dir_all(output_dir)?;
     
+    // Step 1: Extract cover art from the original audio file if no external cover provided
+    let extracted_cover_path = if cover_path.is_none() {
+        extract_cover_from_audio(input_file, output_dir)?
+    } else {
+        None
+    };
+    
+    // Use external cover if provided, otherwise use extracted cover
+    let final_cover_path = cover_path.or(extracted_cover_path.as_deref());
+    
     let mut output_files = Vec::new();
 
     for (index, chapter) in chapters.iter().enumerate() {
@@ -29,23 +39,24 @@ pub fn split_audio_by_chapters(
         
         let mut cmd = Command::new("ffmpeg");
         
-        // Add inputs: audio first, then cover if available
-        cmd.arg("-i").arg(input_file);
-        if let Some(cover) = cover_path {
-            cmd.arg("-i").arg(cover);
+        // Step 2: Use the audio file twice - once for audio, once for cover art
+        // This is the key to making cover art work on all tracks
+        cmd.arg("-i").arg(input_file);  // First input: for audio
+        
+        if final_cover_path.is_some() {
+            // Second input: same audio file for extracting cover art
+            cmd.arg("-i").arg(input_file);
+            
+            // Map audio from first input, video/image from second input
+            cmd.arg("-map").arg("0:a")   // Audio from first input
+               .arg("-map").arg("1:v");  // Video (cover) from second input
         }
         
-        // Seek and duration
+        // Seek and duration - applied to the mapped streams
         cmd.arg("-ss")
             .arg(chapter.start_time.to_string())
             .arg("-t")
             .arg(duration.to_string());
-        
-        // Map streams
-        if cover_path.is_some() {
-            cmd.arg("-map").arg("0:a")  // Audio from first input
-               .arg("-map").arg("1:v");  // Video (image) from second input
-        }
         
         // Audio encoding
         cmd.arg("-c:a")
@@ -53,14 +64,15 @@ pub fn split_audio_by_chapters(
             .arg("-q:a")
             .arg("0");
         
-        // Cover art encoding (simplified for Android compatibility)
-        if cover_path.is_some() {
-            cmd.arg("-c:v").arg("copy")  // Copy image without re-encoding
-               .arg("-disposition:v").arg("attached_pic");  // Mark as attached picture
-            // Note: Removed -metadata:s:v flags for better Android compatibility
-            // Android doesn't always recognize stream-specific metadata
+        // Cover art encoding - copy without re-encoding
+        if final_cover_path.is_some() {
+            cmd.arg("-c:v").arg("copy")
+               .arg("-metadata:s:v").arg("title=Album cover")
+               .arg("-metadata:s:v").arg("comment=Cover (front)")
+               .arg("-disposition:v").arg("attached_pic");
         }
         
+        // Track metadata
         cmd.arg("-metadata")
             .arg(format!("title={}", chapter.title))
             .arg("-metadata")
@@ -83,8 +95,38 @@ pub fn split_audio_by_chapters(
         output_files.push(output_path);
     }
 
+    // Clean up extracted cover if we created one
+    if let Some(extracted) = extracted_cover_path {
+        let _ = std::fs::remove_file(extracted);
+    }
+
     println!("✓ Splitting completed successfully!");
     Ok(output_files)
+}
+
+/// Extract cover art from audio file to a temporary file
+fn extract_cover_from_audio(input_file: &Path, output_dir: &Path) -> Result<Option<PathBuf>> {
+    let cover_output = output_dir.join(".temp_cover.jpg");
+    
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(input_file)
+        .arg("-an")  // No audio
+        .arg("-vcodec")
+        .arg("copy")  // Copy video stream (cover art) without re-encoding
+        .arg("-y")
+        .arg(&cover_output)
+        .output()
+        .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
+
+    // If extraction succeeds and file exists, return the path
+    if output.status.success() && cover_output.exists() {
+        println!("✓ Cover art extracted from audio file");
+        Ok(Some(cover_output))
+    } else {
+        // No cover art in the audio file, that's okay
+        Ok(None)
+    }
 }
 
 pub fn detect_silence_chapters(
