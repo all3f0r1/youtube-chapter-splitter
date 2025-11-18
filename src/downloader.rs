@@ -1,7 +1,9 @@
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{Result, YtcsError};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader};
 
 pub struct VideoInfo {
     pub title: String,
@@ -154,7 +156,16 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     println!("Downloading audio from YouTube...");
     
-    let output = Command::new("yt-dlp")
+    // Créer une barre de progression
+    let pb = ProgressBar::new(100);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}")
+            .unwrap()
+            .progress_chars("#>-")
+    );
+    
+    let mut child = Command::new("yt-dlp")
         .arg("-x")
         .arg("--audio-format")
         .arg("mp3")
@@ -163,9 +174,35 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
         .arg("-o")
         .arg(output_path.to_str().unwrap())
         .arg("--no-playlist")
+        .arg("--newline")
         .arg(url)
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
+
+    // Lire la sortie pour extraire la progression
+    if let Some(stdout) = child.stdout.take() {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                // Chercher les lignes de progression de yt-dlp
+                if line.contains("[download]") {
+                    if let Some(percent_str) = line.split_whitespace()
+                        .find(|s| s.ends_with('%'))
+                        .and_then(|s| s.trim_end_matches('%').parse::<u64>().ok()) {
+                        pb.set_position(percent_str);
+                    }
+                    pb.set_message(line.clone());
+                }
+            }
+        }
+    }
+
+    let output = child.wait_with_output()
+        .map_err(|e| YtcsError::DownloadError(format!("Failed to wait for yt-dlp: {}", e)))?;
+
+    pb.finish_with_message("Download complete");
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -184,6 +221,23 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
 }
 
 
+/// Télécharge la miniature d'une vidéo YouTube.
+///
+/// Tente de télécharger la miniature en plusieurs qualités (maxres, hq, mq)
+/// avec timeout et retry automatique.
+///
+/// # Arguments
+///
+/// * `url` - L'URL de la vidéo YouTube
+/// * `output_dir` - Le répertoire de sortie pour la miniature
+///
+/// # Returns
+///
+/// Le chemin du fichier de miniature téléchargé
+///
+/// # Errors
+///
+/// Retourne une erreur si aucune miniature n'a pu être téléchargée
 pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
     // Get video ID
     let video_id = extract_video_id(url)?;
@@ -197,19 +251,32 @@ pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std
     
     let output_path = output_dir.join("cover.jpg");
     
-    // Try each thumbnail URL until one works
+    // Créer un agent avec timeout
+    let agent = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(30))
+        .build();
+    
+    // Try each thumbnail URL with retry
     for thumb_url in thumbnail_urls {
-        match ureq::get(&thumb_url).call() {
-            Ok(response) if response.status() == 200 => {
-                let mut reader = response.into_reader();
-                let mut bytes = Vec::new();
-                std::io::Read::read_to_end(&mut reader, &mut bytes)
-                    .map_err(|e| YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e)))?;
-                
-                std::fs::write(&output_path, bytes)?;
-                return Ok(output_path);
+        // Retry jusqu'à 3 fois
+        for attempt in 1..=3 {
+            match agent.get(&thumb_url).call() {
+                Ok(response) if response.status() == 200 => {
+                    let mut reader = response.into_reader();
+                    let mut bytes = Vec::new();
+                    std::io::Read::read_to_end(&mut reader, &mut bytes)
+                        .map_err(|e| YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e)))?;
+                    
+                    std::fs::write(&output_path, bytes)?;
+                    return Ok(output_path);
+                }
+                Err(e) if attempt < 3 => {
+                    eprintln!("Attempt {}/3 failed for {}: {}", attempt, thumb_url, e);
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    continue;
+                }
+                _ => break,
             }
-            _ => continue,
         }
     }
     

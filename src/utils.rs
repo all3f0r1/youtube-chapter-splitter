@@ -1,24 +1,61 @@
+use once_cell::sync::Lazy;
 use regex::Regex;
 
-/// Nettoie et formate le nom de dossier selon les règles :
-/// - Retire les [] et () avec leur contenu
-/// - Remplace _ par - entre artiste et album
-/// - Capitalise les mots
+// Regex compilées une seule fois au démarrage
+static RE_FULL_ALBUM: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap()
+});
+
+static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\[.*?\]|\(.*?\)").unwrap()
+});
+
+static RE_SPACES: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\s+").unwrap()
+});
+
+static RE_TRACK_PREFIX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap()
+});
+
+/// Nettoie et formate le nom de dossier selon les règles définies.
+///
+/// Cette fonction applique plusieurs transformations pour normaliser les noms de dossiers :
+/// - Retire tout le contenu après `[FULL ALBUM]` ou `(FULL ALBUM)` (insensible à la casse)
+/// - Supprime tous les crochets `[]` et parenthèses `()` avec leur contenu
+/// - Remplace les underscores `_`, pipes `|` et slashes `/` par des tirets `-`
+/// - Normalise les espaces multiples en un seul espace
+/// - Capitalise chaque mot (première lettre en majuscule, reste en minuscule)
+/// - Supprime les espaces et tirets en début/fin de chaîne
+///
+/// # Arguments
+///
+/// * `name` - Le nom de dossier brut à nettoyer
+///
+/// # Returns
+///
+/// Une chaîne nettoyée et formatée, prête à être utilisée comme nom de dossier
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::clean_folder_name;
+///
+/// let result = clean_folder_name("MARIGOLD - Oblivion Gate [Full Album] (70s Rock)");
+/// assert_eq!(result, "Marigold - Oblivion Gate");
+/// ```
 pub fn clean_folder_name(name: &str) -> String {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM] (case insensitive)
-    let re_full_album = Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap();
-    let without_suffix = re_full_album.replace_all(name, "");
+    let without_suffix = RE_FULL_ALBUM.replace_all(name, "");
     
     // Retirer les [] et () avec leur contenu restants
-    let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
-    let cleaned = re_brackets.replace_all(&without_suffix, "");
+    let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
     
     // Remplacer les underscores, pipes et slashes par des tirets
     let with_dashes = cleaned.replace('_', "-").replace('|', "-").replace('/', "-");
     
     // Nettoyer les espaces multiples
-    let re_spaces = Regex::new(r"\s+").unwrap();
-    let normalized = re_spaces.replace_all(&with_dashes, " ");
+    let normalized = RE_SPACES.replace_all(&with_dashes, " ");
     
     // Capitaliser chaque mot
     let capitalized = normalized
@@ -39,7 +76,28 @@ pub fn clean_folder_name(name: &str) -> String {
     capitalized.trim().trim_matches('-').trim().to_string()
 }
 
-/// Formate une durée en secondes en format MM:SS ou HH:MM:SS
+/// Formate une durée en secondes au format lisible.
+///
+/// Convertit une durée en secondes en une chaîne formatée :
+/// - Format `Mm SSs` si la durée est inférieure à une heure
+/// - Format `Hh MMm SSs` si la durée est d'une heure ou plus
+///
+/// # Arguments
+///
+/// * `seconds` - La durée en secondes (peut être décimale)
+///
+/// # Returns
+///
+/// Une chaîne formatée représentant la durée
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::format_duration;
+///
+/// assert_eq!(format_duration(90.0), "1m 30s");
+/// assert_eq!(format_duration(3661.0), "1h 01m 01s");
+/// ```
 pub fn format_duration(seconds: f64) -> String {
     let hours = (seconds / 3600.0).floor() as u32;
     let minutes = ((seconds % 3600.0) / 60.0).floor() as u32;
@@ -52,23 +110,67 @@ pub fn format_duration(seconds: f64) -> String {
     }
 }
 
-/// Formate une durée en secondes en format court (ex: "5m 43s")
+/// Formate une durée en secondes au format court.
+///
+/// Convertit une durée en secondes en une chaîne compacte au format `Mm SSs`,
+/// sans afficher les heures même si la durée dépasse une heure.
+///
+/// # Arguments
+///
+/// * `seconds` - La durée en secondes (peut être décimale)
+///
+/// # Returns
+///
+/// Une chaîne formatée au format court
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::format_duration_short;
+///
+/// assert_eq!(format_duration_short(343.0), "5m 43s");
+/// ```
 pub fn format_duration_short(seconds: f64) -> String {
     let minutes = (seconds / 60.0).floor() as u32;
     let secs = (seconds % 60.0).floor() as u32;
     format!("{}m {:02}s", minutes, secs)
 }
 
-/// Parse le titre de la vidéo pour extraire l'artiste et l'album
-/// Format attendu : "ARTIST - ALBUM [...]" ou "ARTIST | ALBUM [...]"
+/// Parse le titre d'une vidéo YouTube pour extraire l'artiste et l'album.
+///
+/// Cette fonction analyse le titre d'une vidéo et tente d'en extraire le nom de l'artiste
+/// et le titre de l'album en se basant sur des conventions de nommage courantes.
+///
+/// # Format attendu
+///
+/// - `"ARTIST - ALBUM [...]"` (séparateur tiret)
+/// - `"ARTIST | ALBUM [...]"` (séparateur pipe)
+///
+/// # Arguments
+///
+/// * `title` - Le titre de la vidéo YouTube
+///
+/// # Returns
+///
+/// Un tuple `(artiste, album)` où :
+/// - Si le parsing réussit : les deux valeurs sont extraites et nettoyées
+/// - Si le parsing échoue : `("Unknown Artist", titre_nettoyé)`
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::parse_artist_album;
+///
+/// let (artist, album) = parse_artist_album("Pink Floyd - Dark Side [1973]");
+/// assert_eq!(artist, "Pink Floyd");
+/// assert_eq!(album, "Dark Side");
+/// ```
 pub fn parse_artist_album(title: &str) -> (String, String) {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM]
-    let re_full_album = Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap();
-    let without_suffix = re_full_album.replace_all(title, "");
+    let without_suffix = RE_FULL_ALBUM.replace_all(title, "");
     
     // Retirer les [] et () restants
-    let re_brackets = Regex::new(r"\[.*?\]|\(.*?\)").unwrap();
-    let cleaned = re_brackets.replace_all(&without_suffix, "");
+    let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
     
     // Séparer par - ou |
     let parts: Vec<&str> = if cleaned.contains(" - ") {
@@ -87,6 +189,46 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
         let cleaned_title = clean_folder_name(cleaned.trim());
         ("Unknown Artist".to_string(), cleaned_title)
     }
+}
+
+/// Nettoie un titre de chapitre pour l'utiliser comme nom de fichier.
+///
+/// Cette fonction supprime les préfixes de numérotation de piste et remplace
+/// les caractères invalides pour les systèmes de fichiers.
+///
+/// # Transformations appliquées
+///
+/// - Supprime les préfixes comme `"1 - "`, `"01. "`, `"Track 5: "`
+/// - Remplace les caractères interdits (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) par `_`
+///
+/// # Arguments
+///
+/// * `title` - Le titre brut du chapitre
+///
+/// # Returns
+///
+/// Un titre nettoyé, sûr pour une utilisation comme nom de fichier
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::sanitize_title;
+///
+/// assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
+/// assert_eq!(sanitize_title("Track 5: Test/Song"), "Test_Song");
+/// ```
+pub fn sanitize_title(title: &str) -> String {
+    // Retirer les numéros de piste au début
+    let title = RE_TRACK_PREFIX.replace(title, "");
+    
+    // Remplacer les caractères invalides
+    title
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -127,5 +269,19 @@ mod tests {
     fn test_format_duration_short() {
         assert_eq!(format_duration_short(343.0), "5m 43s");
         assert_eq!(format_duration_short(90.0), "1m 30s");
+    }
+
+    #[test]
+    fn test_sanitize_title() {
+        assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
+        assert_eq!(sanitize_title("Track 5: Another Song"), "Another Song");
+        assert_eq!(sanitize_title("Invalid/Characters:Here"), "Invalid_Characters_Here");
+    }
+
+    #[test]
+    fn test_parse_artist_album() {
+        let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]");
+        assert_eq!(artist, "Pink Floyd");
+        assert_eq!(album, "Dark Side Of The Moon");
     }
 }

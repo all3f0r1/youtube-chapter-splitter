@@ -1,5 +1,6 @@
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -15,6 +16,15 @@ pub fn split_audio_by_chapters(
     
     std::fs::create_dir_all(output_dir)?;
     
+    // Créer une barre de progression
+    let pb = ProgressBar::new(chapters.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("#>-")
+    );
+    
     let mut output_files = Vec::new();
 
     for (index, chapter) in chapters.iter().enumerate() {
@@ -23,7 +33,7 @@ pub fn split_audio_by_chapters(
         let output_filename = format!("{:02} - {}.mp3", track_number, sanitized_title);
         let output_path = output_dir.join(&output_filename);
 
-        println!("  Track {}/{}: {}", track_number, chapters.len(), chapter.title);
+        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
         
@@ -82,9 +92,10 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
+        pb.inc(1);
     }
 
-    println!("✓ Splitting completed successfully!");
+    pb.finish_with_message("Splitting completed successfully!");
     Ok(output_files)
 }
 

@@ -1,6 +1,15 @@
+//! Gestion des chapitres de vidéos YouTube.
+//!
+//! Ce module fournit les structures et fonctions pour manipuler les chapitres
+//! extraits des vidéos YouTube.
+
 use serde::{Deserialize, Serialize};
 use crate::error::{Result, YtcsError};
+use crate::utils;
 
+/// Représente un chapitre d'une vidéo YouTube.
+///
+/// Un chapitre est défini par un titre et une plage temporelle (début et fin).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chapter {
     pub title: String,
@@ -9,6 +18,13 @@ pub struct Chapter {
 }
 
 impl Chapter {
+    /// Crée un nouveau chapitre.
+    ///
+    /// # Arguments
+    ///
+    /// * `title` - Le titre du chapitre
+    /// * `start_time` - Le temps de début en secondes
+    /// * `end_time` - Le temps de fin en secondes
     pub fn new(title: String, start_time: f64, end_time: f64) -> Self {
         Self {
             title,
@@ -17,27 +33,45 @@ impl Chapter {
         }
     }
 
+    /// Calcule la durée du chapitre en secondes.
+    ///
+    /// # Returns
+    ///
+    /// La durée du chapitre (end_time - start_time)
     pub fn duration(&self) -> f64 {
         self.end_time - self.start_time
     }
 
+    /// Nettoie le titre du chapitre pour l'utiliser comme nom de fichier.
+    ///
+    /// Délègue le traitement à [`utils::sanitize_title`].
+    ///
+    /// # Returns
+    ///
+    /// Un titre nettoyé, sûr pour une utilisation comme nom de fichier
     pub fn sanitize_title(&self) -> String {
-        // Retirer les numéros de piste au début (ex: "1 - ", "01. ", "Track 1: ", "1 sands")
-        let title = regex::Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+")
-            .unwrap()
-            .replace(&self.title, "");
-        
-        // Remplacer les caractères invalides
-        title
-            .chars()
-            .map(|c| match c {
-                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
-                _ => c,
-            })
-            .collect()
+        utils::sanitize_title(&self.title)
     }
 }
 
+/// Parse les chapitres depuis la sortie JSON de yt-dlp.
+///
+/// Extrait les chapitres depuis les métadonnées JSON d'une vidéo YouTube.
+///
+/// # Arguments
+///
+/// * `json_str` - La chaîne JSON contenant les métadonnées de la vidéo
+///
+/// # Returns
+///
+/// Un vecteur de chapitres extraits, ou une erreur si le parsing échoue
+///
+/// # Errors
+///
+/// Retourne une erreur si :
+/// - Le JSON est mal formaté
+/// - Le champ "chapters" est absent
+/// - Les champs start_time ou end_time sont invalides
 pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     let data: serde_json::Value = serde_json::from_str(json_str)?;
     
@@ -66,6 +100,19 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     Ok(chapters)
 }
 
+/// Parse un timestamp au format HH:MM:SS, MM:SS ou SS.
+///
+/// # Arguments
+///
+/// * `timestamp` - Le timestamp à parser (ex: "1:23:45", "5:30", "42")
+///
+/// # Returns
+///
+/// Le nombre de secondes correspondant au timestamp
+///
+/// # Errors
+///
+/// Retourne une erreur si le format du timestamp est invalide
 pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
     let parts: Vec<&str> = timestamp.split(':').collect();
     
@@ -94,6 +141,15 @@ pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
     Ok(seconds)
 }
 
+/// Formate un nombre de secondes en timestamp HH:MM:SS ou MM:SS.
+///
+/// # Arguments
+///
+/// * `seconds` - Le nombre de secondes à formater
+///
+/// # Returns
+///
+/// Un timestamp formaté (HH:MM:SS si >= 1h, sinon MM:SS)
 pub fn format_timestamp(seconds: f64) -> String {
     let hours = (seconds / 3600.0).floor() as u32;
     let minutes = ((seconds % 3600.0) / 60.0).floor() as u32;
