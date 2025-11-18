@@ -1,10 +1,16 @@
+//! Téléchargement de vidéos YouTube et extraction de métadonnées.
+//!
+//! Ce module gère l'interaction avec `yt-dlp` pour télécharger les vidéos
+//! et extraire leurs métadonnées (titre, durée, chapitres).
+
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{Result, YtcsError};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::io::{BufRead, BufReader};
 
+/// Informations sur une vidéo YouTube.
+#[derive(Debug)]
 pub struct VideoInfo {
     pub title: String,
     pub duration: f64,
@@ -12,11 +18,21 @@ pub struct VideoInfo {
     pub video_id: String,
 }
 
+/// Informations sur une dépendance système manquante.
 pub struct MissingDependency {
     pub tool: String,
     pub install_command: String,
 }
 
+/// Vérifie la présence des dépendances système requises.
+///
+/// # Returns
+///
+/// Ok si toutes les dépendances sont présentes, sinon une erreur avec les détails
+///
+/// # Errors
+///
+/// Retourne une erreur si `yt-dlp` ou `ffmpeg` sont manquants
 pub fn check_dependencies() -> Result<()> {
     let mut missing = Vec::new();
 
@@ -53,6 +69,15 @@ pub fn check_dependencies() -> Result<()> {
     Ok(())
 }
 
+/// Installe une dépendance système manquante.
+///
+/// # Arguments
+///
+/// * `tool` - Le nom de l'outil à installer ("yt-dlp" ou "ffmpeg")
+///
+/// # Errors
+///
+/// Retourne une erreur si l'installation échoue
 pub fn install_dependency(tool: &str) -> Result<()> {
     let command = match tool {
         "yt-dlp" => "pip install yt-dlp",
@@ -88,6 +113,19 @@ pub fn install_dependency(tool: &str) -> Result<()> {
     }
 }
 
+/// Extrait l'ID d'une vidéo YouTube depuis son URL.
+///
+/// # Arguments
+///
+/// * `url` - L'URL de la vidéo YouTube
+///
+/// # Returns
+///
+/// L'ID de la vidéo (11 caractères)
+///
+/// # Errors
+///
+/// Retourne une erreur si l'URL est invalide ou si l'ID ne peut pas être extrait
 pub fn extract_video_id(url: &str) -> Result<String> {
     let patterns = [
         r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})",
@@ -105,6 +143,21 @@ pub fn extract_video_id(url: &str) -> Result<String> {
     Err(YtcsError::InvalidUrl(format!("Unable to extract video ID from: {}", url)))
 }
 
+/// Récupère les informations d'une vidéo YouTube.
+///
+/// Utilise `yt-dlp` pour extraire les métadonnées de la vidéo.
+///
+/// # Arguments
+///
+/// * `url` - L'URL de la vidéo YouTube
+///
+/// # Returns
+///
+/// Les informations de la vidéo (titre, durée, chapitres, ID)
+///
+/// # Errors
+///
+/// Retourne une erreur si yt-dlp échoue ou si les métadonnées sont invalides
 pub fn get_video_info(url: &str) -> Result<VideoInfo> {
     let output = Command::new("yt-dlp")
         .arg("--dump-json")
@@ -153,19 +206,38 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
     })
 }
 
+/// Télécharge l'audio d'une vidéo YouTube en format MP3.
+///
+/// Utilise `yt-dlp` avec une barre de progression pour télécharger et convertir l'audio.
+///
+/// # Arguments
+///
+/// * `url` - L'URL de la vidéo YouTube
+/// * `output_path` - Le chemin de sortie (sans extension)
+///
+/// # Returns
+///
+/// Le chemin du fichier MP3 téléchargé
+///
+/// # Errors
+///
+/// Retourne une erreur si le téléchargement échoue
 pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     println!("Downloading audio from YouTube...");
     
-    // Créer une barre de progression
-    let pb = ProgressBar::new(100);
+    // Créer une barre de progression indéterminée
+    let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}")
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
             .unwrap()
-            .progress_chars("#>-")
     );
+    pb.set_message("Downloading...");
     
-    let mut child = Command::new("yt-dlp")
+    // Lancer yt-dlp en arrière-plan
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    
+    let output = Command::new("yt-dlp")
         .arg("-x")
         .arg("--audio-format")
         .arg("mp3")
@@ -174,33 +246,11 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
         .arg("-o")
         .arg(output_path.to_str().unwrap())
         .arg("--no-playlist")
-        .arg("--newline")
         .arg(url)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
-
-    // Lire la sortie pour extraire la progression
-    if let Some(stdout) = child.stdout.take() {
-        let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                // Chercher les lignes de progression de yt-dlp
-                if line.contains("[download]") {
-                    if let Some(percent_str) = line.split_whitespace()
-                        .find(|s| s.ends_with('%'))
-                        .and_then(|s| s.trim_end_matches('%').parse::<u64>().ok()) {
-                        pb.set_position(percent_str);
-                    }
-                    pb.set_message(line.clone());
-                }
-            }
-        }
-    }
-
-    let output = child.wait_with_output()
-        .map_err(|e| YtcsError::DownloadError(format!("Failed to wait for yt-dlp: {}", e)))?;
 
     pb.finish_with_message("Download complete");
 

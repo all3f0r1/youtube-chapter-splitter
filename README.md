@@ -286,7 +286,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 A: By default, files are saved to your Music directory (`~/Music` on Linux/macOS, `%USERPROFILE%\Music` on Windows). You can change this with the `-o` flag.
 
 **Q: Why not use a pure Rust solution instead of ffmpeg?**  
-A: After extensive research, there is no viable pure Rust alternative to ffmpeg for MP3 encoding and audio manipulation. Libraries like Symphonia only support decoding, not encoding. ffmpeg remains the industry standard.
+A: We use ffmpeg for audio encoding and splitting (industry standard), but we use the Rust library `lofty` for adding metadata and album artwork. This hybrid approach gives us the best of both worlds: ffmpeg's robust audio processing and Rust's safe, efficient metadata handling.
 
 **Q: Can I use this for playlists?**  
 A: Currently, the tool processes one video at a time. Playlist support may be added in the future.
@@ -301,11 +301,23 @@ A: Currently, the parameters are fixed (-30 dB threshold, 2.0s minimum duration)
 A: Always put the URL in quotes: `ytcs "URL"` instead of `ytcs URL`. The `&` character in URLs is interpreted by the shell as a background job operator.
 
 **Q: Does the cover art appear in my music player?**  
-A: Yes! Starting from v0.2.3, the album artwork is automatically embedded in each MP3 file using ID3v2.3 tags. It works with iTunes, VLC, foobar2000, Windows Media Player, and most mobile music apps.
+A: Yes! The album artwork is automatically embedded in each MP3 file using the `lofty` Rust library. It works with iTunes, VLC, foobar2000, Windows Media Player, and most mobile music apps.
 
 ## 📈 Changelog
 
-### v0.2.4 (Latest)
+### v0.4.0 (Latest)
+- **Performance**: Optimized regex compilation with `once_cell` for faster processing
+- **UX**: Added progress bars for downloads and track splitting with `indicatif`
+- **Cover Art**: Switched to `lofty` library for reliable album artwork embedding
+- **Documentation**: Complete rustdoc coverage for all public APIs
+- **Robustness**: Network timeout and retry mechanism for thumbnail downloads
+- **Testing**: Unit tests for core modules (chapters, downloader, error)
+- **Quality**: Improved code maintainability and error handling
+
+### v0.3.2
+- Simplified cover art logic to use external cover only
+
+### v0.2.4
 - Default output to ~/Music directory (cross-platform)
 - Lighter binary with ureq instead of reqwest (6.3 MB)
 - Removed tokio async runtime (no longer needed)
