@@ -177,8 +177,9 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
     // Ajouter l'image au tag
     tag.push_picture(picture);
     
-    // Sauvegarder les modifications
-    tag.save_to_path(audio_path, WriteOptions::default())
+    // Sauvegarder les modifications avec tagged_file.save_to() pour préserver tous les tags
+    // Note: save_to() préserve toutes les métadonnées existantes, contrairement à save_to_path()
+    tagged_file.save_to_path(audio_path, WriteOptions::default())
         .map_err(|e| YtcsError::AudioError(format!("Failed to save tags: {}", e)))?;
     
     Ok(())
