@@ -23,9 +23,16 @@ impl Chapter {
     /// # Arguments
     ///
     /// * `title` - Le titre du chapitre
-    /// * `start_time` - Le temps de début en secondes
-    /// * `end_time` - Le temps de fin en secondes
+    /// * `start_time` - Le temps de début en secondes (doit être >= 0)
+    /// * `end_time` - Le temps de fin en secondes (doit être > start_time)
+    ///
+    /// # Panics
+    ///
+    /// Panique si start_time < 0 ou si end_time <= start_time
     pub fn new(title: String, start_time: f64, end_time: f64) -> Self {
+        assert!(start_time >= 0.0, "start_time must be >= 0, got {}", start_time);
+        assert!(end_time > start_time, "end_time ({}) must be > start_time ({})", end_time, start_time);
+        
         Self {
             title,
             start_time,

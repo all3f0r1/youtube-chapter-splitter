@@ -1,8 +1,7 @@
-use youtube_chapter_splitter::{audio, downloader};
+use youtube_chapter_splitter::{audio, downloader, utils};
 use std::path::PathBuf;
 
-#[tokio::main]
-async fn main() -> youtube_chapter_splitter::Result<()> {
+fn main() -> youtube_chapter_splitter::Result<()> {
     // Vérifier les dépendances
     downloader::check_dependencies()?;
 
@@ -15,33 +14,49 @@ async fn main() -> youtube_chapter_splitter::Result<()> {
     println!("Titre: {}", video_info.title);
     println!("Chapitres: {}", video_info.chapters.len());
 
+    // Parser artiste et album
+    let (artist, album) = utils::parse_artist_album(&video_info.title);
+    println!("Artiste: {}", artist);
+    println!("Album: {}", album);
+
     // Télécharger l'audio
     let output_path = PathBuf::from("./temp_audio");
     println!("Téléchargement...");
     let audio_file = downloader::download_audio(url, &output_path)?;
 
+    // Télécharger la miniature
+    let output_dir = PathBuf::from("./output");
+    std::fs::create_dir_all(&output_dir)?;
+    
+    let cover_path = match downloader::download_thumbnail(url, &output_dir) {
+        Ok(path) => {
+            println!("Miniature téléchargée: {:?}", path);
+            Some(path)
+        }
+        Err(e) => {
+            println!("Impossible de télécharger la miniature: {}", e);
+            None
+        }
+    };
+
     // Si des chapitres existent, les utiliser
-    if !video_info.chapters.is_empty() {
-        let output_dir = PathBuf::from("./output");
-        audio::split_audio_by_chapters(
-            &audio_file,
-            &video_info.chapters,
-            &output_dir,
-            &video_info.title,
-        )?;
+    let chapters = if !video_info.chapters.is_empty() {
+        video_info.chapters
     } else {
         // Sinon, détecter les silences
         println!("Détection des silences...");
-        let chapters = audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?;
-        
-        let output_dir = PathBuf::from("./output");
-        audio::split_audio_by_chapters(
-            &audio_file,
-            &chapters,
-            &output_dir,
-            &video_info.title,
-        )?;
-    }
+        audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
+    };
+
+    // Découper l'audio
+    audio::split_audio_by_chapters(
+        &audio_file,
+        &chapters,
+        &output_dir,
+        &artist,
+        &album,
+        cover_path.as_deref(),
+    )?;
 
     // Nettoyer
     std::fs::remove_file(&audio_file).ok();

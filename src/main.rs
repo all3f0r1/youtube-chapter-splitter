@@ -90,7 +90,8 @@ fn main() -> Result<()> {
 
     // Parse artist and album from title or use forced values
     let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
-        (a.clone(), al.clone())
+        // Nettoyer les valeurs forcées par l'utilisateur
+        (utils::clean_folder_name(a), utils::clean_folder_name(al))
     } else {
         utils::parse_artist_album(&video_info.title)
     };

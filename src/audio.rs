@@ -10,10 +10,21 @@ use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
 use lofty::prelude::*;
 use lofty::probe::Probe;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+// Regex compilées une seule fois au démarrage
+static RE_SILENCE_START: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"silence_start: ([\d.]+)").unwrap()
+});
+
+static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"silence_end: ([\d.]+)").unwrap()
+});
 
 /// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
 ///
@@ -226,18 +237,15 @@ pub fn detect_silence_chapters(
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     
-    let silence_start_re = regex::Regex::new(r"silence_start: ([\d.]+)")?;
-    let silence_end_re = regex::Regex::new(r"silence_end: ([\d.]+)")?;
-
     let mut silence_periods = Vec::new();
     let mut current_start: Option<f64> = None;
 
     for line in stderr.lines() {
-        if let Some(caps) = silence_start_re.captures(line) {
+        if let Some(caps) = RE_SILENCE_START.captures(line) {
             if let Some(start_str) = caps.get(1) {
                 current_start = start_str.as_str().parse::<f64>().ok();
             }
-        } else if let Some(caps) = silence_end_re.captures(line) {
+        } else if let Some(caps) = RE_SILENCE_END.captures(line) {
             if let (Some(start), Some(end_str)) = (current_start, caps.get(1)) {
                 if let Ok(end) = end_str.as_str().parse::<f64>() {
                     let mid_point = (start + end) / 2.0;
