@@ -22,9 +22,9 @@ struct Cli {
     #[arg(short = 'A', long)]
     album: Option<String>,
 
-    /// Interactive mode with TUI
-    #[arg(short, long)]
-    interactive: bool,
+    /// Disable interactive TUI mode (use classic CLI mode)
+    #[arg(long)]
+    no_interactive: bool,
 }
 
 fn clean_url(url: &str) -> String {
@@ -141,8 +141,8 @@ fn main() -> Result<()> {
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
 
-    // Interactive mode with TUI
-    let (final_chapters, final_artist, final_album) = if cli.interactive {
+    // Interactive mode with TUI (default)
+    let (final_chapters, final_artist, final_album) = if !cli.no_interactive {
         println!();
         println!("{}", "Launching interactive mode...".cyan());
         std::thread::sleep(std::time::Duration::from_millis(500));

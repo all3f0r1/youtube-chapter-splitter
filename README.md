@@ -55,13 +55,18 @@ cargo install --path .
 
 ### Usage
 
-#### Interactive Mode (TUI) 🎨
+#### Interactive Mode (TUI) 🎨 - **Default Mode**
 
-Launch the beautiful Text User Interface for full control:
+The TUI is now **enabled by default** for the best user experience:
 
 ```bash
-ytcs --interactive "https://www.youtube.com/watch?v=VIDEO_ID"
-ytcs -i "https://www.youtube.com/watch?v=VIDEO_ID"
+ytcs "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+To disable TUI and use classic CLI mode:
+
+```bash
+ytcs --no-interactive "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 **TUI Features:**
@@ -92,7 +97,7 @@ ytcs <YOUTUBE_URL> [OPTIONS]
 ```
 
 **Options:**
-- `-i, --interactive` - Launch interactive TUI mode
+- `--no-interactive` - Disable TUI and use classic CLI mode
 - `-o, --output <DIR>` - Output directory (default: ~/Music)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
