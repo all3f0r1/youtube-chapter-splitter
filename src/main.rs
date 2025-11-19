@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use youtube_chapter_splitter::{audio, downloader, utils, Result};
+use youtube_chapter_splitter::{audio, downloader, utils, tui, Result};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -21,6 +21,10 @@ struct Cli {
     /// Force album name (overrides auto-detection)
     #[arg(short = 'A', long)]
     album: Option<String>,
+
+    /// Interactive mode with TUI
+    #[arg(short, long)]
+    interactive: bool,
 }
 
 fn clean_url(url: &str) -> String {
@@ -131,33 +135,61 @@ fn main() -> Result<()> {
     // Determine chapters to use
     let chapters_to_use = if !video_info.chapters.is_empty() {
         println!("{}", "Using YouTube tracks".green());
-        video_info.chapters
+        video_info.chapters.clone()
     } else {
         println!("{}", "No tracks found, detecting automatically...".yellow());
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
 
-    // Display chapters
-    println!();
-    println!("{}", "Tracks to create:".bold());
-    for (i, chapter) in chapters_to_use.iter().enumerate() {
-        println!(
-            "  {}. {} [{}]",
-            i + 1,
-            chapter.title,
-            utils::format_duration_short(chapter.duration())
+    // Interactive mode with TUI
+    let (final_chapters, final_artist, final_album) = if cli.interactive {
+        println!();
+        println!("{}", "Launching interactive mode...".cyan());
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        
+        let app = tui::App::new(
+            video_info.clone(),
+            chapters_to_use,
+            artist.clone(),
+            album.clone(),
+            output_dir.clone(),
         );
-    }
-    println!();
+        
+        let result_app = tui::run(app)?;
+        
+        if !result_app.confirmed {
+            println!();
+            println!("{}", "Operation cancelled by user.".yellow());
+            std::fs::remove_file(&audio_file).ok();
+            return Ok(());
+        }
+        
+        (result_app.get_selected_chapters(), result_app.artist, result_app.album)
+    } else {
+        // Display chapters in non-interactive mode
+        println!();
+        println!("{}", "Tracks to create:".bold());
+        for (i, chapter) in chapters_to_use.iter().enumerate() {
+            println!(
+                "  {}. {} [{}]",
+                i + 1,
+                chapter.title,
+                utils::format_duration_short(chapter.duration())
+            );
+        }
+        println!();
+        
+        (chapters_to_use, artist, album)
+    };
 
     // Split audio with metadata
     let cover_path = output_dir.join("cover.jpg");
     let output_files = audio::split_audio_by_chapters(
         &audio_file,
-        &chapters_to_use,
+        &final_chapters,
         &output_dir,
-        &artist,
-        &album,
+        &final_artist,
+        &final_album,
         if cover_path.exists() { Some(&cover_path) } else { None },
     )?;
 

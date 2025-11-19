@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 /// Informations sur une vidéo YouTube.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VideoInfo {
     pub title: String,
     pub duration: f64,

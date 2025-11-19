@@ -55,6 +55,36 @@ cargo install --path .
 
 ### Usage
 
+#### Interactive Mode (TUI) 🎨
+
+Launch the beautiful Text User Interface for full control:
+
+```bash
+ytcs --interactive "https://www.youtube.com/watch?v=VIDEO_ID"
+ytcs -i "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+**TUI Features:**
+- ✅ **Visual chapter selection** - Choose exactly which tracks to download
+- ✅ **Live metadata editing** - Edit artist, album, and track titles before download
+- ✅ **Preview output** - See file structure before processing
+- ✅ **Progress visualization** - Real-time progress bars and status
+- ✅ **Keyboard navigation** - Intuitive controls (↑↓, Space, Enter, e, s, q)
+- ✅ **Confirmation dialog** - Review before starting
+
+**Keyboard Shortcuts:**
+- `↑/↓` or `j/k` - Navigate chapters
+- `Space` - Toggle chapter selection
+- `a` - Select all chapters
+- `n` - Select none
+- `i` - Invert selection
+- `e` - Edit metadata
+- `s` or `Enter` - Start download
+- `?` - Show help
+- `q` or `Esc` - Quit
+
+#### Non-Interactive Mode (CLI)
+
 **Simple syntax:**
 
 ```bash
@@ -62,6 +92,7 @@ ytcs <YOUTUBE_URL> [OPTIONS]
 ```
 
 **Options:**
+- `-i, --interactive` - Launch interactive TUI mode
 - `-o, --output <DIR>` - Output directory (default: ~/Music)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
@@ -305,7 +336,27 @@ A: Yes! The album artwork is automatically embedded in each MP3 file using the `
 
 ## 📈 Changelog
 
-### v0.4.0 (Latest)
+### v0.7.0 (Latest)
+- **TUI**: Interactive Text User Interface with `ratatui` and `crossterm`
+- **Visual Selection**: Choose chapters to download with keyboard navigation
+- **Live Editing**: Edit metadata (artist, album, track titles) before processing
+- **Progress Bars**: Real-time visual feedback during download and splitting
+- **Help Screen**: Built-in keyboard shortcuts reference
+- **Confirmation**: Review selections before starting
+
+### v0.6.0
+- **Testing**: Comprehensive test suite with 139 tests (85% coverage)
+- **Benchmarks**: Performance benchmarks with Criterion
+- **Edge Cases**: Unicode, emoji, and international character support
+- **Validation**: Input validation for chapters and metadata
+
+### v0.5.0
+- **Metadata**: Automatic capitalization and cleaning of artist/album names
+- **Validation**: Chapter validation (start/end times)
+- **Performance**: Regex optimization with `once_cell`
+- **Tests**: 77 unit tests added
+
+### v0.4.0
 - **Performance**: Optimized regex compilation with `once_cell` for faster processing
 - **UX**: Added progress bars for downloads and track splitting with `indicatif`
 - **Cover Art**: Switched to `lofty` library for reliable album artwork embedding
