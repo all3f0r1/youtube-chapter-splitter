@@ -55,41 +55,6 @@ cargo install --path .
 
 ### Usage
 
-#### Interactive Mode (TUI) 🎨 - **Default Mode**
-
-The TUI is now **enabled by default** for the best user experience:
-
-```bash
-ytcs "https://www.youtube.com/watch?v=VIDEO_ID"
-```
-
-To disable TUI and use classic CLI mode:
-
-```bash
-ytcs --no-interactive "https://www.youtube.com/watch?v=VIDEO_ID"
-```
-
-**TUI Features:**
-- ✅ **Visual chapter selection** - Choose exactly which tracks to download
-- ✅ **Live metadata editing** - Edit artist, album, and track titles before download
-- ✅ **Preview output** - See file structure before processing
-- ✅ **Progress visualization** - Real-time progress bars and status
-- ✅ **Keyboard navigation** - Intuitive controls (↑↓, Space, Enter, e, s, q)
-- ✅ **Confirmation dialog** - Review before starting
-
-**Keyboard Shortcuts:**
-- `↑/↓` or `j/k` - Navigate chapters
-- `Space` - Toggle chapter selection
-- `a` - Select all chapters
-- `n` - Select none
-- `i` - Invert selection
-- `e` - Edit metadata
-- `s` or `Enter` - Start download
-- `?` - Show help
-- `q` or `Esc` - Quit
-
-#### Non-Interactive Mode (CLI)
-
 **Simple syntax:**
 
 ```bash
@@ -97,7 +62,6 @@ ytcs <YOUTUBE_URL> [OPTIONS]
 ```
 
 **Options:**
-- `--no-interactive` - Disable TUI and use classic CLI mode
 - `-o, --output <DIR>` - Output directory (default: ~/Music)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)

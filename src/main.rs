@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use youtube_chapter_splitter::{audio, downloader, utils, tui, Result};
+use youtube_chapter_splitter::{audio, downloader, utils, Result};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -22,9 +22,7 @@ struct Cli {
     #[arg(short = 'A', long)]
     album: Option<String>,
 
-    /// Disable interactive TUI mode (use classic CLI mode)
-    #[arg(long)]
-    no_interactive: bool,
+
 }
 
 fn clean_url(url: &str) -> String {
@@ -141,70 +139,20 @@ fn main() -> Result<()> {
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
 
-    // Interactive mode with TUI (default)
-    let (final_chapters, final_artist, final_album) = if !cli.no_interactive {
-        println!();
-        println!("{}", "Launching interactive mode...".cyan());
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        
-        let app = tui::App::new(
-            video_info.clone(),
-            chapters_to_use.clone(),
-            artist.clone(),
-            album.clone(),
-            output_dir.clone(),
+    // Display chapters
+    println!();
+    println!("{}", "Tracks to create:".bold());
+    for (i, chapter) in chapters_to_use.iter().enumerate() {
+        println!(
+            "  {}. {} [{}]",
+            i + 1,
+            chapter.title,
+            utils::format_duration_short(chapter.duration())
         );
-        
-        match tui::run(app) {
-            Ok(result_app) => {
-                if !result_app.confirmed {
-                    // User cancelled in TUI
-                    println!();
-                    println!("{}", "Operation cancelled by user.".yellow());
-                    std::fs::remove_file(&audio_file).ok();
-                    return Ok(());
-                }
-                (result_app.get_selected_chapters(), result_app.artist, result_app.album)
-            }
-            Err(e) => {
-                // TUI failed, fall back to CLI mode
-                println!();
-                println!("{} {}", "⚠ TUI mode not available:".yellow(), e);
-                println!("{}", "Falling back to classic CLI mode...".yellow());
-                println!();
-                
-                // Display chapters in CLI mode
-                println!("{}", "Tracks to create:".bold());
-                for (i, chapter) in chapters_to_use.iter().enumerate() {
-                    println!(
-                        "  {}. {} [{}]",
-                        i + 1,
-                        chapter.title,
-                        utils::format_duration_short(chapter.duration())
-                    );
-                }
-                println!();
-                
-                // Continue with all chapters selected
-                (chapters_to_use, artist, album)
-            }
-        }
-    } else {
-        // Display chapters in non-interactive mode
-        println!();
-        println!("{}", "Tracks to create:".bold());
-        for (i, chapter) in chapters_to_use.iter().enumerate() {
-            println!(
-                "  {}. {} [{}]",
-                i + 1,
-                chapter.title,
-                utils::format_duration_short(chapter.duration())
-            );
-        }
-        println!();
-        
-        (chapters_to_use, artist, album)
-    };
+    }
+    println!();
+    
+    let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
 
     // Split audio with metadata
     let cover_path = output_dir.join("cover.jpg");

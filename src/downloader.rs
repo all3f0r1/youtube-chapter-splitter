@@ -5,7 +5,7 @@
 
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{Result, YtcsError};
-use indicatif::{ProgressBar, ProgressStyle};
+
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -225,17 +225,7 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     println!("Downloading audio from YouTube...");
     
-    // Créer une barre de progression indéterminée
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.green} {msg}")
-            .unwrap()
-    );
-    pb.set_message("Downloading...");
-    
-    // Lancer yt-dlp en arrière-plan
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+
     
     let output = Command::new("yt-dlp")
         .arg("-x")
@@ -252,7 +242,7 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
 
-    pb.finish_with_message("Download complete");
+    println!("✓ Audio downloaded: {}", output_path.display());
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);

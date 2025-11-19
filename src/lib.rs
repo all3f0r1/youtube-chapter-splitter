@@ -50,7 +50,7 @@ pub mod chapters;
 pub mod downloader;
 pub mod audio;
 pub mod utils;
-pub mod tui;
+
 
 pub use error::{Result, YtcsError};
 pub use chapters::Chapter;
