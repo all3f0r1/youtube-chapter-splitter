@@ -1,6 +1,6 @@
 [package]
 name = "youtube_chapter_splitter"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 authors = ["YouTube Chapter Splitter Contributors"]
 description = "Download YouTube videos, extract audio to MP3, and split by chapters"
