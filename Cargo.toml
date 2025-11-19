@@ -31,3 +31,10 @@ path = "src/main.rs"
 [lib]
 name = "youtube_chapter_splitter"
 path = "src/lib.rs"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "performance_benchmarks"
+harness = false
