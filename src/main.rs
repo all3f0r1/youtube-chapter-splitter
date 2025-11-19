@@ -149,22 +149,46 @@ fn main() -> Result<()> {
         
         let app = tui::App::new(
             video_info.clone(),
-            chapters_to_use,
+            chapters_to_use.clone(),
             artist.clone(),
             album.clone(),
             output_dir.clone(),
         );
         
-        let result_app = tui::run(app)?;
-        
-        if !result_app.confirmed {
-            println!();
-            println!("{}", "Operation cancelled by user.".yellow());
-            std::fs::remove_file(&audio_file).ok();
-            return Ok(());
+        match tui::run(app) {
+            Ok(result_app) => {
+                if !result_app.confirmed {
+                    // User cancelled in TUI
+                    println!();
+                    println!("{}", "Operation cancelled by user.".yellow());
+                    std::fs::remove_file(&audio_file).ok();
+                    return Ok(());
+                }
+                (result_app.get_selected_chapters(), result_app.artist, result_app.album)
+            }
+            Err(e) => {
+                // TUI failed, fall back to CLI mode
+                println!();
+                println!("{} {}", "⚠ TUI mode not available:".yellow(), e);
+                println!("{}", "Falling back to classic CLI mode...".yellow());
+                println!();
+                
+                // Display chapters in CLI mode
+                println!("{}", "Tracks to create:".bold());
+                for (i, chapter) in chapters_to_use.iter().enumerate() {
+                    println!(
+                        "  {}. {} [{}]",
+                        i + 1,
+                        chapter.title,
+                        utils::format_duration_short(chapter.duration())
+                    );
+                }
+                println!();
+                
+                // Continue with all chapters selected
+                (chapters_to_use, artist, album)
+            }
         }
-        
-        (result_app.get_selected_chapters(), result_app.artist, result_app.album)
     } else {
         // Display chapters in non-interactive mode
         println!();
