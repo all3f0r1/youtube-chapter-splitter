@@ -1,5 +1,5 @@
-use youtube_chapter_splitter::{audio, downloader, utils};
 use std::path::PathBuf;
+use youtube_chapter_splitter::{audio, downloader, utils};
 
 fn main() -> youtube_chapter_splitter::Result<()> {
     // Vérifier les dépendances
@@ -27,7 +27,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
     // Télécharger la miniature
     let output_dir = PathBuf::from("./output");
     std::fs::create_dir_all(&output_dir)?;
-    
+
     let cover_path = match downloader::download_thumbnail(url, &output_dir) {
         Ok(path) => {
             println!("Miniature téléchargée: {:?}", path);

@@ -1,10 +1,9 @@
 /// Tests de cas limites pour le module utils
-
 #[cfg(test)]
 mod utils_edge_cases_tests {
     use youtube_chapter_splitter::utils::{
-        clean_folder_name, parse_artist_album, sanitize_title,
-        format_duration, format_duration_short
+        clean_folder_name, format_duration, format_duration_short, parse_artist_album,
+        sanitize_title,
     };
 
     // Tests pour clean_folder_name

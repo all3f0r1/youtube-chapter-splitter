@@ -32,7 +32,8 @@ fn test_extract_video_id_short() {
 
 #[test]
 fn test_extract_video_id_with_params() {
-    let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf&t=42s";
+    let url =
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf&t=42s";
     assert_eq!(extract_video_id(url), Some("dQw4w9WgXcQ".to_string()));
 }
 
@@ -66,7 +67,8 @@ fn test_remove_playlist_param_list_first() {
 
 #[test]
 fn test_remove_playlist_param_with_other_params() {
-    let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
+    let url =
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
     let clean = remove_playlist_param(url);
     assert_eq!(clean, "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s");
 }
@@ -78,7 +80,7 @@ fn test_get_playlist_info_real() {
     let url = "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
     let result = get_playlist_info(url);
     assert!(result.is_ok());
-    
+
     let playlist = result.unwrap();
     assert!(!playlist.videos.is_empty());
     assert!(!playlist.title.is_empty());

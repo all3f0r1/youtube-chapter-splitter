@@ -47,15 +47,14 @@
 //! - [`audio`] - Traitement et découpage audio
 //! - [`utils`] - Fonctions utilitaires (formatage, nettoyage)
 
-pub mod error;
-pub mod chapters;
-pub mod downloader;
 pub mod audio;
-pub mod utils;
+pub mod chapters;
 pub mod config;
+pub mod downloader;
+pub mod error;
 pub mod playlist;
+pub mod utils;
 
-
-pub use error::{Result, YtcsError};
 pub use chapters::Chapter;
 pub use downloader::VideoInfo;
+pub use error::{Result, YtcsError};

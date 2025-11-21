@@ -30,7 +30,7 @@ fn test_error_types() {
         YtcsError::MissingTool("test".to_string()),
         YtcsError::Other("test".to_string()),
     ];
-    
+
     for err in errors {
         assert!(!err.to_string().is_empty());
     }
@@ -41,7 +41,7 @@ fn test_result_type() {
     fn returns_result() -> youtube_chapter_splitter::Result<i32> {
         Ok(42)
     }
-    
+
     assert_eq!(returns_result().unwrap(), 42);
 }
 
@@ -50,6 +50,6 @@ fn test_result_error() {
     fn returns_error() -> youtube_chapter_splitter::Result<i32> {
         Err(YtcsError::Other("test error".to_string()))
     }
-    
+
     assert!(returns_error().is_err());
 }

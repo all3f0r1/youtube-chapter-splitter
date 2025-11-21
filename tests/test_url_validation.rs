@@ -1,5 +1,4 @@
 /// Tests avancés de validation d'URL YouTube
-
 #[cfg(test)]
 mod url_validation_tests {
     use youtube_chapter_splitter::downloader::extract_video_id;
@@ -8,14 +7,18 @@ mod url_validation_tests {
     fn test_valid_video_id_length() {
         let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
         let id = extract_video_id(url).unwrap();
-        assert_eq!(id.len(), 11, "YouTube video IDs must be exactly 11 characters");
+        assert_eq!(
+            id.len(),
+            11,
+            "YouTube video IDs must be exactly 11 characters"
+        );
     }
 
     #[test]
     fn test_video_id_alphanumeric_underscore_dash() {
         let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
         let id = extract_video_id(url).unwrap();
-        
+
         for c in id.chars() {
             assert!(
                 c.is_ascii_alphanumeric() || c == '_' || c == '-',
@@ -44,7 +47,7 @@ mod url_validation_tests {
         // YouTube IDs ne contiennent pas de caractères spéciaux comme @#$%
         let url = "https://www.youtube.com/watch?v=abc@def#ghi";
         let result = extract_video_id(url);
-        
+
         if let Ok(id) = result {
             // Si ça passe, vérifier que les caractères spéciaux sont exclus
             assert!(!id.contains('@'));
@@ -57,7 +60,7 @@ mod url_validation_tests {
     fn test_url_with_very_long_id() {
         let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQextracharacters";
         let result = extract_video_id(url);
-        
+
         if let Ok(id) = result {
             // Devrait tronquer ou échouer
             assert!(id.len() <= 11, "Video ID should not exceed 11 characters");
@@ -68,7 +71,7 @@ mod url_validation_tests {
     fn test_url_with_very_short_id() {
         let url = "https://www.youtube.com/watch?v=abc";
         let result = extract_video_id(url);
-        
+
         // Un ID de 3 caractères n'est pas valide
         if let Ok(id) = result {
             assert_eq!(id.len(), 11, "Should validate ID length");
@@ -79,10 +82,10 @@ mod url_validation_tests {
     fn test_url_case_sensitivity() {
         let url1 = "https://www.youtube.com/watch?v=AbCdEfGhIjK";
         let url2 = "https://www.youtube.com/watch?v=abcdefghijk";
-        
+
         let id1 = extract_video_id(url1).unwrap();
         let id2 = extract_video_id(url2).unwrap();
-        
+
         // Les IDs sont sensibles à la casse
         assert_ne!(id1, id2);
         assert_eq!(id1, "AbCdEfGhIjK");
@@ -114,7 +117,7 @@ mod url_validation_tests {
     fn test_url_youtu_be_short_format() {
         let url = "https://youtu.be/dQw4w9WgXcQ";
         let result = extract_video_id(url);
-        
+
         // Le code actuel ne gère pas youtu.be, mais devrait
         if result.is_err() {
             // C'est un bug connu, documenter
@@ -134,7 +137,7 @@ mod url_validation_tests {
         // URL malformée avec plusieurs paramètres v=
         let url = "https://www.youtube.com/watch?v=first&v=second";
         let result = extract_video_id(url);
-        
+
         // Le comportement avec plusieurs v= n'est pas défini
         // Soit ça échoue (comportement actuel), soit ça prend le premier
         if let Ok(id) = result {

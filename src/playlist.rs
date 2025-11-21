@@ -9,22 +9,21 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 
 /// Regex pour détecter une URL de playlist YouTube
-static PLAYLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"[?&]list=([a-zA-Z0-9_-]+)").unwrap()
-});
+static PLAYLIST_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[?&]list=([a-zA-Z0-9_-]+)").unwrap());
 
 /// Information sur une vidéo dans une playlist
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistVideo {
     /// ID de la vidéo
     pub id: String,
-    
+
     /// Titre de la vidéo
     pub title: String,
-    
+
     /// URL complète de la vidéo
     pub url: String,
-    
+
     /// Durée en secondes
     pub duration: f64,
 }
@@ -34,10 +33,10 @@ pub struct PlaylistVideo {
 pub struct PlaylistInfo {
     /// ID de la playlist
     pub id: String,
-    
+
     /// Titre de la playlist
     pub title: String,
-    
+
     /// Liste des vidéos
     pub videos: Vec<PlaylistVideo>,
 }
@@ -95,12 +94,7 @@ pub fn extract_video_id(url: &str) -> Option<String> {
 pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
     // Utiliser yt-dlp pour obtenir les informations de la playlist
     let output = Command::new("yt-dlp")
-        .args(&[
-            "--dump-json",
-            "--flat-playlist",
-            "--no-warnings",
-            url,
-        ])
+        .args(["--dump-json", "--flat-playlist", "--no-warnings", url])
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to run yt-dlp: {}", e)))?;
 
@@ -113,20 +107,19 @@ pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
+
     // Parser chaque ligne JSON (une vidéo par ligne)
     let mut videos = Vec::new();
     let mut playlist_title = String::new();
     let mut playlist_id = String::new();
-    
+
     for line in stdout.lines() {
         if line.trim().is_empty() {
             continue;
         }
-        
-        let json: serde_json::Value = serde_json::from_str(line)
-            .map_err(|e| YtcsError::JsonError(e))?;
-        
+
+        let json: serde_json::Value = serde_json::from_str(line).map_err(YtcsError::JsonError)?;
+
         // Extraire les informations de la playlist (première ligne)
         if playlist_title.is_empty() {
             if let Some(title) = json.get("playlist_title").and_then(|v| v.as_str()) {
@@ -134,25 +127,24 @@ pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
             } else if let Some(title) = json.get("title").and_then(|v| v.as_str()) {
                 playlist_title = title.to_string();
             }
-            
+
             if let Some(id) = json.get("playlist_id").and_then(|v| v.as_str()) {
                 playlist_id = id.to_string();
             }
         }
-        
+
         // Extraire les informations de la vidéo
         if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
-            let title = json.get("title")
+            let title = json
+                .get("title")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown")
                 .to_string();
-            
-            let duration = json.get("duration")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            
+
+            let duration = json.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
             let url = format!("https://www.youtube.com/watch?v={}", id);
-            
+
             videos.push(PlaylistVideo {
                 id: id.to_string(),
                 title,
@@ -161,11 +153,11 @@ pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
             });
         }
     }
-    
+
     if videos.is_empty() {
         return Err(YtcsError::Other("No videos found in playlist".to_string()));
     }
-    
+
     Ok(PlaylistInfo {
         id: playlist_id,
         title: playlist_title,
@@ -200,7 +192,8 @@ pub fn remove_playlist_param(url: &str) -> String {
         // Si list= est le premier paramètre
         if let Some(video_pos) = url.find("?v=") {
             // Garder le paramètre v=
-            url[..video_pos + url[video_pos..].find('&').unwrap_or(url.len() - video_pos)].to_string()
+            url[..video_pos + url[video_pos..].find('&').unwrap_or(url.len() - video_pos)]
+                .to_string()
         } else {
             url[..pos].to_string()
         }
@@ -215,23 +208,39 @@ mod tests {
 
     #[test]
     fn test_is_playlist_url() {
-        assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf").is_some());
-        assert!(is_playlist_url("https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf").is_some());
+        assert!(is_playlist_url(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
+        )
+        .is_some());
+        assert!(is_playlist_url(
+            "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
+        )
+        .is_some());
         assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
     }
 
     #[test]
     fn test_extract_video_id() {
-        assert_eq!(extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), Some("dQw4w9WgXcQ".to_string()));
-        assert_eq!(extract_video_id("https://youtu.be/dQw4w9WgXcQ"), Some("dQw4w9WgXcQ".to_string()));
+        assert_eq!(
+            extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            Some("dQw4w9WgXcQ".to_string())
+        );
+        assert_eq!(
+            extract_video_id("https://youtu.be/dQw4w9WgXcQ"),
+            Some("dQw4w9WgXcQ".to_string())
+        );
         assert!(extract_video_id("https://www.youtube.com/").is_none());
     }
 
     #[test]
     fn test_remove_playlist_param() {
-        let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
-        assert_eq!(remove_playlist_param(url), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-        
+        let url =
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
+        assert_eq!(
+            remove_playlist_param(url),
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        );
+
         let url2 = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
         assert_eq!(remove_playlist_param(url2), url2);
     }

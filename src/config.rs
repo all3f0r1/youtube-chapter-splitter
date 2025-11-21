@@ -12,10 +12,10 @@ use std::path::PathBuf;
 pub struct Config {
     /// Répertoire de téléchargement par défaut
     pub default_output_dir: Option<String>,
-    
+
     /// Télécharger la pochette d'album
     pub download_cover: bool,
-    
+
     /// Format du nom de fichier
     /// Placeholders disponibles:
     /// - %n: numéro de piste (01, 02, etc.)
@@ -23,22 +23,22 @@ pub struct Config {
     /// - %a: artiste
     /// - %A: album
     pub filename_format: String,
-    
+
     /// Format du nom de répertoire
     /// Placeholders disponibles:
     /// - %a: artiste
     /// - %A: album
     pub directory_format: String,
-    
+
     /// Qualité audio en kbps (128 ou 192)
     pub audio_quality: u32,
-    
+
     /// Écraser les fichiers existants
     pub overwrite_existing: bool,
-    
+
     /// Nombre de tentatives en cas d'échec
     pub max_retries: u32,
-    
+
     /// Créer un fichier playlist (.m3u)
     pub create_playlist: bool,
 }
@@ -63,41 +63,41 @@ impl Config {
     pub fn config_path() -> Result<PathBuf> {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| YtcsError::ConfigError("Could not find config directory".to_string()))?;
-        
+
         let ytcs_config_dir = config_dir.join("ytcs");
         fs::create_dir_all(&ytcs_config_dir)?;
-        
+
         Ok(ytcs_config_dir.join("config.toml"))
     }
-    
+
     /// Charger la configuration depuis le fichier
     pub fn load() -> Result<Self> {
         let config_path = Self::config_path()?;
-        
+
         if !config_path.exists() {
             // Créer une configuration par défaut
             let config = Self::default();
             config.save()?;
             return Ok(config);
         }
-        
+
         let content = fs::read_to_string(&config_path)?;
         let config: Config = toml::from_str(&content)
             .map_err(|e| YtcsError::ConfigError(format!("Failed to parse config: {}", e)))?;
-        
+
         Ok(config)
     }
-    
+
     /// Sauvegarder la configuration dans le fichier
     pub fn save(&self) -> Result<()> {
         let config_path = Self::config_path()?;
         let content = toml::to_string_pretty(self)
             .map_err(|e| YtcsError::ConfigError(format!("Failed to serialize config: {}", e)))?;
-        
+
         fs::write(&config_path, content)?;
         Ok(())
     }
-    
+
     /// Obtenir le répertoire de sortie par défaut
     pub fn get_output_dir(&self) -> PathBuf {
         if let Some(ref dir) = self.default_output_dir {
@@ -111,16 +111,22 @@ impl Config {
             }
         }
     }
-    
+
     /// Formater le nom de fichier selon le template
-    pub fn format_filename(&self, track_number: usize, title: &str, artist: &str, album: &str) -> String {
+    pub fn format_filename(
+        &self,
+        track_number: usize,
+        title: &str,
+        artist: &str,
+        album: &str,
+    ) -> String {
         self.filename_format
             .replace("%n", &format!("{:02}", track_number))
             .replace("%t", title)
             .replace("%a", artist)
             .replace("%A", album)
     }
-    
+
     /// Formater le nom de répertoire selon le template
     pub fn format_directory(&self, artist: &str, album: &str) -> String {
         self.directory_format
@@ -133,11 +139,16 @@ impl Config {
 pub fn show_config() -> Result<()> {
     let config = Config::load()?;
     let config_path = Config::config_path()?;
-    
+
     println!("Configuration file: {}", config_path.display());
     println!();
     println!("Current settings:");
-    println!("  default_output_dir = {:?}", config.default_output_dir.unwrap_or_else(|| "~/Music (default)".to_string()));
+    println!(
+        "  default_output_dir = {:?}",
+        config
+            .default_output_dir
+            .unwrap_or_else(|| "~/Music (default)".to_string())
+    );
     println!("  download_cover     = {}", config.download_cover);
     println!("  filename_format    = \"{}\"", config.filename_format);
     println!("  directory_format   = \"{}\"", config.directory_format);
@@ -149,14 +160,14 @@ pub fn show_config() -> Result<()> {
     println!("Available placeholders:");
     println!("  Filename: %n (track number), %t (title), %a (artist), %A (album)");
     println!("  Directory: %a (artist), %A (album)");
-    
+
     Ok(())
 }
 
 /// Définir une valeur de configuration
 pub fn set_config(key: &str, value: &str) -> Result<()> {
     let mut config = Config::load()?;
-    
+
     match key {
         "default_output_dir" => {
             config.default_output_dir = if value.is_empty() {
@@ -167,8 +178,9 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
             println!("✓ Set default_output_dir to: {}", value);
         }
         "download_cover" => {
-            config.download_cover = value.parse::<bool>()
-                .map_err(|_| YtcsError::ConfigError("Value must be 'true' or 'false'".to_string()))?;
+            config.download_cover = value.parse::<bool>().map_err(|_| {
+                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
+            })?;
             println!("✓ Set download_cover to: {}", config.download_cover);
         }
         "filename_format" => {
@@ -180,37 +192,49 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
             println!("✓ Set directory_format to: \"{}\"", value);
         }
         "audio_quality" => {
-            let quality = value.parse::<u32>()
-                .map_err(|_| YtcsError::ConfigError("Value must be a number (128 or 192)".to_string()))?;
+            let quality = value.parse::<u32>().map_err(|_| {
+                YtcsError::ConfigError("Value must be a number (128 or 192)".to_string())
+            })?;
             if quality != 128 && quality != 192 {
-                return Err(YtcsError::ConfigError("Audio quality must be 128 or 192 kbps".to_string()));
+                return Err(YtcsError::ConfigError(
+                    "Audio quality must be 128 or 192 kbps".to_string(),
+                ));
             }
             config.audio_quality = quality;
             println!("✓ Set audio_quality to: {} kbps", quality);
         }
         "overwrite_existing" => {
-            config.overwrite_existing = value.parse::<bool>()
-                .map_err(|_| YtcsError::ConfigError("Value must be 'true' or 'false'".to_string()))?;
+            config.overwrite_existing = value.parse::<bool>().map_err(|_| {
+                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
+            })?;
             println!("✓ Set overwrite_existing to: {}", config.overwrite_existing);
         }
         "max_retries" => {
-            config.max_retries = value.parse::<u32>()
-                .map_err(|_| YtcsError::ConfigError("Value must be a positive number".to_string()))?;
+            config.max_retries = value.parse::<u32>().map_err(|_| {
+                YtcsError::ConfigError("Value must be a positive number".to_string())
+            })?;
             println!("✓ Set max_retries to: {}", config.max_retries);
         }
         "create_playlist" => {
-            config.create_playlist = value.parse::<bool>()
-                .map_err(|_| YtcsError::ConfigError("Value must be 'true' or 'false'".to_string()))?;
+            config.create_playlist = value.parse::<bool>().map_err(|_| {
+                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
+            })?;
             println!("✓ Set create_playlist to: {}", config.create_playlist);
         }
         _ => {
-            return Err(YtcsError::ConfigError(format!("Unknown config key: {}", key)));
+            return Err(YtcsError::ConfigError(format!(
+                "Unknown config key: {}",
+                key
+            )));
         }
     }
-    
+
     config.save()?;
-    println!("✓ Configuration saved to: {}", Config::config_path()?.display());
-    
+    println!(
+        "✓ Configuration saved to: {}",
+        Config::config_path()?.display()
+    );
+
     Ok(())
 }
 
@@ -219,6 +243,9 @@ pub fn reset_config() -> Result<()> {
     let config = Config::default();
     config.save()?;
     println!("✓ Configuration reset to defaults");
-    println!("✓ Configuration saved to: {}", Config::config_path()?.display());
+    println!(
+        "✓ Configuration saved to: {}",
+        Config::config_path()?.display()
+    );
     Ok(())
 }

@@ -1,5 +1,4 @@
 /// Tests pour la gestion d'erreur stdin et interactions utilisateur
-
 #[cfg(test)]
 mod stdin_handling_tests {
     use std::io::{self, BufRead};
@@ -40,7 +39,7 @@ mod stdin_handling_tests {
         let input = "y\n";
         let mut cursor = io::Cursor::new(input);
         let mut buffer = String::new();
-        
+
         let result = cursor.read_line(&mut buffer);
         assert!(result.is_ok(), "read_line should succeed");
         assert_eq!(buffer.trim(), "y");
@@ -51,7 +50,7 @@ mod stdin_handling_tests {
         let input = "\n";
         let mut cursor = io::Cursor::new(input);
         let mut buffer = String::new();
-        
+
         let result = cursor.read_line(&mut buffer);
         assert!(result.is_ok());
         assert_eq!(buffer.trim(), "");
@@ -62,7 +61,7 @@ mod stdin_handling_tests {
         let input = "   \n";
         let mut cursor = io::Cursor::new(input);
         let mut buffer = String::new();
-        
+
         let result = cursor.read_line(&mut buffer);
         assert!(result.is_ok());
         assert_eq!(buffer.trim(), "");
@@ -72,11 +71,11 @@ mod stdin_handling_tests {
     fn test_read_line_multiple_lines() {
         let input = "first\nsecond\nthird\n";
         let mut cursor = io::Cursor::new(input);
-        
+
         let mut buffer1 = String::new();
         cursor.read_line(&mut buffer1).unwrap();
         assert_eq!(buffer1.trim(), "first");
-        
+
         let mut buffer2 = String::new();
         cursor.read_line(&mut buffer2).unwrap();
         assert_eq!(buffer2.trim(), "second");
@@ -85,7 +84,7 @@ mod stdin_handling_tests {
     #[test]
     fn test_user_input_yes_variations() {
         let variations = vec!["y", "Y", "yes", "Yes", "YES", "yEs"];
-        
+
         for input in variations {
             assert!(
                 input.trim().to_lowercase() == "y" || input.trim().to_lowercase() == "yes",
@@ -98,7 +97,7 @@ mod stdin_handling_tests {
     #[test]
     fn test_user_input_no_variations() {
         let variations = vec!["n", "N", "no", "No", "NO", "nO"];
-        
+
         for input in variations {
             assert!(
                 input.trim().to_lowercase() == "n" || input.trim().to_lowercase() == "no",
@@ -111,7 +110,7 @@ mod stdin_handling_tests {
     #[test]
     fn test_user_input_invalid() {
         let invalid_inputs = vec!["maybe", "123", "!", "", "   "];
-        
+
         for input in invalid_inputs {
             let normalized = input.trim().to_lowercase();
             assert!(
@@ -127,7 +126,7 @@ mod stdin_handling_tests {
     fn test_interrupt_handling() {
         // Vérifier que le signal handler est bien configuré
         // Note: Difficile à tester directement, mais on peut vérifier la présence
-        
+
         // Pour l'instant, juste documenter le comportement attendu
         assert!(true, "Program should handle SIGINT gracefully");
     }
@@ -135,15 +134,15 @@ mod stdin_handling_tests {
     /// Test de timeout sur stdin
     #[test]
     fn test_stdin_timeout() {
-        use std::time::Duration;
         use std::thread;
-        
+        use std::time::Duration;
+
         // Simuler un timeout
         let handle = thread::spawn(|| {
             thread::sleep(Duration::from_millis(100));
             "timeout"
         });
-        
+
         let result = handle.join();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "timeout");

@@ -19,13 +19,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // Regex compilées une seule fois au démarrage
-static RE_SILENCE_START: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"silence_start: ([\d.]+)").unwrap()
-});
+static RE_SILENCE_START: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"silence_start: ([\d.]+)").unwrap());
 
-static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"silence_end: ([\d.]+)").unwrap()
-});
+static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d.]+)").unwrap());
 
 /// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
 ///
@@ -62,19 +59,19 @@ pub fn split_audio_by_chapters(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
             .unwrap()
-            .progress_chars("█▒-")
+            .progress_chars("█▒-"),
     );
     pb.set_message("Splitting audio...");
-    
+
     std::fs::create_dir_all(output_dir)?;
-    
+
     // Charger l'image de couverture une seule fois si elle existe
     let cover_data = if let Some(cover) = cover_path {
         load_cover_image(cover)?
     } else {
         None
     };
-    
+
     let mut output_files = Vec::new();
 
     for (index, chapter) in chapters.iter().enumerate() {
@@ -87,7 +84,7 @@ pub fn split_audio_by_chapters(
         pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
-        
+
         // Découper l'audio avec ffmpeg (sans cover art)
         let mut cmd = Command::new("ffmpeg");
         cmd.arg("-i")
@@ -110,8 +107,9 @@ pub fn split_audio_by_chapters(
             .arg(format!("track={}/{}", track_number, chapters.len()))
             .arg("-y")
             .arg(&output_path);
-        
-        let output = cmd.output()
+
+        let output = cmd
+            .output()
             .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
         if !output.status.success() {
@@ -146,14 +144,14 @@ fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
     if !cover_path.exists() {
         return Ok(None);
     }
-    
+
     let mut file = File::open(cover_path)
         .map_err(|e| YtcsError::AudioError(format!("Failed to open cover image: {}", e)))?;
-    
+
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| YtcsError::AudioError(format!("Failed to read cover image: {}", e)))?;
-    
+
     Ok(Some(data))
 }
 
@@ -171,16 +169,16 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
         .map_err(|e| YtcsError::AudioError(format!("Failed to guess file type: {}", e)))?
         .read()
         .map_err(|e| YtcsError::AudioError(format!("Failed to read audio file: {}", e)))?;
-    
+
     // Créer l'objet Picture depuis les données
-    let mut cover_reader = &cover_data[..];
+    let mut cover_reader = cover_data;
     let mut picture = Picture::from_reader(&mut cover_reader)
         .map_err(|e| YtcsError::AudioError(format!("Failed to create picture: {}", e)))?;
-    
+
     // Définir le type et la description
     picture.set_pic_type(PictureType::CoverFront);
     picture.set_description(Some("Album Cover".to_string()));
-    
+
     // Obtenir ou créer le tag principal
     let tag = match tagged_file.primary_tag_mut() {
         Some(primary_tag) => primary_tag,
@@ -190,15 +188,16 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
             tagged_file.primary_tag_mut().unwrap()
         }
     };
-    
+
     // Ajouter l'image au tag
     tag.push_picture(picture);
-    
+
     // Sauvegarder les modifications avec tagged_file.save_to() pour préserver tous les tags
     // Note: save_to() préserve toutes les métadonnées existantes, contrairement à save_to_path()
-    tagged_file.save_to_path(audio_path, WriteOptions::default())
+    tagged_file
+        .save_to_path(audio_path, WriteOptions::default())
         .map_err(|e| YtcsError::AudioError(format!("Failed to save tags: {}", e)))?;
-    
+
     Ok(())
 }
 
@@ -226,7 +225,7 @@ pub fn detect_silence_chapters(
     min_silence_duration: f64,
 ) -> Result<Vec<Chapter>> {
     println!("Detecting silence to identify tracks...");
-    
+
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(input_file)
@@ -242,7 +241,7 @@ pub fn detect_silence_chapters(
         .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     let mut silence_periods = Vec::new();
     let mut current_start: Option<f64> = None;
 
@@ -264,7 +263,7 @@ pub fn detect_silence_chapters(
 
     if silence_periods.is_empty() {
         return Err(YtcsError::ChapterError(
-            "No silence detected. Try adjusting the parameters.".to_string()
+            "No silence detected. Try adjusting the parameters.".to_string(),
         ));
     }
 

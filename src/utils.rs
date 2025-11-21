@@ -2,21 +2,15 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 // Regex compilées une seule fois au démarrage
-static RE_FULL_ALBUM: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap()
-});
+static RE_FULL_ALBUM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
-static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\[.*?\]|\(.*?\)").unwrap()
-});
+static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)").unwrap());
 
-static RE_SPACES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\s+").unwrap()
-});
+static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 
-static RE_TRACK_PREFIX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap()
-});
+static RE_TRACK_PREFIX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap());
 
 /// Nettoie et formate le nom de dossier selon les règles définies.
 ///
@@ -47,16 +41,16 @@ static RE_TRACK_PREFIX: Lazy<Regex> = Lazy::new(|| {
 pub fn clean_folder_name(name: &str) -> String {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM] (case insensitive)
     let without_suffix = RE_FULL_ALBUM.replace_all(name, "");
-    
+
     // Retirer les [] et () avec leur contenu restants
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
-    
+
     // Remplacer les underscores, pipes et slashes par des tirets
-    let with_dashes = cleaned.replace('_', "-").replace('|', "-").replace('/', "-");
-    
+    let with_dashes = cleaned.replace(['_', '|', '/'], "-");
+
     // Nettoyer les espaces multiples
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");
-    
+
     // Capitaliser chaque mot
     let capitalized = normalized
         .split_whitespace()
@@ -65,13 +59,14 @@ pub fn clean_folder_name(name: &str) -> String {
             match chars.next() {
                 None => String::new(),
                 Some(first) => {
-                    first.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str()
+                    first.to_uppercase().collect::<String>()
+                        + chars.as_str().to_lowercase().as_str()
                 }
             }
         })
         .collect::<Vec<String>>()
         .join(" ");
-    
+
     // Nettoyer les tirets et espaces en début/fin
     capitalized.trim().trim_matches('-').trim().to_string()
 }
@@ -168,10 +163,10 @@ pub fn format_duration_short(seconds: f64) -> String {
 pub fn parse_artist_album(title: &str) -> (String, String) {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM]
     let without_suffix = RE_FULL_ALBUM.replace_all(title, "");
-    
+
     // Retirer les [] et () restants
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
-    
+
     // Séparer par - (tiret), – (tiret long/em-dash), ou |
     let parts: Vec<&str> = if cleaned.contains(" - ") {
         cleaned.split(" - ").collect()
@@ -182,7 +177,7 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     } else {
         vec![cleaned.trim()]
     };
-    
+
     if parts.len() >= 2 {
         let artist = clean_folder_name(parts[0].trim());
         let album = clean_folder_name(parts[1].trim());
@@ -222,7 +217,7 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
 pub fn sanitize_title(title: &str) -> String {
     // Retirer les numéros de piste au début
     let title = RE_TRACK_PREFIX.replace(title, "");
-    
+
     // Remplacer les caractères invalides
     title
         .chars()
@@ -240,22 +235,26 @@ mod tests {
     #[test]
     fn test_clean_folder_name() {
         assert_eq!(
-            clean_folder_name("MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"),
+            clean_folder_name(
+                "MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"
+            ),
             "Marigold - Oblivion Gate"
         );
-        
+
         assert_eq!(
             clean_folder_name("Artist_Name - Album_Title [2024]"),
             "Artist-name - Album-title"
         );
-        
+
         assert_eq!(
             clean_folder_name("test_album (bonus tracks) [remastered]"),
             "Test-album"
         );
-        
+
         assert_eq!(
-            clean_folder_name("PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"),
+            clean_folder_name(
+                "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
+            ),
             "Purple Dreams - Wandering Shadows"
         );
     }
@@ -277,7 +276,10 @@ mod tests {
     fn test_sanitize_title() {
         assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
         assert_eq!(sanitize_title("Track 5: Another Song"), "Another Song");
-        assert_eq!(sanitize_title("Invalid/Characters:Here"), "Invalid_Characters_Here");
+        assert_eq!(
+            sanitize_title("Invalid/Characters:Here"),
+            "Invalid_Characters_Here"
+        );
     }
 
     #[test]
@@ -285,9 +287,11 @@ mod tests {
         let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]");
         assert_eq!(artist, "Pink Floyd");
         assert_eq!(album, "Dark Side Of The Moon");
-        
+
         // Test avec em-dash et FULL ALBUM
-        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM) 70s Progressive • Psychedelic Rock");
+        let (artist, album) = parse_artist_album(
+            "Arcane Voyage – Third (FULL ALBUM) 70s Progressive • Psychedelic Rock",
+        );
         assert_eq!(artist, "Arcane Voyage");
         assert_eq!(album, "Third");
     }
