@@ -172,9 +172,11 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     // Retirer les [] et () restants
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
     
-    // Séparer par - ou |
+    // Séparer par - (tiret), – (tiret long/em-dash), ou |
     let parts: Vec<&str> = if cleaned.contains(" - ") {
         cleaned.split(" - ").collect()
+    } else if cleaned.contains(" – ") {
+        cleaned.split(" – ").collect()
     } else if cleaned.contains(" | ") {
         cleaned.split(" | ").collect()
     } else {

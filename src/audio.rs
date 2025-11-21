@@ -142,6 +142,11 @@ pub fn split_audio_by_chapters(
 ///
 /// Les données de l'image sous forme de vecteur d'octets
 fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
+    // Vérifier si le fichier existe
+    if !cover_path.exists() {
+        return Ok(None);
+    }
+    
     let mut file = File::open(cover_path)
         .map_err(|e| YtcsError::AudioError(format!("Failed to open cover image: {}", e)))?;
     

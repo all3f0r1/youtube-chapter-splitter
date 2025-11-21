@@ -186,4 +186,11 @@ mod utils_edge_cases_tests {
         // 3661 secondes = 1h 1m 1s, mais format_short n'affiche que minutes
         assert_eq!(format_duration_short(3661.0), "61m 01s");
     }
+
+    #[test]
+    fn test_parse_artist_album_with_em_dash() {
+        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM)");
+        assert_eq!(artist, "Arcane Voyage");
+        assert_eq!(album, "Third");
+    }
 }
