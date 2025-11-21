@@ -107,7 +107,7 @@ mod integration_e2e_tests {
             use std::process::Command;
 
             let output = Command::new("ffprobe")
-                .args(&[
+                .args([
                     "-v",
                     "quiet",
                     "-print_format",
@@ -281,7 +281,7 @@ mod integration_e2e_tests {
     fn test_e2e_chapter_duration_calculation() {
         use youtube_chapter_splitter::chapters::Chapter;
 
-        let chapters = vec![
+        let chapters = [
             Chapter::new("Track 1".to_string(), 0.0, 180.0),
             Chapter::new("Track 2".to_string(), 180.0, 360.0),
             Chapter::new("Track 3".to_string(), 360.0, 540.0),

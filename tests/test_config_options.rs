@@ -5,10 +5,10 @@ fn test_config_default_values() {
     let config = Config::default();
 
     assert_eq!(config.audio_quality, 192);
-    assert_eq!(config.overwrite_existing, false);
+    assert!(!config.overwrite_existing);
     assert_eq!(config.max_retries, 3);
-    assert_eq!(config.create_playlist, false);
-    assert_eq!(config.download_cover, true);
+    assert!(!config.create_playlist);
+    assert!(config.download_cover);
 }
 
 #[test]
@@ -27,10 +27,10 @@ fn test_config_overwrite_existing() {
     let mut config = Config::default();
 
     config.overwrite_existing = true;
-    assert_eq!(config.overwrite_existing, true);
+    assert!(config.overwrite_existing);
 
     config.overwrite_existing = false;
-    assert_eq!(config.overwrite_existing, false);
+    assert!(!config.overwrite_existing);
 }
 
 #[test]
@@ -49,10 +49,10 @@ fn test_config_create_playlist() {
     let mut config = Config::default();
 
     config.create_playlist = true;
-    assert_eq!(config.create_playlist, true);
+    assert!(config.create_playlist);
 
     config.create_playlist = false;
-    assert_eq!(config.create_playlist, false);
+    assert!(!config.create_playlist);
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn test_config_deserialization() {
     let config: Config = toml::from_str(toml_str).unwrap();
 
     assert_eq!(config.audio_quality, 128);
-    assert_eq!(config.overwrite_existing, true);
+    assert!(config.overwrite_existing);
     assert_eq!(config.max_retries, 5);
-    assert_eq!(config.create_playlist, true);
+    assert!(config.create_playlist);
 }

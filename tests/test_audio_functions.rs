@@ -13,7 +13,7 @@ mod audio_function_tests {
         duration_secs: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let output = Command::new("ffmpeg")
-            .args(&[
+            .args([
                 "-f",
                 "lavfi",
                 "-i",
@@ -52,11 +52,7 @@ mod audio_function_tests {
         let duration = get_audio_duration(&test_file).unwrap();
 
         // La durée devrait être proche de 5 secondes (avec une marge d'erreur)
-        assert!(
-            duration >= 4.9 && duration <= 5.1,
-            "Duration was {}",
-            duration
-        );
+        assert!((4.9..=5.1).contains(&duration), "Duration was {}", duration);
 
         fs::remove_dir_all(&test_dir).ok();
     }
@@ -97,7 +93,7 @@ mod audio_function_tests {
 
     #[test]
     fn test_multiple_chapters_no_overlap() {
-        let chapters = vec![
+        let chapters = [
             Chapter::new("Track 1".to_string(), 0.0, 100.0),
             Chapter::new("Track 2".to_string(), 100.0, 200.0),
             Chapter::new("Track 3".to_string(), 200.0, 300.0),

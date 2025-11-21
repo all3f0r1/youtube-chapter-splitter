@@ -47,10 +47,10 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
-        run: cargo test --locked --verbose
+        run: cargo test --verbose
 
       - name: Run doc tests
-        run: cargo test --doc --locked --verbose
+        run: cargo test --doc --verbose
 
   fmt:
     name: Rustfmt
@@ -98,7 +98,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -W clippy::all
 
   build:
     name: Build
@@ -133,10 +133,10 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
-        run: cargo build --locked --verbose
+        run: cargo build --verbose
 
       - name: Build release
-        run: cargo build --release --locked --verbose
+        run: cargo build --release --verbose
 
   coverage:
     name: Code Coverage

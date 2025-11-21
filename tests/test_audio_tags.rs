@@ -15,7 +15,7 @@ mod audio_tags_tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Créer un fichier audio silencieux de 1 seconde
         let output = Command::new("ffmpeg")
-            .args(&[
+            .args([
                 "-f",
                 "lavfi",
                 "-i",
@@ -53,7 +53,7 @@ mod audio_tags_tests {
         path: &PathBuf,
     ) -> Result<(String, String, String), Box<dyn std::error::Error>> {
         let output = Command::new("ffprobe")
-            .args(&[
+            .args([
                 "-v",
                 "quiet",
                 "-print_format",
