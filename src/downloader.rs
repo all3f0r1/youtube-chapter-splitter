@@ -7,7 +7,7 @@ use crate::chapters::{parse_chapters_from_json, Chapter};
 use crate::error::{Result, YtcsError};
 use indicatif::{ProgressBar, ProgressStyle};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Informations sur une vidéo YouTube.
@@ -238,7 +238,7 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 /// # Errors
 ///
 /// Retourne une erreur si le téléchargement échoue
-pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
+pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
         ProgressStyle::default_spinner()
@@ -274,7 +274,7 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     }
 
     // yt-dlp adds .mp3 automatically
-    let mut final_path = output_path.clone();
+    let mut final_path = output_path.to_path_buf();
     final_path.set_extension("mp3");
 
     if !final_path.exists() {
