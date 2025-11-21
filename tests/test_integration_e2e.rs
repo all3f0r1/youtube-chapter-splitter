@@ -68,6 +68,7 @@ mod integration_e2e_tests {
 
         assert!(!chapters.is_empty(), "Should have at least one chapter");
 
+        let cfg = youtube_chapter_splitter::config::Config::load().unwrap();
         let output_files = audio::split_audio_by_chapters(
             &audio_file,
             &chapters,
@@ -75,6 +76,7 @@ mod integration_e2e_tests {
             &artist,
             &album,
             cover_path.as_deref(),
+            &cfg,
         ).unwrap();
 
         // 7. Vérifier les fichiers de sortie

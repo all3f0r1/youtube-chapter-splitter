@@ -49,6 +49,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
     };
 
     // Découper l'audio
+    let cfg = youtube_chapter_splitter::config::Config::load()?;
     audio::split_audio_by_chapters(
         &audio_file,
         &chapters,
@@ -56,6 +57,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
         &artist,
         &album,
         cover_path.as_deref(),
+        &cfg,
     )?;
 
     // Nettoyer

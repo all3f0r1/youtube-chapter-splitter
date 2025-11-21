@@ -5,6 +5,7 @@
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
+use indicatif::{ProgressBar, ProgressStyle};
 
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
@@ -54,8 +55,16 @@ pub fn split_audio_by_chapters(
     artist: &str,
     album: &str,
     cover_path: Option<&Path>,
+    cfg: &crate::config::Config,
 ) -> Result<Vec<PathBuf>> {
-    println!("Splitting audio into {} tracks...", chapters.len());
+    let pb = ProgressBar::new(chapters.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█▒-")
+    );
+    pb.set_message("Splitting audio...");
     
     std::fs::create_dir_all(output_dir)?;
     
@@ -71,10 +80,11 @@ pub fn split_audio_by_chapters(
     for (index, chapter) in chapters.iter().enumerate() {
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
-        let output_filename = format!("{:02} - {}.mp3", track_number, sanitized_title);
+        let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
+        let output_filename = format!("{}.mp3", filename_base);
         let output_path = output_dir.join(&output_filename);
 
-        println!("  Track {}/{}: {}", track_number, chapters.len(), chapter.title);
+        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
         
@@ -115,10 +125,10 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
-
+        pb.inc(1);
     }
 
-    println!("✓ Splitting completed successfully!");
+    pb.finish_with_message("✓ Splitting completed successfully!");
     Ok(output_files)
 }
 

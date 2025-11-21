@@ -42,6 +42,10 @@ pub enum YtcsError {
     #[error("Regex error: {0}")]
     RegexError(#[from] regex::Error),
 
+    /// Erreur de configuration (fichier TOML, valeurs invalides, etc.).
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+
     /// Erreur générique pour les cas non couverts par les autres variantes.
     #[error("Generic error: {0}")]
     Other(String),

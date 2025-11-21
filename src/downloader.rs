@@ -5,6 +5,7 @@
 
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{Result, YtcsError};
+use indicatif::{ProgressBar, ProgressStyle};
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -16,6 +17,8 @@ pub struct VideoInfo {
     pub duration: f64,
     pub chapters: Vec<Chapter>,
     pub video_id: String,
+    pub thumbnail_url: String,
+    pub uploader: String,
 }
 
 /// Informations sur une dépendance système manquante.
@@ -188,6 +191,16 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         .unwrap_or("")
         .to_string();
 
+    let thumbnail_url = data["thumbnail"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+
+    let uploader = data["uploader"]
+        .as_str()
+        .unwrap_or("Unknown")
+        .to_string();
+
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
             parse_chapters_from_json(&json_str).unwrap_or_else(|_| Vec::new())
@@ -203,6 +216,8 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         duration,
         chapters,
         video_id,
+        thumbnail_url,
+        uploader,
     })
 }
 
@@ -223,9 +238,14 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 ///
 /// Retourne une erreur si le téléchargement échoue
 pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
-    println!("Downloading audio from YouTube...");
-    
-
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap()
+    );
+    pb.set_message("Downloading audio from YouTube...");
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
     
     let output = Command::new("yt-dlp")
         .arg("-x")
@@ -242,7 +262,7 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
 
-    println!("✓ Audio downloaded: {}", output_path.display());
+    pb.finish_with_message(format!("✓ Audio downloaded: {}", output_path.display()));
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);

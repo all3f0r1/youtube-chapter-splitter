@@ -9,7 +9,7 @@
 //! # Exemple d'utilisation
 //!
 //! ```no_run
-//! use youtube_chapter_splitter::{downloader, audio, Result};
+//! use youtube_chapter_splitter::{downloader, audio, config, Result};
 //! use std::path::PathBuf;
 //!
 //! fn main() -> Result<()> {
@@ -24,6 +24,7 @@
 //!     
 //!     // Découper par chapitres
 //!     let output_dir = PathBuf::from("output");
+//!     let cfg = config::Config::default();
 //!     audio::split_audio_by_chapters(
 //!         &audio_file,
 //!         &video_info.chapters,
@@ -31,6 +32,7 @@
 //!         "Artist Name",
 //!         "Album Name",
 //!         None,
+//!         &cfg,
 //!     )?;
 //!     
 //!     Ok(())
@@ -50,6 +52,7 @@ pub mod chapters;
 pub mod downloader;
 pub mod audio;
 pub mod utils;
+pub mod config;
 
 
 pub use error::{Result, YtcsError};
