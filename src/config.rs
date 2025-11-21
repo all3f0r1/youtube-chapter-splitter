@@ -29,6 +29,18 @@ pub struct Config {
     /// - %a: artiste
     /// - %A: album
     pub directory_format: String,
+    
+    /// Qualité audio en kbps (128 ou 192)
+    pub audio_quality: u32,
+    
+    /// Écraser les fichiers existants
+    pub overwrite_existing: bool,
+    
+    /// Nombre de tentatives en cas d'échec
+    pub max_retries: u32,
+    
+    /// Créer un fichier playlist (.m3u)
+    pub create_playlist: bool,
 }
 
 impl Default for Config {
@@ -38,6 +50,10 @@ impl Default for Config {
             download_cover: true,
             filename_format: "%n - %t".to_string(),
             directory_format: "%a - %A".to_string(),
+            audio_quality: 192,
+            overwrite_existing: false,
+            max_retries: 3,
+            create_playlist: false,
         }
     }
 }
@@ -125,6 +141,10 @@ pub fn show_config() -> Result<()> {
     println!("  download_cover     = {}", config.download_cover);
     println!("  filename_format    = \"{}\"", config.filename_format);
     println!("  directory_format   = \"{}\"", config.directory_format);
+    println!("  audio_quality      = {} kbps", config.audio_quality);
+    println!("  overwrite_existing = {}", config.overwrite_existing);
+    println!("  max_retries        = {}", config.max_retries);
+    println!("  create_playlist    = {}", config.create_playlist);
     println!();
     println!("Available placeholders:");
     println!("  Filename: %n (track number), %t (title), %a (artist), %A (album)");
@@ -158,6 +178,30 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
         "directory_format" => {
             config.directory_format = value.to_string();
             println!("✓ Set directory_format to: \"{}\"", value);
+        }
+        "audio_quality" => {
+            let quality = value.parse::<u32>()
+                .map_err(|_| YtcsError::ConfigError("Value must be a number (128 or 192)".to_string()))?;
+            if quality != 128 && quality != 192 {
+                return Err(YtcsError::ConfigError("Audio quality must be 128 or 192 kbps".to_string()));
+            }
+            config.audio_quality = quality;
+            println!("✓ Set audio_quality to: {} kbps", quality);
+        }
+        "overwrite_existing" => {
+            config.overwrite_existing = value.parse::<bool>()
+                .map_err(|_| YtcsError::ConfigError("Value must be 'true' or 'false'".to_string()))?;
+            println!("✓ Set overwrite_existing to: {}", config.overwrite_existing);
+        }
+        "max_retries" => {
+            config.max_retries = value.parse::<u32>()
+                .map_err(|_| YtcsError::ConfigError("Value must be a positive number".to_string()))?;
+            println!("✓ Set max_retries to: {}", config.max_retries);
+        }
+        "create_playlist" => {
+            config.create_playlist = value.parse::<bool>()
+                .map_err(|_| YtcsError::ConfigError("Value must be 'true' or 'false'".to_string()))?;
+            println!("✓ Set create_playlist to: {}", config.create_playlist);
         }
         _ => {
             return Err(YtcsError::ConfigError(format!("Unknown config key: {}", key)));

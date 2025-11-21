@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -21,7 +21,10 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 - 🎯 **Force artist/album names** with CLI options
 - ⚡ **Dependency checking** with automatic installation prompts
 - 🧹 **URL cleaning** - automatically removes playlist and extra parameters
-- 🪶 **Lightweight binary** (7.8 MB) with minimal dependencies
+- 🪶 **Lightweight binary** (8.5 MB) with minimal dependencies
+- 🎶 **Playlist support** (NEW in v0.8.2)
+- 🔄 **Retry mechanism** for failed downloads (NEW in v0.8.2)
+- 덮어쓰기 **Overwrite option** for existing files (NEW in v0.8.2)
 
 ## 🚀 Quick Start
 
@@ -69,6 +72,7 @@ ytcs <YOUTUBE_URL> [OPTIONS]
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
 - `--no-cover` - Skip downloading cover art
+- `--playlist` - Force playlist download
 
 **Configuration commands:**
 - `ytcs config` - Show current configuration
@@ -80,6 +84,9 @@ ytcs <YOUTUBE_URL> [OPTIONS]
 ```bash
 # Download and split a YouTube video (saves to ~/Music)
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA"
+
+# Download a playlist
+ytcs "https://www.youtube.com/playlist?list=..."
 
 # Specify custom output directory
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
@@ -115,11 +122,15 @@ YouTube Chapter Splitter uses a persistent configuration file stored at:
 ### Available Settings
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+|---|---|---|
 | `default_output_dir` | `~/Music` | Default download directory |
 | `download_cover` | `true` | Download album artwork |
 | `filename_format` | `"%n - %t"` | Filename format with placeholders |
 | `directory_format` | `"%a - %A"` | Directory format with placeholders |
+| `audio_quality` | `192` | MP3 quality (128 or 192 kbps) |
+| `overwrite_existing` | `false` | Overwrite existing files |
+| `max_retries` | `3` | Retries on download failure |
+| `create_playlist` | `false` | Create .m3u playlist file |
 
 ### Format Placeholders
 
@@ -189,7 +200,7 @@ Directory: /home/user/Music/Marigold - Oblivion Gate
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite with 139 tests covering:
+The project includes a comprehensive test suite with 172 tests covering:
 
 ```bash
 # Run all tests
@@ -203,6 +214,12 @@ cargo test test_clean_folder_name
 ```
 
 ## 📝 Changelog
+
+### v0.8.2 (2024)
+- 🎶 Added playlist support
+- 🔄 Added retry mechanism for failed downloads
+- 덮어쓰기 Added overwrite option for existing files
+- 🎧 Added audio quality option (128/192 kbps)
 
 ### v0.8.1 (2024)
 - ⚙️ Added persistent configuration system with TOML

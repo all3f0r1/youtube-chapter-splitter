@@ -53,6 +53,7 @@ pub mod downloader;
 pub mod audio;
 pub mod utils;
 pub mod config;
+pub mod playlist;
 
 
 pub use error::{Result, YtcsError};
