@@ -175,9 +175,8 @@ fn main() -> Result<()> {
     let download_cover = !cli.no_cover && config.download_cover;
     if download_cover {
         println!("{}", "Downloading album artwork...".yellow());
-        let thumb_path = output_dir.join("cover.jpg");
-        match downloader::download_thumbnail(&video_info.thumbnail_url, &thumb_path) {
-            Ok(_) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
+        match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
+            Ok(thumb_path) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
             Err(e) => println!("{} {}", "⚠ Could not download artwork:".yellow(), e),
         }
         println!();
@@ -352,9 +351,8 @@ fn download_single_video(
     // Download cover art (unless --no-cover)
     let download_cover = !cli.no_cover && cfg.download_cover;
     if download_cover {
-        let thumb_path = output_dir.join("cover.jpg");
-        match downloader::download_thumbnail(&video_info.thumbnail_url, &thumb_path) {
-            Ok(_) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
+        match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
+            Ok(thumb_path) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
             Err(e) => println!("{} {}", "⚠ Could not download artwork:".yellow(), e),
         }
     }

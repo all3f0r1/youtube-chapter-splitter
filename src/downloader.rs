@@ -299,15 +299,18 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
 ///
 /// Retourne une erreur si aucune miniature n'a pu être téléchargée
 pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
-    // Get video ID
-    let video_id = extract_video_id(url)?;
-    
-    // YouTube thumbnail URLs (try different qualities)
-    let thumbnail_urls = vec![
-        format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id),
-        format!("https://img.youtube.com/vi/{}/hqdefault.jpg", video_id),
-        format!("https://img.youtube.com/vi/{}/mqdefault.jpg", video_id),
-    ];
+    // Si l'URL est déjà une URL d'image, l'utiliser directement
+    let thumbnail_urls = if url.contains("ytimg.com") || url.contains("img.youtube.com") {
+        vec![url.to_string()]
+    } else {
+        // Sinon, extraire le video ID et construire les URLs
+        let video_id = extract_video_id(url)?;
+        vec![
+            format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id),
+            format!("https://img.youtube.com/vi/{}/hqdefault.jpg", video_id),
+            format!("https://img.youtube.com/vi/{}/mqdefault.jpg", video_id),
+        ]
+    };
     
     let output_path = output_dir.join("cover.jpg");
     

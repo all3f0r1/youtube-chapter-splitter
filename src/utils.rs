@@ -285,5 +285,10 @@ mod tests {
         let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]");
         assert_eq!(artist, "Pink Floyd");
         assert_eq!(album, "Dark Side Of The Moon");
+        
+        // Test avec em-dash et FULL ALBUM
+        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM) 70s Progressive • Psychedelic Rock");
+        assert_eq!(artist, "Arcane Voyage");
+        assert_eq!(album, "Third");
     }
 }
