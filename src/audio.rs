@@ -132,6 +132,68 @@ pub fn split_audio_by_chapters(
     Ok(output_files)
 }
 
+/// Vérifie si les données sont au format WebP.
+///
+/// # Arguments
+///
+/// * `data` - Les données à vérifier
+///
+/// # Returns
+///
+/// `true` si c'est un WebP, `false` sinon
+fn is_webp(data: &[u8]) -> bool {
+    data.len() >= 12
+        && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46  // "RIFF"
+        && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50  // "WEBP"
+}
+
+/// Convertit une image WebP en JPEG en utilisant ffmpeg.
+///
+/// # Arguments
+///
+/// * `webp_path` - Chemin vers le fichier WebP
+///
+/// # Returns
+///
+/// Les données de l'image JPEG
+fn convert_webp_to_jpeg(webp_path: &Path) -> Result<Vec<u8>> {
+    // Créer un fichier temporaire pour le JPEG
+    let temp_dir = std::env::temp_dir();
+    let temp_jpeg = temp_dir.join(format!("cover_{}.jpg", std::process::id()));
+    
+    // Convertir avec ffmpeg
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(webp_path)
+        .arg("-y")  // Overwrite output file
+        .arg("-q:v")
+        .arg("2")  // Haute qualité JPEG (1-31, 2 = très haute qualité)
+        .arg(&temp_jpeg)
+        .output()
+        .map_err(|e| YtcsError::AudioError(format!("Failed to run ffmpeg for WebP conversion: {}", e)))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(YtcsError::AudioError(format!(
+            "ffmpeg failed to convert WebP to JPEG: {}",
+            stderr
+        )));
+    }
+    
+    // Lire le fichier JPEG converti
+    let mut jpeg_file = File::open(&temp_jpeg)
+        .map_err(|e| YtcsError::AudioError(format!("Failed to open converted JPEG: {}", e)))?;
+    
+    let mut jpeg_data = Vec::new();
+    jpeg_file.read_to_end(&mut jpeg_data)
+        .map_err(|e| YtcsError::AudioError(format!("Failed to read converted JPEG: {}", e)))?;
+    
+    // Nettoyer le fichier temporaire
+    let _ = std::fs::remove_file(&temp_jpeg);
+    
+    Ok(jpeg_data)
+}
+
 /// Charge une image de couverture depuis un fichier.
 ///
 /// # Arguments
@@ -154,7 +216,59 @@ fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
     file.read_to_end(&mut data)
         .map_err(|e| YtcsError::AudioError(format!("Failed to read cover image: {}", e)))?;
     
+    // Détecter si c'est un WebP et le convertir en JPEG si nécessaire
+    if is_webp(&data) {
+        eprintln!("Warning: Cover image is WebP format. Converting to JPEG...");
+        data = convert_webp_to_jpeg(cover_path)?;
+    }
+    
     Ok(Some(data))
+}
+
+/// Détecte le type MIME d'une image basé sur ses magic bytes.
+///
+/// # Arguments
+///
+/// * `data` - Les données de l'image
+///
+/// # Returns
+///
+/// Le type MIME détecté, ou None si non reconnu
+fn detect_image_mime_type(data: &[u8]) -> Option<lofty::picture::MimeType> {
+    use lofty::picture::MimeType;
+    
+    if data.len() < 12 {
+        return None;
+    }
+    
+    // JPEG: FF D8 FF
+    if data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
+        return Some(MimeType::Jpeg);
+    }
+    
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
+        return Some(MimeType::Png);
+    }
+    
+    // GIF: 47 49 46 38 (GIF8)
+    if data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 {
+        return Some(MimeType::Gif);
+    }
+    
+    // BMP: 42 4D (BM)
+    if data[0] == 0x42 && data[1] == 0x4D {
+        return Some(MimeType::Bmp);
+    }
+    
+    // WEBP: 52 49 46 46 ... 57 45 42 50 (RIFF...WEBP)
+    // Note: WEBP n'est pas dans l'enum MimeType de lofty, donc on ne le supporte pas pour l'instant
+    // if data.len() >= 12 && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46
+    //     && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
+    //     return Some(MimeType::from("image/webp"));
+    // }
+    
+    None
 }
 
 /// Ajoute une pochette d'album à un fichier audio avec lofty.
@@ -174,12 +288,35 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
     
     // Créer l'objet Picture depuis les données
     let mut cover_reader = &cover_data[..];
-    let mut picture = Picture::from_reader(&mut cover_reader)
-        .map_err(|e| YtcsError::AudioError(format!("Failed to create picture: {}", e)))?;
+    let mut picture = match Picture::from_reader(&mut cover_reader) {
+        Ok(pic) => pic,
+        Err(e) => {
+            // Si la lecture automatique échoue, essayer de créer manuellement avec le MIME type
+            eprintln!("Warning: Failed to auto-detect image format: {}. Trying manual creation...", e);
+            
+            // Détecter le MIME type basé sur les magic bytes
+            let mime_type = detect_image_mime_type(cover_data)
+                .ok_or_else(|| YtcsError::AudioError(
+                    "Failed to detect image format. The cover image may be corrupted or in an unsupported format.".to_string()
+                ))?;
+            
+            // Créer la picture manuellement
+            Picture::new_unchecked(
+                PictureType::CoverFront,
+                Some(mime_type),
+                None,
+                cover_data.to_vec()
+            )
+        }
+    };
     
-    // Définir le type et la description
-    picture.set_pic_type(PictureType::CoverFront);
-    picture.set_description(Some("Album Cover".to_string()));
+    // Définir le type et la description (seulement si pas déjà défini)
+    if picture.pic_type() != PictureType::CoverFront {
+        picture.set_pic_type(PictureType::CoverFront);
+    }
+    if picture.description().is_none() {
+        picture.set_description(Some("Album Cover".to_string()));
+    }
     
     // Obtenir ou créer le tag principal
     let tag = match tagged_file.primary_tag_mut() {
