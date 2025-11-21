@@ -4,7 +4,9 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.8.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
+[![Release](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/Release/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/release.yml)
 
 ## ✨ Features
 
@@ -40,7 +42,35 @@ The application will check for dependencies at startup and offer to install them
 
 ### Installation
 
-#### Option 1: From crates.io (Recommended)
+#### Option 1: Download pre-built binaries (Easiest)
+
+Download the latest release for your platform from the [Releases page](https://github.com/all3f0r1/youtube-chapter-splitter/releases):
+
+- **Linux x86_64**: `ytcs-x86_64-unknown-linux-gnu.tar.gz` (dynamically linked)
+- **Linux x86_64 (static)**: `ytcs-x86_64-unknown-linux-musl.tar.gz` (no dependencies)
+- **Windows x86_64**: `ytcs-x86_64-pc-windows-msvc.zip`
+- **macOS Intel**: `ytcs-x86_64-apple-darwin.tar.gz`
+- **macOS Apple Silicon**: `ytcs-aarch64-apple-darwin.tar.gz`
+
+**Linux/macOS:**
+```bash
+# Download and extract
+wget https://github.com/all3f0r1/youtube-chapter-splitter/releases/latest/download/ytcs-x86_64-unknown-linux-gnu.tar.gz
+tar xzf ytcs-x86_64-unknown-linux-gnu.tar.gz
+
+# Install
+sudo mv ytcs /usr/local/bin/
+
+# Verify
+ytcs --version
+```
+
+**Windows:**
+1. Download `ytcs-x86_64-pc-windows-msvc.zip`
+2. Extract `ytcs.exe`
+3. Add the directory to your PATH or move to a directory in PATH
+
+#### Option 2: From crates.io
 
 ```bash
 cargo install youtube_chapter_splitter
@@ -48,7 +78,7 @@ cargo install youtube_chapter_splitter
 
 The `ytcs` binary will be installed in `~/.cargo/bin/` (make sure it's in your PATH).
 
-#### Option 2: From source
+#### Option 3: From source
 
 ```bash
 # Clone the repository
