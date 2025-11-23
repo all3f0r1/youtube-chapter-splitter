@@ -7,6 +7,18 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Comportement lors de la détection d'une playlist
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaylistBehavior {
+    /// Demander à l'utilisateur ce qu'il veut faire (défaut)
+    Ask,
+    /// Toujours télécharger uniquement la vidéo
+    VideoOnly,
+    /// Toujours télécharger la playlist entière
+    PlaylistOnly,
+}
+
 /// Configuration de l'application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -41,6 +53,9 @@ pub struct Config {
 
     /// Créer un fichier playlist (.m3u)
     pub create_playlist: bool,
+
+    /// Comportement lors de la détection d'une playlist
+    pub playlist_behavior: PlaylistBehavior,
 }
 
 impl Default for Config {
@@ -54,6 +69,7 @@ impl Default for Config {
             overwrite_existing: false,
             max_retries: 3,
             create_playlist: false,
+            playlist_behavior: PlaylistBehavior::Ask,
         }
     }
 }
@@ -156,6 +172,7 @@ pub fn show_config() -> Result<()> {
     println!("  overwrite_existing = {}", config.overwrite_existing);
     println!("  max_retries        = {}", config.max_retries);
     println!("  create_playlist    = {}", config.create_playlist);
+    println!("  playlist_behavior  = {:?}", config.playlist_behavior);
     println!();
     println!("Available placeholders:");
     println!("  Filename: %n (track number), %t (title), %a (artist), %A (album)");
@@ -220,6 +237,20 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
                 YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
             })?;
             println!("✓ Set create_playlist to: {}", config.create_playlist);
+        }
+        "playlist_behavior" => {
+            let behavior = match value {
+                "ask" => PlaylistBehavior::Ask,
+                "video_only" => PlaylistBehavior::VideoOnly,
+                "playlist_only" => PlaylistBehavior::PlaylistOnly,
+                _ => {
+                    return Err(YtcsError::ConfigError(
+                        "Value must be 'ask', 'video_only', or 'playlist_only'".to_string(),
+                    ));
+                }
+            };
+            config.playlist_behavior = behavior;
+            println!("✓ Set playlist_behavior to: {:?}", config.playlist_behavior);
         }
         _ => {
             return Err(YtcsError::ConfigError(format!(

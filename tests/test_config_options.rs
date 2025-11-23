@@ -110,6 +110,7 @@ fn test_config_deserialization() {
         overwrite_existing = true
         max_retries = 5
         create_playlist = true
+        playlist_behavior = "ask"
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();

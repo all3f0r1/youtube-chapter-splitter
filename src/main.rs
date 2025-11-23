@@ -11,9 +11,9 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// YouTube video URL (if no subcommand)
+    /// YouTube video URL(s) (if no subcommand)
     #[arg(value_name = "URL", required_unless_present = "command")]
-    url: Option<String>,
+    urls: Vec<String>,
 
     /// Output directory (overrides config)
     #[arg(short, long)]
@@ -115,53 +115,96 @@ fn main() -> Result<()> {
     }
 
     // Main download flow
-    let url = cli.url.clone().expect("URL is required");
+    if cli.urls.is_empty() {
+        eprintln!("{}", "Error: No URL provided".red().bold());
+        std::process::exit(1);
+    }
 
     check_dependencies()?;
 
-    println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
-    println!();
+    // Afficher l'en-tête TUI moderne
+    youtube_chapter_splitter::ui::print_header();
 
     // Load config
     let config = config::Config::load()?;
 
+    // Process each URL
+    let total_urls = cli.urls.len();
+    for (index, url) in cli.urls.iter().enumerate() {
+        if total_urls > 1 {
+            println!();
+            println!("{}", format!("=== Processing URL {}/{} ===", index + 1, total_urls).cyan().bold());
+            println!("{}", url.bright_blue());
+            println!();
+        }
+
+        process_single_url(url, &cli, &config)?;
+    }
+
+    if total_urls > 1 {
+        println!();
+        println!("{}", format!("✓ All {} URL(s) processed successfully!", total_urls).green().bold());
+    }
+
+    Ok(())
+}
+
+fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<()> {
+    use config::PlaylistBehavior;
+
     // Check if URL contains a playlist
-    if let Some(_playlist_id) = playlist::is_playlist_url(&url) {
+    if let Some(_playlist_id) = playlist::is_playlist_url(url) {
         println!("{}", "Playlist detected!".yellow().bold());
         println!();
 
-        // Ask user what to do
-        print!(
-            "{}",
-            "Do you want to download (v)ideo only or (p)laylist? [v/p]: ".bold()
-        );
-        io::stdout().flush()?;
+        // Determine action based on config
+        let should_download_playlist = match config.playlist_behavior {
+            PlaylistBehavior::Ask => {
+                // Ask user what to do
+                print!(
+                    "{}",
+                    "Do you want to download (v)ideo only or (p)laylist? [v/p]: ".bold()
+                );
+                io::stdout().flush()?;
 
-        let mut choice = String::new();
-        io::stdin().read_line(&mut choice)?;
-        let choice = choice.trim().to_lowercase();
+                let mut choice = String::new();
+                io::stdin().read_line(&mut choice)?;
+                let choice = choice.trim().to_lowercase();
 
-        if choice == "p" || choice == "playlist" {
-            // Download entire playlist
-            return download_playlist(&url, &cli, &config);
+                choice == "p" || choice == "playlist"
+            }
+            PlaylistBehavior::VideoOnly => {
+                println!("{}", "Downloading video only (configured behavior)...".green());
+                println!();
+                false
+            }
+            PlaylistBehavior::PlaylistOnly => {
+                println!("{}", "Downloading entire playlist (configured behavior)...".green());
+                println!();
+                true
+            }
+        };
+
+        if should_download_playlist {
+            return download_playlist(url, cli, config);
         } else {
-            // Download only the video (remove playlist parameter)
             println!("{}", "Downloading video only...".green());
             println!();
         }
     }
 
-    let url = clean_url(&url);
+    use youtube_chapter_splitter::ui::{self, Status, TrackProgress};
+
+    let url = clean_url(url);
     println!("{}", "Fetching video information...".yellow());
     let video_info = downloader::get_video_info(&url)?;
-    println!("{} {}", "Title:".bold(), video_info.title);
-    println!(
-        "{} {}",
-        "Duration:".bold(),
-        utils::format_duration(video_info.duration)
+    
+    // Afficher les infos vidéo avec le nouveau TUI
+    ui::print_video_info(
+        &video_info.title,
+        &utils::format_duration(video_info.duration),
+        video_info.chapters.len()
     );
-    println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
-    println!();
 
     // Determine output directory
     let output_dir = if let Some(ref output) = cli.output {
@@ -182,22 +225,48 @@ fn main() -> Result<()> {
     let output_dir = output_dir.join(&dir_name);
     std::fs::create_dir_all(&output_dir)?;
 
-    // Download cover art (unless --no-cover)
+    // Download cover art and audio with TUI
     let download_cover = !cli.no_cover && config.download_cover;
+    
+    let mut cover_status = if download_cover { Status::InProgress } else { Status::Pending };
+    let mut audio_status = Status::Pending;
+    
+    // Afficher l'état initial
+    ui::print_download_section(cover_status, audio_status);
+    
+    // Download cover
     if download_cover {
-        println!("{}", "Downloading album artwork...".yellow());
         match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
-            Ok(thumb_path) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
-            Err(e) => println!("{} {}", "⚠ Could not download artwork:".yellow(), e),
+            Ok(_) => cover_status = Status::Success,
+            Err(e) => {
+                cover_status = Status::Failed;
+                ui::print_warning(&format!("Could not download artwork: {}", e));
+            }
         }
-        println!();
+        // Mettre à jour l'affichage
+        ui::clear_lines(5);
+        ui::print_download_section(cover_status, audio_status);
     }
-
+    
     // Download audio
-    println!("{}", "Downloading audio...".yellow());
-    let audio_file = downloader::download_audio(&url, &output_dir.join("temp_audio.mp3"))?;
-    println!("{} {}", "✓ Audio downloaded:".green(), audio_file.display());
-    println!();
+    audio_status = Status::InProgress;
+    ui::clear_lines(5);
+    ui::print_download_section(cover_status, audio_status);
+    
+    let audio_file = match downloader::download_audio(&url, &output_dir.join("temp_audio.mp3")) {
+        Ok(file) => {
+            audio_status = Status::Success;
+            ui::clear_lines(5);
+            ui::print_download_section(cover_status, audio_status);
+            file
+        }
+        Err(e) => {
+            audio_status = Status::Failed;
+            ui::clear_lines(5);
+            ui::print_download_section(cover_status, audio_status);
+            return Err(e);
+        }
+    };
 
     // Get chapters
     let chapters_to_use = if !video_info.chapters.is_empty() {
@@ -207,18 +276,6 @@ fn main() -> Result<()> {
         println!("{}", "No tracks found, detecting automatically...".yellow());
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
-
-    // Display chapters
-    println!();
-    println!("{}", "Tracks to create:".bold());
-    for (i, chapter) in chapters_to_use.iter().enumerate() {
-        println!(
-            "  {}. {} [{}]",
-            i + 1,
-            chapter.title,
-            utils::format_duration_short(chapter.duration())
-        );
-    }
     println!();
 
     let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
@@ -230,6 +287,21 @@ fn main() -> Result<()> {
         None
     };
 
+    // Initialiser les pistes pour l'affichage TUI
+    let mut tracks: Vec<TrackProgress> = final_chapters.iter().enumerate().map(|(i, ch)| {
+        TrackProgress {
+            number: i + 1,
+            title: ch.title.clone(),
+            status: Status::Pending,
+            progress: 0,
+        }
+    }).collect();
+    
+    // Afficher l'état initial
+    ui::print_track_section(&tracks);
+    
+    // Découper toutes les pistes (la fonction split_audio_by_chapters gère déjà la progression)
+    // On va simuler la progression visuellement
     let output_files = audio::split_audio_by_chapters(
         &audio_file,
         &final_chapters,
@@ -239,14 +311,23 @@ fn main() -> Result<()> {
         cover_path.as_deref(),
         &config,
     )?;
-
+    
+    // Marquer toutes les pistes comme réussies
+    for track in &mut tracks {
+        track.status = Status::Success;
+        track.progress = 100;
+    }
+    ui::clear_lines(tracks.len() + 3);
+    ui::print_track_section(&tracks);
+    
     // Clean up temporary audio file
     std::fs::remove_file(&audio_file).ok();
-
-    println!();
-    println!("{}", "✓ Processing completed successfully!".bold().green());
-    println!("{} {}", "Files created:".bold(), output_files.len());
-    println!("{} {}", "Directory:".bold(), output_dir.display());
+    
+    // Message de succès
+    ui::print_success(
+        &format!("✓ All {} tracks created successfully!", output_files.len()),
+        &output_dir.display().to_string()
+    );
 
     Ok(())
 }

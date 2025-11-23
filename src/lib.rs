@@ -53,6 +53,7 @@ pub mod config;
 pub mod downloader;
 pub mod error;
 pub mod playlist;
+pub mod ui;
 pub mod utils;
 
 pub use chapters::Chapter;
