@@ -1,16 +1,18 @@
-> **ytcs**: Téléchargez des albums YouTube complets, proprement découpés en pistes MP3 avec métadonnées et pochette, le tout via une simple ligne de commande.
+# youtube-chapter-splitter
+
+> **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
 [![Version](https://img.shields.io/badge/version-0.10.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/) [![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
 
 ---
 
-`youtube-chapter-splitter` (ou `ytcs`) est un outil CLI puissant et pragmatique conçu pour une seule chose : archiver parfaitement la musique de YouTube. Il télécharge la vidéo, extrait l'audio en MP3, récupère la pochette, nettoie les titres, et découpe l'audio en pistes impeccables basées sur les chapitres, le tout en une seule commande.
+`youtube-chapter-splitter` (or `ytcs`) is a powerful and pragmatic CLI tool designed for one thing: archiving music from YouTube perfectly. It downloads the video, extracts audio to MP3, fetches the cover art, cleans titles, and splits the audio into pristine tracks based on chapters, all in a single command.
 
-## Philosophie
+## Philosophy
 
-- **Pragmatique**: Pas de fioritures, juste ce qui compte.
-- **Direct**: Info claire sans détours.
-- **Classe**: Élégant sans être tape-à-l'œil.
+- **Pragmatic**: No frills, just what matters.
+- **Direct**: Clear info without detours.
+- **Classy**: Elegant without being flashy.
 
 ```
 ytcs v0.10.1
@@ -31,40 +33,64 @@ ytcs v0.10.1
 ✓ Done → ~/Music/Marigold - Oblivion Gate
 ```
 
-## Fonctionnalités
+## Features
 
-- **Téléchargement MP3**: Audio de haute qualité (192 kbps par défaut).
-- **Pochette Automatique**: Pochette d'album intégrée aux métadonnées MP3.
-- **Découpage par Chapitres**: Détection automatique des chapitres YouTube.
-- **Détection de Silence**: Plan B si la vidéo n'a pas de chapitres.
-- **Métadonnées Complètes**: Titre, artiste, album, numéro de piste, pochette.
-- **Configuration Persistante**: Fichier `config.toml` pour vos préférences.
-- **Formatage Personnalisable**: Noms de fichiers (`%n`, `%t`) et de dossiers (`%a`, `%A`).
-- **Nettoyage Intelligent**: Supprime `[Full Album]`, `(Official Audio)`, etc.
-- **Support des Playlists**: Gestion interactive des playlists.
-- **Vérification des Dépendances**: `yt-dlp` et `ffmpeg` sont vérifiés au démarrage.
+- **MP3 Download**: High-quality audio (192 kbps by default).
+- **Automatic Cover Art**: Album artwork embedded in MP3 metadata.
+- **Chapter-based Splitting**: Automatic detection of YouTube chapters.
+- **Silence Detection**: Fallback if the video has no chapters.
+- **Complete Metadata**: Title, artist, album, track number, cover art.
+- **Persistent Configuration**: `config.toml` file for your preferences.
+- **Customizable Formatting**: File names (`%n`, `%t`) and folders (`%a`, `%A`).
+- **Smart Cleanup**: Removes `[Full Album]`, `(Official Audio)`, etc.
+- **Playlist Support**: Interactive playlist handling.
+- **Dependency Verification**: `yt-dlp` and `ffmpeg` are checked at startup.
 
 ## Installation
 
-### 1. Binaires Pré-compilés (Recommandé)
+### Prerequisites
 
-Récupérez la dernière version pour votre système sur la [page des Releases](https://github.com/all3f0r1/youtube-chapter-splitter/releases).
+`ytcs` requires two external tools:
+
+- **[yt-dlp](https://github.com/yt-dlp/yt-dlp)**: For downloading YouTube videos
+- **[ffmpeg](https://ffmpeg.org/)**: For audio processing and splitting
+
+**Quick install:**
+
+```bash
+# Linux/macOS (via package manager)
+# Ubuntu/Debian
+sudo apt install yt-dlp ffmpeg
+
+# macOS (via Homebrew)
+brew install yt-dlp ffmpeg
+
+# Or via pip (cross-platform)
+pip install yt-dlp
+
+# Windows (via Chocolatey)
+choco install yt-dlp ffmpeg
+```
+
+### 1. Pre-compiled Binaries (Recommended)
+
+Download the latest release for your system from the [Releases page](https://github.com/all3f0r1/youtube-chapter-splitter/releases).
 
 **Linux/macOS:**
 ```bash
-# Téléchargez, extrayez, et installez
+# Download, extract, and install
 wget https://github.com/all3f0r1/youtube-chapter-splitter/releases/latest/download/ytcs-x86_64-unknown-linux-gnu.tar.gz
 tar xzf ytcs-x86_64-unknown-linux-gnu.tar.gz
 sudo mv ytcs /usr/local/bin/
 
-# Vérifiez l'installation
+# Verify installation
 ytcs --version
 ```
 
 **Windows:**
-1. Téléchargez `ytcs-x86_64-pc-windows-msvc.zip`.
-2. Extrayez `ytcs.exe`.
-3. Placez-le dans un dossier inclus dans votre `PATH`.
+1. Download `ytcs-x86_64-pc-windows-msvc.zip`.
+2. Extract `ytcs.exe`.
+3. Place it in a folder included in your `PATH`.
 
 ### 2. Via `cargo`
 
@@ -72,76 +98,125 @@ ytcs --version
 cargo install youtube_chapter_splitter
 ```
 
-## Utilisation
+## Usage
 
-`ytcs` fonctionne avec des commandes claires et directes.
+`ytcs` works with clear and direct commands.
 
-### Télécharger une Vidéo
+### Download a Video
 
-La commande par défaut est `download`. Vous pouvez l'omettre pour un usage rapide.
+The default command is `download`. You can omit it for quick usage.
 
 ```bash
-# Syntaxe complète
+# Full syntax
 ytcs download "https://www.youtube.com/watch?v=..."
 
-# Syntaxe rapide (recommandée)
+# Quick syntax (recommended)
 ytcs "https://www.youtube.com/watch?v=..."
 ```
 
-**Options de téléchargement:**
-- `-o, --output <DIR>`: Spécifie un dossier de sortie.
-- `-a, --artist <ARTIST>`: Force le nom de l'artiste.
-- `-A, --album <ALBUM>`: Force le nom de l'album.
-- `--no-cover`: Désactive le téléchargement de la pochette.
+**Download options:**
+- `-o, --output <DIR>`: Specify an output folder.
+- `-a, --artist <ARTIST>`: Force the artist name.
+- `-A, --album <ALBUM>`: Force the album name.
+- `--no-cover`: Disable cover art download.
 
-### Gérer la Configuration
-
-`ytcs` utilise un fichier de configuration simple (`~/.config/ytcs/config.toml`).
+**Examples:**
 
 ```bash
-# Afficher la configuration actuelle
+# Basic usage
+ytcs "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+# Custom output directory
+ytcs -o ~/Downloads/Music "https://youtube.com/..."
+
+# Override artist and album
+ytcs -a "Pink Floyd" -A "The Wall" "https://youtube.com/..."
+
+# Skip cover art
+ytcs --no-cover "https://youtube.com/..."
+```
+
+### Manage Configuration
+
+`ytcs` uses a simple configuration file (`~/.config/ytcs/config.toml`).
+
+```bash
+# Show current configuration
 ytcs config
 
-# Modifier une valeur
+# Modify a value
 ytcs set audio_quality 128
 ytcs set playlist_behavior video_only
 
-# Réinitialiser la configuration par défaut
+# Reset to default configuration
 ytcs reset
 ```
 
 ## Configuration
 
-Personnalisez `ytcs` selon vos besoins. Modifiez directement le fichier `config.toml` ou utilisez `ytcs set`.
+Customize `ytcs` according to your needs. Edit the `config.toml` file directly or use `ytcs set`.
 
-| Clé                  | Défaut                   | Description                                                                 |
+| Key                  | Default                  | Description                                                                 |
 |----------------------|--------------------------|-----------------------------------------------------------------------------|
-| `default_output_dir` | `~/Music`                | Dossier de sortie par défaut.                                               |
-| `download_cover`     | `true`                   | Télécharger la pochette de l'album.                                         |
-| `filename_format`    | `"%n - %t"`              | Format du nom de fichier (`%n`: numéro, `%t`: titre, `%a`: artiste, `%A`: album). |
-| `directory_format`   | `"%a - %A"`              | Format du dossier (`%a`: artiste, `%A`: album).                             |
-| `audio_quality`      | `192`                    | Qualité audio en kbps (ex: `128`, `192`).                                   |
-| `overwrite_existing` | `false`                  | Ré-télécharger et écraser les fichiers existants.                           |
-| `max_retries`        | `3`                      | Nombre de tentatives en cas d'échec de téléchargement.                      |
-| `create_playlist`    | `false`                  | Créer un fichier playlist `.m3u` pour les playlists YouTube.                |
-| `playlist_behavior`  | `ask`                    | Comportement pour les URLs de playlist: `ask`, `video_only`, `playlist_only`. |
+| `default_output_dir` | `~/Music`                | Default output folder.                                                      |
+| `download_cover`     | `true`                   | Download album cover art.                                                   |
+| `filename_format`    | `"%n - %t"`              | File name format (`%n`: number, `%t`: title, `%a`: artist, `%A`: album).    |
+| `directory_format`   | `"%a - %A"`              | Folder format (`%a`: artist, `%A`: album).                                  |
+| `audio_quality`      | `192`                    | Audio quality in kbps (e.g., `128`, `192`, `320`).                          |
+| `overwrite_existing` | `false`                  | Re-download and overwrite existing files.                                   |
+| `max_retries`        | `3`                      | Number of retry attempts on download failure.                               |
+| `create_playlist`    | `false`                  | Create a `.m3u` playlist file for YouTube playlists.                        |
+| `playlist_behavior`  | `ask`                    | Behavior for playlist URLs: `ask`, `video_only`, `playlist_only`.           |
+
+**Format placeholders:**
+
+**File format:**
+- `%n` - Track number (01, 02, ...)
+- `%t` - Track title
+- `%a` - Artist name
+- `%A` - Album name
+
+**Directory format:**
+- `%a` - Artist name
+- `%A` - Album name
 
 ## Changelog
 
 ### [0.10.1] - 2025-11-24
-- **Fixed:** Les sous-commandes CLI (`config`, `set`, `reset`) fonctionnent maintenant correctement.
-- **Technical:** La structure CLI a été refactorisée pour gérer proprement les sous-commandes avec `clap`.
+- **Fixed:** CLI subcommands (`config`, `set`, `reset`) now work correctly.
+- **Technical:** Refactored CLI structure to properly handle subcommands with `clap`.
 
 ### [0.10.0] - 2025-11-24
-- **Changed:** Refonte complète de l'UI pour un design minimaliste, propre et pragmatique.
-- **Removed:** Suppression des bordures, boîtes et bruit visuel inutiles.
-- **Improved:** Nettoyage automatique des titres de vidéos (supprime `[Full Album]`, `[Official Audio]`, etc.).
+- **Changed:** Complete UI redesign - minimal, clean, and pragmatic.
+- **Removed:** Unnecessary borders, boxes, and visual noise.
+- **Removed:** Emojis from main output (kept only status checkmarks).
+- **Improved:** Auto-clean video titles (removes `[Full Album]`, `[Official Audio]`, etc.).
+- **Improved:** More direct and readable output format.
+- **Philosophy:** Pragmatic • Direct • Classy
 
 ### [0.9.3] - 2025-11-24
-- **Fixed:** Correction d'une erreur de parsing de configuration pour les utilisateurs migrant depuis d'anciennes versions.
+- **Fixed:** Configuration parsing error for users upgrading from older versions.
+- **Added:** Serde default values for all configuration fields to ensure backward compatibility.
+- **Technical:** Old config files missing `playlist_behavior` field now work correctly.
+
+### [0.9.2] - 2025-11-24
+- **Changed:** MP3 filename capitalization from UPPERCASE to Title Case for better readability.
+- **Example:** `01 - Oblivion Gate.mp3` instead of `01 - OBLIVION GATE.MP3`.
+
+### [0.9.1] - 2025-11-24
+- **Added:** Complete code audit with all clippy warnings fixed.
+- **Removed:** Obsolete documentation files and examples.
+- **Improved:** Code quality and maintainability.
+- **Changed:** Capitalized MP3 filenames (reverted in 0.9.2).
+
+### [0.9.0] - 2025-11-24
+- **Added:** Playlist support with configurable behavior.
+- **Added:** Configuration management commands (`config`, `set`, `reset`).
+- **Added:** Customizable file and directory naming formats.
+- **Improved:** Better error handling and user feedback.
 
 ---
 
-## Licence
+## License
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
