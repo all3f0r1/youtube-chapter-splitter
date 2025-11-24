@@ -78,7 +78,19 @@ pub fn split_audio_by_chapters(
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
         let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
-        let output_filename = format!("{}.mp3", filename_base).to_uppercase();
+        // Title Case: première lettre de chaque mot en majuscule
+        let title_cased = filename_base
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+        let output_filename = format!("{}.mp3", title_cased);
         let output_path = output_dir.join(&output_filename);
 
         pb.set_message(format!("Track {}: {}", track_number, chapter.title));

@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.9.2-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 [![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
 
 ## ✨ Features
@@ -25,7 +25,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 - 🎶 **Playlist support** with interactive prompts.
 - 🔄 **Retry mechanism** for failed downloads.
 - 덮어쓰기 **Overwrite option** for existing files.
-- 🔠 **CAPITALIZED** final MP3 filenames for better compatibility with some players.
+- 🔠 **Title Case** final MP3 filenames (first letter of each word capitalized) for better readability.
 
 ## 🚀 Quick Start
 
@@ -137,6 +137,10 @@ YouTube Chapter Splitter uses a persistent configuration file stored at:
 - `%A` - Album name
 
 ## 📝 Changelog
+
+### [0.9.2] - 2025-11-24
+- **Changed:** MP3 filenames now use Title Case (first letter of each word capitalized) instead of full uppercase for better readability.
+- **Example:** `01 - Oblivion Gate.mp3` instead of `01 - OBLIVION GATE.MP3`
 
 ### [0.9.1] - 2025-11-24
 - **Added:** Final MP3 filenames are now fully capitalized for better compatibility.
