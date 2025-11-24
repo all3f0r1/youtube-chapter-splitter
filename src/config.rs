@@ -8,10 +8,11 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Comportement lors de la détection d'une playlist
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlaylistBehavior {
     /// Demander à l'utilisateur ce qu'il veut faire (défaut)
+    #[default]
     Ask,
     /// Toujours télécharger uniquement la vidéo
     VideoOnly,
@@ -23,9 +24,11 @@ pub enum PlaylistBehavior {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Répertoire de téléchargement par défaut
+    #[serde(default)]
     pub default_output_dir: Option<String>,
 
     /// Télécharger la pochette d'album
+    #[serde(default = "default_download_cover")]
     pub download_cover: bool,
 
     /// Format du nom de fichier
@@ -34,28 +37,56 @@ pub struct Config {
     /// - %t: titre de la piste
     /// - %a: artiste
     /// - %A: album
+    #[serde(default = "default_filename_format")]
     pub filename_format: String,
 
     /// Format du nom de répertoire
     /// Placeholders disponibles:
     /// - %a: artiste
     /// - %A: album
+    #[serde(default = "default_directory_format")]
     pub directory_format: String,
 
     /// Qualité audio en kbps (128 ou 192)
+    #[serde(default = "default_audio_quality")]
     pub audio_quality: u32,
 
     /// Écraser les fichiers existants
+    #[serde(default)]
     pub overwrite_existing: bool,
 
     /// Nombre de tentatives en cas d'échec
+    #[serde(default = "default_max_retries")]
     pub max_retries: u32,
 
     /// Créer un fichier playlist (.m3u)
+    #[serde(default)]
     pub create_playlist: bool,
 
     /// Comportement lors de la détection d'une playlist
+    #[serde(default)]
     pub playlist_behavior: PlaylistBehavior,
+}
+
+// Fonctions de valeur par défaut pour serde
+fn default_download_cover() -> bool {
+    true
+}
+
+fn default_filename_format() -> String {
+    "%n - %t".to_string()
+}
+
+fn default_directory_format() -> String {
+    "%a - %A".to_string()
+}
+
+fn default_audio_quality() -> u32 {
+    192
+}
+
+fn default_max_retries() -> u32 {
+    3
 }
 
 impl Default for Config {
