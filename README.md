@@ -1,200 +1,147 @@
-# YouTube Chapter Splitter
+> **ytcs**: Téléchargez des albums YouTube complets, proprement découpés en pistes MP3 avec métadonnées et pochette, le tout via une simple ligne de commande.
 
-A simple and powerful Rust CLI tool to download YouTube videos, extract audio to MP3, and automatically split them into individual tracks based on chapters.
+[![Version](https://img.shields.io/badge/version-0.10.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/) [![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.10.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
-[![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
+---
 
-## ✨ Features
+`youtube-chapter-splitter` (ou `ytcs`) est un outil CLI puissant et pragmatique conçu pour une seule chose : archiver parfaitement la musique de YouTube. Il télécharge la vidéo, extrait l'audio en MP3, récupère la pochette, nettoie les titres, et découpe l'audio en pistes impeccables basées sur les chapitres, le tout en une seule commande.
 
-- 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps default).
-- 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags.
-- 📑 **Automatic chapter detection** from YouTube video metadata.
-- 🔇 **Silence detection fallback** for videos without chapters.
-- ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art).
-- ⚙️ **Persistent configuration** with customizable defaults in a `config.toml` file.
-- 📝 **Customizable filename format** with placeholders (`%n`, `%t`, `%a`, `%A`).
-- 📁 **Customizable directory format** for organized music library (`%a`, `%A`).
-- 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, and capitalizes).
-- 📊 **Progress bars** for download and splitting operations.
-- 🎯 **Force artist/album names** with CLI options.
-- ⚡ **Dependency checking** with automatic installation prompts.
-- 🧹 **URL cleaning** - automatically removes playlist and extra parameters.
-- 🎶 **Playlist support** with interactive prompts.
-- 🔄 **Retry mechanism** for failed downloads.
-- 덮어쓰기 **Overwrite option** for existing files.
-- 🔠 **Title Case** final MP3 filenames (first letter of each word capitalized) for better readability.
+## Philosophie
 
-## 🚀 Quick Start
+- **Pragmatique**: Pas de fioritures, juste ce qui compte.
+- **Direct**: Info claire sans détours.
+- **Classe**: Élégant sans être tape-à-l'œil.
 
-### Prerequisites
+```
+ytcs v0.10.1
 
-The application will check for dependencies at startup and offer to install them:
+→ Marigold - Oblivion Gate
+  29m 29s • 5 tracks
 
-- **yt-dlp**: `pip install yt-dlp`
-- **ffmpeg**:
-  - Linux: `sudo apt install ffmpeg`
-  - macOS: `brew install ffmpeg`
-  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+  ✓ Cover downloaded
+  ✓ Audio downloaded
 
-### Installation
+  Splitting tracks...
+  ✓ 01 Oblivion Gate (5m 54s)
+  ✓ 02 Obsidian Throne (5m 35s)
+  ✓ 03 Crimson Citadel (5m 47s)
+  ✓ 04 Silver Spire (6m 30s)
+  ✓ 05 Eternal Pyre (5m 43s)
 
-#### Option 1: Download pre-built binaries (Easiest)
+✓ Done → ~/Music/Marigold - Oblivion Gate
+```
 
-Download the latest release for your platform from the [Releases page](https://github.com/all3f0r1/youtube-chapter-splitter/releases).
+## Fonctionnalités
+
+- **Téléchargement MP3**: Audio de haute qualité (192 kbps par défaut).
+- **Pochette Automatique**: Pochette d'album intégrée aux métadonnées MP3.
+- **Découpage par Chapitres**: Détection automatique des chapitres YouTube.
+- **Détection de Silence**: Plan B si la vidéo n'a pas de chapitres.
+- **Métadonnées Complètes**: Titre, artiste, album, numéro de piste, pochette.
+- **Configuration Persistante**: Fichier `config.toml` pour vos préférences.
+- **Formatage Personnalisable**: Noms de fichiers (`%n`, `%t`) et de dossiers (`%a`, `%A`).
+- **Nettoyage Intelligent**: Supprime `[Full Album]`, `(Official Audio)`, etc.
+- **Support des Playlists**: Gestion interactive des playlists.
+- **Vérification des Dépendances**: `yt-dlp` et `ffmpeg` sont vérifiés au démarrage.
+
+## Installation
+
+### 1. Binaires Pré-compilés (Recommandé)
+
+Récupérez la dernière version pour votre système sur la [page des Releases](https://github.com/all3f0r1/youtube-chapter-splitter/releases).
 
 **Linux/macOS:**
 ```bash
-# Download and extract
+# Téléchargez, extrayez, et installez
 wget https://github.com/all3f0r1/youtube-chapter-splitter/releases/latest/download/ytcs-x86_64-unknown-linux-gnu.tar.gz
 tar xzf ytcs-x86_64-unknown-linux-gnu.tar.gz
-
-# Install
 sudo mv ytcs /usr/local/bin/
 
-# Verify
+# Vérifiez l'installation
 ytcs --version
 ```
 
 **Windows:**
-1. Download `ytcs-x86_64-pc-windows-msvc.zip`
-2. Extract `ytcs.exe`
-3. Add the directory to your PATH or move to a directory in PATH
+1. Téléchargez `ytcs-x86_64-pc-windows-msvc.zip`.
+2. Extrayez `ytcs.exe`.
+3. Placez-le dans un dossier inclus dans votre `PATH`.
 
-#### Option 2: From crates.io
+### 2. Via `cargo`
 
 ```bash
 cargo install youtube_chapter_splitter
 ```
 
-The `ytcs` binary will be installed in `~/.cargo/bin/` (make sure it's in your PATH).
+## Utilisation
 
-### Usage
+`ytcs` fonctionne avec des commandes claires et directes.
 
-**Simple syntax:**
+### Télécharger une Vidéo
+
+La commande par défaut est `download`. Vous pouvez l'omettre pour un usage rapide.
+
 ```bash
-ytcs "<YOUTUBE_URL>" [OPTIONS]
+# Syntaxe complète
+ytcs download "https://www.youtube.com/watch?v=..."
+
+# Syntaxe rapide (recommandée)
+ytcs "https://www.youtube.com/watch?v=..."
 ```
 
-**Options:**
-- `-o, --output <DIR>` - Output directory (overrides config)
-- `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
-- `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
-- `--no-cover` - Skip downloading cover art
+**Options de téléchargement:**
+- `-o, --output <DIR>`: Spécifie un dossier de sortie.
+- `-a, --artist <ARTIST>`: Force le nom de l'artiste.
+- `-A, --album <ALBUM>`: Force le nom de l'album.
+- `--no-cover`: Désactive le téléchargement de la pochette.
 
-**Configuration commands:**
-- `ytcs config` - Show current configuration
-- `ytcs set <key> <value>` - Set a configuration value
-- `ytcs reset` - Reset configuration to defaults
+### Gérer la Configuration
 
-**Examples:**
+`ytcs` utilise un fichier de configuration simple (`~/.config/ytcs/config.toml`).
+
 ```bash
-# Download and split a YouTube video (saves to ~/Music)
-ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA"
+# Afficher la configuration actuelle
+ytcs config
 
-# Download a playlist (will prompt for confirmation)
-ytcs "https://www.youtube.com/playlist?list=..."
+# Modifier une valeur
+ytcs set audio_quality 128
+ytcs set playlist_behavior video_only
 
-# Specify custom output directory
-ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
-
-# Force artist and album names
-ytcs "https://www.youtube.com/watch?v=..." -a "Pink Floyd" -A "Dark Side of the Moon"
+# Réinitialiser la configuration par défaut
+ytcs reset
 ```
 
-## ⚙️ Configuration
+## Configuration
 
-YouTube Chapter Splitter uses a persistent configuration file stored at:
-- **Linux/macOS**: `~/.config/ytcs/config.toml`
-- **Windows**: `%APPDATA%\ytcs\config.toml`
+Personnalisez `ytcs` selon vos besoins. Modifiez directement le fichier `config.toml` ou utilisez `ytcs set`.
 
-### Available Settings
+| Clé                  | Défaut                   | Description                                                                 |
+|----------------------|--------------------------|-----------------------------------------------------------------------------|
+| `default_output_dir` | `~/Music`                | Dossier de sortie par défaut.                                               |
+| `download_cover`     | `true`                   | Télécharger la pochette de l'album.                                         |
+| `filename_format`    | `"%n - %t"`              | Format du nom de fichier (`%n`: numéro, `%t`: titre, `%a`: artiste, `%A`: album). |
+| `directory_format`   | `"%a - %A"`              | Format du dossier (`%a`: artiste, `%A`: album).                             |
+| `audio_quality`      | `192`                    | Qualité audio en kbps (ex: `128`, `192`).                                   |
+| `overwrite_existing` | `false`                  | Ré-télécharger et écraser les fichiers existants.                           |
+| `max_retries`        | `3`                      | Nombre de tentatives en cas d'échec de téléchargement.                      |
+| `create_playlist`    | `false`                  | Créer un fichier playlist `.m3u` pour les playlists YouTube.                |
+| `playlist_behavior`  | `ask`                    | Comportement pour les URLs de playlist: `ask`, `video_only`, `playlist_only`. |
 
-| Setting              | Default                  | Description                                      |
-|----------------------|--------------------------|--------------------------------------------------|
-| `default_output_dir` | `~/Music`                | Default download directory                       |
-| `download_cover`     | `true`                   | Download album artwork                           |
-| `filename_format`    | `"%n - %t"`              | Filename format with placeholders                |
-| `directory_format`   | `"%a - %A"`              | Directory format with placeholders               |
-| `audio_quality`      | `192`                    | MP3 quality (128 or 192 kbps)                    |
-| `overwrite_existing` | `false`                  | Overwrite existing files                         |
-| `max_retries`        | `3`                      | Retries on download failure                      |
-| `create_playlist`    | `false`                  | Create .m3u playlist file for playlists          |
-| `playlist_behavior`  | `ask`                    | `ask`, `video_only`, or `playlist_only`          |
-
-### Format Placeholders
-
-**Filename format**:
-- `%n` - Track number (01, 02, etc.)
-- `%t` - Track title
-- `%a` - Artist name
-- `%A` - Album name
-
-**Directory format**:
-- `%a` - Artist name
-- `%A` - Album name
-
-## 📝 Changelog
+## Changelog
 
 ### [0.10.1] - 2025-11-24
-- **Fixed:** CLI subcommands (config, set, reset) now work correctly.
-- **Technical:** Refactored CLI structure to properly handle subcommands with clap.
+- **Fixed:** Les sous-commandes CLI (`config`, `set`, `reset`) fonctionnent maintenant correctement.
+- **Technical:** La structure CLI a été refactorisée pour gérer proprement les sous-commandes avec `clap`.
 
 ### [0.10.0] - 2025-11-24
-- **Changed:** Complete UI redesign - minimal, clean, and pragmatic.
-- **Removed:** Unnecessary borders, boxes, and visual noise.
-- **Removed:** Emojis from main output (kept only status checkmarks).
-- **Improved:** Auto-clean video titles (removes "[Full Album]", "[Official Audio]", etc.).
-- **Improved:** More direct and readable output format.
-- **Philosophy:** Pragmatic • Direct • Classe
+- **Changed:** Refonte complète de l'UI pour un design minimaliste, propre et pragmatique.
+- **Removed:** Suppression des bordures, boîtes et bruit visuel inutiles.
+- **Improved:** Nettoyage automatique des titres de vidéos (supprime `[Full Album]`, `[Official Audio]`, etc.).
 
 ### [0.9.3] - 2025-11-24
-- **Fixed:** Configuration parsing error for users upgrading from older versions.
-- **Added:** Serde default values for all configuration fields to ensure backward compatibility.
-- **Technical:** Old config files missing `playlist_behavior` field now work correctly.
+- **Fixed:** Correction d'une erreur de parsing de configuration pour les utilisateurs migrant depuis d'anciennes versions.
 
-### [0.9.2] - 2025-11-24
-- **Changed:** MP3 filenames now use Title Case (first letter of each word capitalized) instead of full uppercase for better readability.
-- **Example:** `01 - Oblivion Gate.mp3` instead of `01 - OBLIVION GATE.MP3`
+---
 
-### [0.9.1] - 2025-11-24
-- **Added:** Final MP3 filenames are now fully capitalized for better compatibility.
-- **Fixed:** Corrected all `clippy` warnings for improved code quality.
-- **Changed:** Refactored `main.rs` to reduce code duplication between single video and playlist video downloads.
-- **Removed:** Deleted obsolete changelogs, examples, and backup files from the repository.
-- **Docs:** Completely rewrote the README for clarity, and consolidated the changelog.
+## Licence
 
-### [0.9.0] - (Previous Version)
-- Major internal refactoring and UI improvements.
-
-### [0.3.2] - 2024-11-16
-- **Fixed:** Simplified cover art logic to always use external `cover.jpg`.
-
-### [0.3.1] - 2024-11-16
-- **Fixed:** "Stream map '1:v' matches no streams" error when audio has no embedded cover art.
-
-### [0.3.0] - 2024-11-16
-- **Fixed:** Cover art is now properly embedded in ALL tracks, not just the first one.
-
-### [0.2.x] - 2024-11-10
-- **Added:** Cover art download, `--artist` and `--album` options, cross-platform default directory, and automatic name cleaning.
-- **Changed:** Replaced `reqwest` with `ureq` to reduce binary size.
-
-### [0.1.0] - 2024-11-09
-- **Added:** Initial release with core features: YouTube download, MP3 conversion, chapter splitting, and metadata tagging.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for YouTube downloading
-- [FFmpeg](https://ffmpeg.org/) for audio processing
-- [lofty](https://github.com/Serial-ATA/lofty-rs) for ID3 tag handling
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
