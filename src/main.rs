@@ -10,9 +10,12 @@ use youtube_chapter_splitter::{audio, config, downloader, playlist, utils, Resul
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+}
 
-    /// YouTube video URL(s) (if no subcommand)
-    #[arg(value_name = "URL", required_unless_present = "command")]
+#[derive(Parser)]
+struct DownloadArgs {
+    /// YouTube video URL(s)
+    #[arg(value_name = "URL", required = true)]
     urls: Vec<String>,
 
     /// Output directory (overrides config)
@@ -34,6 +37,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Download and split YouTube video(s) (default)
+    Download(DownloadArgs),
+
     /// Show current configuration
     Config,
 
@@ -105,21 +111,22 @@ fn check_dependencies() -> Result<()> {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Handle subcommands
-    if let Some(command) = cli.command {
-        return match command {
-            Commands::Config => config::show_config(),
-            Commands::Set { key, value } => config::set_config(&key, &value),
-            Commands::Reset => config::reset_config(),
-        };
+    // Handle commands
+    match cli.command {
+        Some(Commands::Config) => config::show_config(),
+        Some(Commands::Set { key, value }) => config::set_config(&key, &value),
+        Some(Commands::Reset) => config::reset_config(),
+        Some(Commands::Download(args)) => handle_download(args),
+        None => {
+            // Si aucune commande, essayer de parser comme download avec les args restants
+            // Cela permet "ytcs URL" au lieu de "ytcs download URL"
+            let args = DownloadArgs::parse();
+            handle_download(args)
+        }
     }
+}
 
-    // Main download flow
-    if cli.urls.is_empty() {
-        eprintln!("{}", "Error: No URL provided".red().bold());
-        std::process::exit(1);
-    }
-
+fn handle_download(cli: DownloadArgs) -> Result<()> {
     check_dependencies()?;
 
     // Afficher l'en-tête TUI moderne
@@ -159,7 +166,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<()> {
+fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) -> Result<()> {
     use config::PlaylistBehavior;
 
     // Check if URL contains a playlist
@@ -325,7 +332,7 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
 }
 // Fonction à ajouter à main.rs
 
-fn download_playlist(url: &str, cli: &Cli, cfg: &config::Config) -> Result<()> {
+fn download_playlist(url: &str, cli: &DownloadArgs, cfg: &config::Config) -> Result<()> {
     println!("{}", "Fetching playlist information...".yellow());
 
     let playlist_info = playlist::get_playlist_info(url)?;
@@ -439,7 +446,7 @@ fn download_playlist(url: &str, cli: &Cli, cfg: &config::Config) -> Result<()> {
 
 fn download_single_video(
     url: &str,
-    cli: &Cli,
+    cli: &DownloadArgs,
     cfg: &config::Config,
     base_output_dir: &std::path::Path,
 ) -> Result<()> {
