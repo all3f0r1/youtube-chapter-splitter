@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.10.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 [![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
 
 ## ✨ Features
@@ -137,6 +137,14 @@ YouTube Chapter Splitter uses a persistent configuration file stored at:
 - `%A` - Album name
 
 ## 📝 Changelog
+
+### [0.10.0] - 2025-11-24
+- **Changed:** Complete UI redesign - minimal, clean, and pragmatic.
+- **Removed:** Unnecessary borders, boxes, and visual noise.
+- **Removed:** Emojis from main output (kept only status checkmarks).
+- **Improved:** Auto-clean video titles (removes "[Full Album]", "[Official Audio]", etc.).
+- **Improved:** More direct and readable output format.
+- **Philosophy:** Pragmatic • Direct • Classe
 
 ### [0.9.3] - 2025-11-24
 - **Fixed:** Configuration parsing error for users upgrading from older versions.

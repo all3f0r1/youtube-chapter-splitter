@@ -249,10 +249,6 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
     } else {
         Status::Pending
     };
-    let mut audio_status = Status::Pending;
-
-    // Afficher l'état initial
-    ui::print_download_section(cover_status, audio_status);
 
     // Download cover
     if download_cover {
@@ -263,40 +259,27 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
                 ui::print_warning(&format!("Could not download artwork: {}", e));
             }
         }
-        // Mettre à jour l'affichage
-        ui::clear_lines(5);
-        ui::print_download_section(cover_status, audio_status);
     }
 
     // Download audio
-    audio_status = Status::InProgress;
-    ui::clear_lines(5);
-    ui::print_download_section(cover_status, audio_status);
-
     let audio_file = match downloader::download_audio(&url, &output_dir.join("temp_audio.mp3")) {
-        Ok(file) => {
-            audio_status = Status::Success;
-            ui::clear_lines(5);
-            ui::print_download_section(cover_status, audio_status);
-            file
-        }
+        Ok(file) => file,
         Err(e) => {
-            audio_status = Status::Failed;
-            ui::clear_lines(5);
-            ui::print_download_section(cover_status, audio_status);
+            ui::print_error(&format!("Failed to download audio: {}", e));
             return Err(e);
         }
     };
 
+    // Afficher le statut de téléchargement
+    ui::print_download_status(cover_status, Status::Success);
+
     // Get chapters
     let chapters_to_use = if !video_info.chapters.is_empty() {
-        println!("{}", "Using YouTube tracks".green());
         video_info.chapters
     } else {
-        println!("{}", "No tracks found, detecting automatically...".yellow());
+        ui::print_info("No tracks found, detecting automatically...");
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
-    println!();
 
     let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
 
@@ -307,24 +290,11 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
         None
     };
 
-    // Initialiser les pistes pour l'affichage TUI
-    let mut tracks: Vec<TrackProgress> = final_chapters
-        .iter()
-        .enumerate()
-        .map(|(i, ch)| TrackProgress {
-            number: i + 1,
-            title: ch.title.clone(),
-            status: Status::Pending,
-            progress: 0,
-        })
-        .collect();
+    // Afficher le début du splitting
+    ui::print_splitting_start();
 
-    // Afficher l'état initial
-    ui::print_track_section(&tracks);
-
-    // Découper toutes les pistes (la fonction split_audio_by_chapters gère déjà la progression)
-    // On va simuler la progression visuellement
-    let output_files = audio::split_audio_by_chapters(
+    // Découper toutes les pistes
+    let _output_files = audio::split_audio_by_chapters(
         &audio_file,
         &final_chapters,
         &output_dir,
@@ -334,22 +304,22 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
         config,
     )?;
 
-    // Marquer toutes les pistes comme réussies
-    for track in &mut tracks {
-        track.status = Status::Success;
-        track.progress = 100;
+    // Afficher chaque piste terminée
+    for (i, ch) in final_chapters.iter().enumerate() {
+        let track = TrackProgress {
+            number: i + 1,
+            title: ch.title.clone(),
+            status: Status::Success,
+            duration: utils::format_duration(ch.duration()),
+        };
+        ui::print_track(&track);
     }
-    ui::clear_lines(tracks.len() + 3);
-    ui::print_track_section(&tracks);
 
     // Clean up temporary audio file
     std::fs::remove_file(&audio_file).ok();
 
     // Message de succès
-    ui::print_success(
-        &format!("✓ All {} tracks created successfully!", output_files.len()),
-        &output_dir.display().to_string(),
-    );
+    ui::print_success(&output_dir.display().to_string());
 
     Ok(())
 }

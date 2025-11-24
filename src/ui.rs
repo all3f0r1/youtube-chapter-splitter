@@ -1,10 +1,10 @@
-//! Module d'interface utilisateur (TUI) moderne
+//! Module d'interface utilisateur minimaliste
 //!
-//! Ce module fournit une interface utilisateur en mode texte avec :
-//! - Indicateurs visuels de statut (✓/✗/⏳/⏸️)
-//! - Cadres et bordures adaptatifs
-//! - Barres de progression
-//! - Adaptation automatique à la largeur du terminal
+//! Design: Pragmatique • Direct • Classe
+//! - Pas de bordures inutiles
+//! - Info essentielle seulement
+//! - Espacement naturel
+//! - Statut clair avec ✓/✗
 
 use colored::*;
 use std::io::{self, Write};
@@ -12,9 +12,9 @@ use std::io::{self, Write};
 /// Statut d'une opération
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
-    /// En attente (⏸️)
+    /// En attente
     Pending,
-    /// En cours (⏳)
+    /// En cours
     InProgress,
     /// Réussi (✓)
     Success,
@@ -28,168 +28,122 @@ pub struct TrackProgress {
     pub number: usize,
     pub title: String,
     pub status: Status,
-    pub progress: u8, // 0-100
+    pub duration: String,
 }
 
-/// Obtenir la largeur du terminal (avec fallback à 80)
-fn terminal_width() -> usize {
-    term_size::dimensions()
-        .map(|(w, _)| w)
-        .unwrap_or(80)
-        .clamp(60, 120) // Entre 60 et 120 caractères pour la lisibilité
-}
-
-/// Icône de statut avec couleur
+/// Icône de statut
 fn status_icon(status: Status) -> ColoredString {
     match status {
-        Status::Pending => "⏸️ ".dimmed(),
+        Status::Pending => " ".dimmed(),
         Status::InProgress => "⏳".yellow(),
-        Status::Success => "✓".green().bold(),
-        Status::Failed => "✗".red().bold(),
+        Status::Success => "✓".green(),
+        Status::Failed => "✗".red(),
     }
 }
 
-/// Tronquer une chaîne à une longueur maximale
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.chars().count() <= max_len {
-        format!("{:<width$}", s, width = max_len)
-    } else {
-        let truncated: String = s.chars().take(max_len.saturating_sub(3)).collect();
-        format!("{}...", truncated)
-    }
-}
-
-/// Créer une mini barre de progression
-fn create_mini_progress_bar(percent: u8, width: usize) -> String {
-    let filled = (percent as usize * width) / 100;
-    let empty = width.saturating_sub(filled);
-    format!(
-        "[{}{}]",
-        "█".repeat(filled).cyan(),
-        "░".repeat(empty).dimmed()
-    )
-}
-
-/// Afficher l'en-tête principal
+/// Afficher l'en-tête minimal
 pub fn print_header() {
-    let width = terminal_width();
-    let title = " YouTube Chapter Splitter v0.9.0 ";
-    let padding = (width.saturating_sub(title.len()).saturating_sub(4)) / 2;
-
-    println!("╔{}╗", "═".repeat(width.saturating_sub(2)));
-    println!(
-        "║{}{}{}║",
-        " ".repeat(padding),
-        title.bold(),
-        " ".repeat(width.saturating_sub(padding + title.len() + 2))
-    );
-    println!("╚{}╝", "═".repeat(width.saturating_sub(2)));
-    println!();
+    println!("{}\n", "ytcs v0.10.0".dimmed());
 }
 
 /// Afficher les informations de la vidéo
 pub fn print_video_info(title: &str, duration: &str, tracks: usize) {
-    println!("📹 Video: {}", title.bright_blue().bold());
-    println!("⏱️  Duration: {}", duration.cyan());
-    println!("🎵 Tracks: {}", tracks.to_string().yellow().bold());
+    // Nettoyer le titre des éléments inutiles
+    let clean_title = clean_title(title);
+
+    println!(
+        "{} {}",
+        "→".cyan().bold(),
+        clean_title.bright_white().bold()
+    );
+    println!(
+        "  {} {} {}",
+        duration.dimmed(),
+        "•".dimmed(),
+        format!("{} tracks", tracks).dimmed()
+    );
     println!();
 }
 
-/// Afficher la section de téléchargement
-pub fn print_download_section(cover_status: Status, audio_status: Status) {
-    let width = terminal_width();
-    let title = " Download Progress ";
-    let title_padding = width.saturating_sub(title.len() + 3);
+/// Nettoyer le titre des éléments inutiles
+fn clean_title(title: &str) -> String {
+    let mut cleaned = title.to_string();
 
-    println!("┌─{}{}", title.bold(), "─".repeat(title_padding));
+    // Patterns à supprimer
+    let patterns = [
+        "[Full Album]",
+        "[FULL ALBUM]",
+        "(Full Album)",
+        "(FULL ALBUM)",
+        "[Official Audio]",
+        "[Official Video]",
+        "(Official Audio)",
+        "(Official Video)",
+        "[HD]",
+        "[4K]",
+        "(HD)",
+        "(4K)",
+    ];
 
-    // Cover line
-    let cover_text = format!("{} Cover art", status_icon(cover_status));
-    let cover_plain_len = 10; // "⏸️  Cover art" sans couleurs
-    let padding = width.saturating_sub(cover_plain_len + 5);
-    println!("│ {}{} │", cover_text, " ".repeat(padding));
-
-    // Audio line
-    let audio_text = format!("{} Audio file", status_icon(audio_status));
-    let audio_plain_len = 11; // "⏸️  Audio file" sans couleurs
-    let padding = width.saturating_sub(audio_plain_len + 5);
-    println!("│ {}{} │", audio_text, " ".repeat(padding));
-
-    println!("└{}┘", "─".repeat(width.saturating_sub(2)));
-    println!();
-
-    // Flush pour afficher immédiatement
-    io::stdout().flush().ok();
-}
-
-/// Afficher la section de découpage des pistes
-pub fn print_track_section(tracks: &[TrackProgress]) {
-    let width = terminal_width();
-    let title = " Track Splitting ";
-    let title_padding = width.saturating_sub(title.len() + 3);
-
-    println!("┌─{}{}", title.bold(), "─".repeat(title_padding));
-
-    for track in tracks {
-        // Calculer les largeurs disponibles
-        let prefix_len = 6; // "│ ⏸️  "
-        let number_len = 5; // "01 - "
-        let suffix_len = 2; // " │"
-        let progress_bar_width = 10; // [████████░░]
-        let percent_len = 5; // " 100%"
-
-        let available_width = width
-            .saturating_sub(prefix_len)
-            .saturating_sub(number_len)
-            .saturating_sub(progress_bar_width)
-            .saturating_sub(percent_len)
-            .saturating_sub(suffix_len)
-            .saturating_sub(2); // Espaces
-
-        let title_truncated = truncate(&track.title, available_width);
-        let progress_bar = create_mini_progress_bar(track.progress, 8);
-
-        println!(
-            "│ {} {:02} - {} {} {:>3}% │",
-            status_icon(track.status),
-            track.number,
-            title_truncated,
-            progress_bar,
-            track.progress
-        );
+    for pattern in &patterns {
+        cleaned = cleaned.replace(pattern, "");
     }
 
-    println!("└{}┘", "─".repeat(width.saturating_sub(2)));
-    println!();
+    // Nettoyer les espaces multiples et trim
+    cleaned = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
 
-    // Flush pour afficher immédiatement
-    io::stdout().flush().ok();
+    cleaned
 }
 
-/// Effacer les lignes précédentes (pour mise à jour en place)
-pub fn clear_lines(count: usize) {
-    for _ in 0..count {
-        print!("\x1b[1A"); // Monter d'une ligne
-        print!("\x1b[2K"); // Effacer la ligne
-    }
+/// Afficher le statut de téléchargement
+pub fn print_download_status(cover_status: Status, audio_status: Status) {
+    println!("  {} Cover downloaded", status_icon(cover_status));
+    println!("  {} Audio downloaded", status_icon(audio_status));
+    println!();
+}
+
+/// Afficher le début du splitting
+pub fn print_splitting_start() {
+    println!("  {}\n", "Splitting tracks...".dimmed());
+}
+
+/// Afficher une piste
+pub fn print_track(track: &TrackProgress) {
+    println!(
+        "  {} {:02} {} ({})",
+        status_icon(track.status),
+        track.number,
+        track.title.bright_white(),
+        track.duration.dimmed()
+    );
     io::stdout().flush().ok();
 }
 
 /// Afficher un message de succès final
-pub fn print_success(message: &str, output_dir: &str) {
-    println!("{}", message.green().bold());
-    println!("📁 Output: {}", output_dir.bright_blue());
+pub fn print_success(output_dir: &str) {
+    println!();
+    println!(
+        "{} {} {}",
+        "✓".green().bold(),
+        "Done".green(),
+        format!("→ {}", output_dir).bright_blue()
+    );
     println!();
 }
 
 /// Afficher un message d'erreur
 pub fn print_error(message: &str) {
-    eprintln!("{}", format!("✗ Error: {}", message).red().bold());
+    eprintln!("{} {}", "✗".red().bold(), message.red());
 }
 
 /// Afficher un avertissement
 pub fn print_warning(message: &str) {
-    eprintln!("{}", format!("⚠ Warning: {}", message).yellow());
+    eprintln!("{} {}", "⚠".yellow(), message.yellow());
+}
+
+/// Afficher un message d'info
+pub fn print_info(message: &str) {
+    println!("  {}", message.dimmed());
 }
 
 #[cfg(test)]
@@ -197,24 +151,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_truncate() {
-        assert_eq!(truncate("Hello", 10), "Hello     ");
-        assert_eq!(truncate("Hello World", 8), "Hello...");
-        assert_eq!(truncate("Test", 4), "Test");
-    }
-
-    #[test]
-    fn test_progress_bar() {
-        let bar = create_mini_progress_bar(50, 8);
-        assert!(bar.contains('['));
-        assert!(bar.contains(']'));
+    fn test_clean_title() {
+        assert_eq!(clean_title("Artist - Song [Full Album]"), "Artist - Song");
+        assert_eq!(clean_title("Song (Official Audio) [HD]"), "Song");
+        assert_eq!(clean_title("Normal Title"), "Normal Title");
     }
 
     #[test]
     fn test_status_icon() {
-        let pending = status_icon(Status::Pending);
         let success = status_icon(Status::Success);
-        assert!(!pending.is_empty());
+        let failed = status_icon(Status::Failed);
         assert!(!success.is_empty());
+        assert!(!failed.is_empty());
     }
 }
