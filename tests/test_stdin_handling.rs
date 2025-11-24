@@ -125,10 +125,9 @@ mod stdin_handling_tests {
     #[test]
     fn test_interrupt_handling() {
         // Vérifier que le signal handler est bien configuré
-        // Note: Difficile à tester directement, mais on peut vérifier la présence
-
-        // Pour l'instant, juste documenter le comportement attendu
-        assert!(true, "Program should handle SIGINT gracefully");
+        // Note: Difficile à tester directement sans spawner un processus
+        // Ce test documente simplement le comportement attendu:
+        // Le programme doit gérer SIGINT gracieusement
     }
 
     /// Test de timeout sur stdin

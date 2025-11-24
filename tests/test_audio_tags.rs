@@ -8,7 +8,7 @@ mod audio_tags_tests {
 
     /// Crée un fichier MP3 de test avec des métadonnées
     fn create_test_mp3_with_metadata(
-        path: &PathBuf,
+        path: &std::path::Path,
         title: &str,
         artist: &str,
         album: &str,
@@ -50,7 +50,7 @@ mod audio_tags_tests {
 
     /// Vérifie les métadonnées d'un fichier MP3
     fn verify_metadata(
-        path: &PathBuf,
+        path: &std::path::Path,
     ) -> Result<(String, String, String), Box<dyn std::error::Error>> {
         let output = Command::new("ffprobe")
             .args([

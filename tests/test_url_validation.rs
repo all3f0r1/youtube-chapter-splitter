@@ -143,10 +143,8 @@ mod url_validation_tests {
         if let Ok(id) = result {
             // Si ça réussit, devrait prendre le premier
             assert!(id == "first" || id.len() == 11);
-        } else {
-            // C'est acceptable que ça échoue pour une URL malformée
-            assert!(true);
         }
+        // C'est acceptable que ça échoue pour une URL malformée
     }
 
     #[test]

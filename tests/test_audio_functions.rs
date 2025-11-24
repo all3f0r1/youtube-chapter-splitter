@@ -9,7 +9,7 @@ mod audio_function_tests {
 
     /// Crée un fichier audio de test
     fn create_test_audio(
-        path: &PathBuf,
+        path: &std::path::Path,
         duration_secs: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let output = Command::new("ffmpeg")

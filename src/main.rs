@@ -133,7 +133,12 @@ fn main() -> Result<()> {
     for (index, url) in cli.urls.iter().enumerate() {
         if total_urls > 1 {
             println!();
-            println!("{}", format!("=== Processing URL {}/{} ===", index + 1, total_urls).cyan().bold());
+            println!(
+                "{}",
+                format!("=== Processing URL {}/{} ===", index + 1, total_urls)
+                    .cyan()
+                    .bold()
+            );
             println!("{}", url.bright_blue());
             println!();
         }
@@ -143,7 +148,12 @@ fn main() -> Result<()> {
 
     if total_urls > 1 {
         println!();
-        println!("{}", format!("✓ All {} URL(s) processed successfully!", total_urls).green().bold());
+        println!(
+            "{}",
+            format!("✓ All {} URL(s) processed successfully!", total_urls)
+                .green()
+                .bold()
+        );
     }
 
     Ok(())
@@ -174,12 +184,18 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
                 choice == "p" || choice == "playlist"
             }
             PlaylistBehavior::VideoOnly => {
-                println!("{}", "Downloading video only (configured behavior)...".green());
+                println!(
+                    "{}",
+                    "Downloading video only (configured behavior)...".green()
+                );
                 println!();
                 false
             }
             PlaylistBehavior::PlaylistOnly => {
-                println!("{}", "Downloading entire playlist (configured behavior)...".green());
+                println!(
+                    "{}",
+                    "Downloading entire playlist (configured behavior)...".green()
+                );
                 println!();
                 true
             }
@@ -198,12 +214,12 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
     let url = clean_url(url);
     println!("{}", "Fetching video information...".yellow());
     let video_info = downloader::get_video_info(&url)?;
-    
+
     // Afficher les infos vidéo avec le nouveau TUI
     ui::print_video_info(
         &video_info.title,
         &utils::format_duration(video_info.duration),
-        video_info.chapters.len()
+        video_info.chapters.len(),
     );
 
     // Determine output directory
@@ -227,13 +243,17 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
 
     // Download cover art and audio with TUI
     let download_cover = !cli.no_cover && config.download_cover;
-    
-    let mut cover_status = if download_cover { Status::InProgress } else { Status::Pending };
+
+    let mut cover_status = if download_cover {
+        Status::InProgress
+    } else {
+        Status::Pending
+    };
     let mut audio_status = Status::Pending;
-    
+
     // Afficher l'état initial
     ui::print_download_section(cover_status, audio_status);
-    
+
     // Download cover
     if download_cover {
         match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
@@ -247,12 +267,12 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
         ui::clear_lines(5);
         ui::print_download_section(cover_status, audio_status);
     }
-    
+
     // Download audio
     audio_status = Status::InProgress;
     ui::clear_lines(5);
     ui::print_download_section(cover_status, audio_status);
-    
+
     let audio_file = match downloader::download_audio(&url, &output_dir.join("temp_audio.mp3")) {
         Ok(file) => {
             audio_status = Status::Success;
@@ -288,18 +308,20 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
     };
 
     // Initialiser les pistes pour l'affichage TUI
-    let mut tracks: Vec<TrackProgress> = final_chapters.iter().enumerate().map(|(i, ch)| {
-        TrackProgress {
+    let mut tracks: Vec<TrackProgress> = final_chapters
+        .iter()
+        .enumerate()
+        .map(|(i, ch)| TrackProgress {
             number: i + 1,
             title: ch.title.clone(),
             status: Status::Pending,
             progress: 0,
-        }
-    }).collect();
-    
+        })
+        .collect();
+
     // Afficher l'état initial
     ui::print_track_section(&tracks);
-    
+
     // Découper toutes les pistes (la fonction split_audio_by_chapters gère déjà la progression)
     // On va simuler la progression visuellement
     let output_files = audio::split_audio_by_chapters(
@@ -309,9 +331,9 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
         &final_artist,
         &final_album,
         cover_path.as_deref(),
-        &config,
+        config,
     )?;
-    
+
     // Marquer toutes les pistes comme réussies
     for track in &mut tracks {
         track.status = Status::Success;
@@ -319,14 +341,14 @@ fn process_single_url(url: &str, cli: &Cli, config: &config::Config) -> Result<(
     }
     ui::clear_lines(tracks.len() + 3);
     ui::print_track_section(&tracks);
-    
+
     // Clean up temporary audio file
     std::fs::remove_file(&audio_file).ok();
-    
+
     // Message de succès
     ui::print_success(
         &format!("✓ All {} tracks created successfully!", output_files.len()),
-        &output_dir.display().to_string()
+        &output_dir.display().to_string(),
     );
 
     Ok(())

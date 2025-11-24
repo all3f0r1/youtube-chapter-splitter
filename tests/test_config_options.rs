@@ -13,46 +13,56 @@ fn test_config_default_values() {
 
 #[test]
 fn test_config_audio_quality() {
-    let mut config = Config::default();
-
-    config.audio_quality = 128;
+    let config = Config {
+        audio_quality: 128,
+        ..Default::default()
+    };
     assert_eq!(config.audio_quality, 128);
 
-    config.audio_quality = 192;
-    assert_eq!(config.audio_quality, 192);
+    let config2 = Config {
+        audio_quality: 192,
+        ..Default::default()
+    };
+    assert_eq!(config2.audio_quality, 192);
 }
 
 #[test]
 fn test_config_overwrite_existing() {
-    let mut config = Config::default();
-
-    config.overwrite_existing = true;
+    let config = Config {
+        overwrite_existing: true,
+        ..Default::default()
+    };
     assert!(config.overwrite_existing);
 
-    config.overwrite_existing = false;
-    assert!(!config.overwrite_existing);
+    let config2 = Config::default();
+    assert!(!config2.overwrite_existing);
 }
 
 #[test]
 fn test_config_max_retries() {
-    let mut config = Config::default();
-
-    config.max_retries = 5;
+    let config = Config {
+        max_retries: 5,
+        ..Default::default()
+    };
     assert_eq!(config.max_retries, 5);
 
-    config.max_retries = 0;
-    assert_eq!(config.max_retries, 0);
+    let config2 = Config {
+        max_retries: 0,
+        ..Default::default()
+    };
+    assert_eq!(config2.max_retries, 0);
 }
 
 #[test]
 fn test_config_create_playlist() {
-    let mut config = Config::default();
-
-    config.create_playlist = true;
+    let config = Config {
+        create_playlist: true,
+        ..Default::default()
+    };
     assert!(config.create_playlist);
 
-    config.create_playlist = false;
-    assert!(!config.create_playlist);
+    let config2 = Config::default();
+    assert!(!config2.create_playlist);
 }
 
 #[test]
@@ -65,8 +75,10 @@ fn test_config_format_filename() {
 
 #[test]
 fn test_config_format_filename_custom() {
-    let mut config = Config::default();
-    config.filename_format = "%a - %n - %t".to_string();
+    let config = Config {
+        filename_format: "%a - %n - %t".to_string(),
+        ..Default::default()
+    };
 
     let result = config.format_filename(5, "Eternal Pyre", "Marigold", "Oblivion Gate");
     assert_eq!(result, "Marigold - 05 - Eternal Pyre");
@@ -82,8 +94,10 @@ fn test_config_format_directory() {
 
 #[test]
 fn test_config_format_directory_custom() {
-    let mut config = Config::default();
-    config.directory_format = "%a/%A".to_string();
+    let config = Config {
+        directory_format: "%a/%A".to_string(),
+        ..Default::default()
+    };
 
     let result = config.format_directory("Marigold", "Oblivion Gate");
     assert_eq!(result, "Marigold/Oblivion Gate");

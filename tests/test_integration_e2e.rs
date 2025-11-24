@@ -246,10 +246,7 @@ mod integration_e2e_tests {
 
         let result = downloader::get_video_info(url);
         // Devrait échouer car la vidéo est privée
-        if result.is_err() {
-            // C'est le comportement attendu
-            assert!(true);
-        }
+        assert!(result.is_err(), "Expected error for private video");
     }
 
     #[test]

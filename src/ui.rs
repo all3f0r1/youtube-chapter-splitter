@@ -36,8 +36,7 @@ fn terminal_width() -> usize {
     term_size::dimensions()
         .map(|(w, _)| w)
         .unwrap_or(80)
-        .max(60) // Minimum 60 caractères
-        .min(120) // Maximum 120 caractères pour la lisibilité
+        .clamp(60, 120) // Entre 60 et 120 caractères pour la lisibilité
 }
 
 /// Icône de statut avec couleur
@@ -76,7 +75,7 @@ pub fn print_header() {
     let width = terminal_width();
     let title = " YouTube Chapter Splitter v0.9.0 ";
     let padding = (width.saturating_sub(title.len()).saturating_sub(4)) / 2;
-    
+
     println!("╔{}╗", "═".repeat(width.saturating_sub(2)));
     println!(
         "║{}{}{}║",
@@ -101,24 +100,24 @@ pub fn print_download_section(cover_status: Status, audio_status: Status) {
     let width = terminal_width();
     let title = " Download Progress ";
     let title_padding = width.saturating_sub(title.len() + 3);
-    
+
     println!("┌─{}{}", title.bold(), "─".repeat(title_padding));
-    
+
     // Cover line
     let cover_text = format!("{} Cover art", status_icon(cover_status));
     let cover_plain_len = 10; // "⏸️  Cover art" sans couleurs
     let padding = width.saturating_sub(cover_plain_len + 5);
     println!("│ {}{} │", cover_text, " ".repeat(padding));
-    
+
     // Audio line
     let audio_text = format!("{} Audio file", status_icon(audio_status));
     let audio_plain_len = 11; // "⏸️  Audio file" sans couleurs
     let padding = width.saturating_sub(audio_plain_len + 5);
     println!("│ {}{} │", audio_text, " ".repeat(padding));
-    
+
     println!("└{}┘", "─".repeat(width.saturating_sub(2)));
     println!();
-    
+
     // Flush pour afficher immédiatement
     io::stdout().flush().ok();
 }
@@ -128,9 +127,9 @@ pub fn print_track_section(tracks: &[TrackProgress]) {
     let width = terminal_width();
     let title = " Track Splitting ";
     let title_padding = width.saturating_sub(title.len() + 3);
-    
+
     println!("┌─{}{}", title.bold(), "─".repeat(title_padding));
-    
+
     for track in tracks {
         // Calculer les largeurs disponibles
         let prefix_len = 6; // "│ ⏸️  "
@@ -138,7 +137,7 @@ pub fn print_track_section(tracks: &[TrackProgress]) {
         let suffix_len = 2; // " │"
         let progress_bar_width = 10; // [████████░░]
         let percent_len = 5; // " 100%"
-        
+
         let available_width = width
             .saturating_sub(prefix_len)
             .saturating_sub(number_len)
@@ -146,10 +145,10 @@ pub fn print_track_section(tracks: &[TrackProgress]) {
             .saturating_sub(percent_len)
             .saturating_sub(suffix_len)
             .saturating_sub(2); // Espaces
-        
+
         let title_truncated = truncate(&track.title, available_width);
         let progress_bar = create_mini_progress_bar(track.progress, 8);
-        
+
         println!(
             "│ {} {:02} - {} {} {:>3}% │",
             status_icon(track.status),
@@ -159,10 +158,10 @@ pub fn print_track_section(tracks: &[TrackProgress]) {
             track.progress
         );
     }
-    
+
     println!("└{}┘", "─".repeat(width.saturating_sub(2)));
     println!();
-    
+
     // Flush pour afficher immédiatement
     io::stdout().flush().ok();
 }
