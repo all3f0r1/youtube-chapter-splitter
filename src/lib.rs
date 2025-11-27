@@ -16,11 +16,11 @@
 //!     let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 //!     
 //!     // Récupérer les informations de la vidéo
-//!     let video_info = downloader::get_video_info(url)?;
+//!     let video_info = downloader::get_video_info(url, None)?;
 //!     
 //!     // Télécharger l'audio
 //!     let output_path = PathBuf::from("temp_audio");
-//!     let audio_file = downloader::download_audio(url, &output_path)?;
+//!     let audio_file = downloader::download_audio(url, &output_path, None)?;
 //!     
 //!     // Découper par chapitres
 //!     let output_dir = PathBuf::from("output");
