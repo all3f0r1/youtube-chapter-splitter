@@ -51,11 +51,13 @@ pub mod audio;
 pub mod chapters;
 pub mod chapters_from_description;
 pub mod config;
+pub mod cookie_helper;
 pub mod downloader;
 pub mod error;
 pub mod playlist;
 pub mod ui;
 pub mod utils;
+pub mod ytdlp_error_parser;
 
 pub use chapters::Chapter;
 pub use downloader::VideoInfo;

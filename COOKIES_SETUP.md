@@ -2,7 +2,40 @@
 
 To download member-only videos or private videos from YouTube, you need to provide your YouTube authentication cookies.
 
-## Setup Instructions
+## Method 1: Automatic Browser Cookie Extraction (Recommended)
+
+The easiest way to authenticate is to let ytcs extract cookies directly from your browser:
+
+```bash
+# Configure ytcs to use cookies from your browser
+ytcs set cookies_from_browser chrome
+```
+
+**Supported browsers:**
+- `chrome` - Google Chrome
+- `firefox` - Mozilla Firefox
+- `safari` - Safari (macOS only)
+- `edge` - Microsoft Edge
+- `chromium` - Chromium
+- `brave` - Brave Browser
+- `opera` - Opera
+- `vivaldi` - Vivaldi
+
+**Requirements:**
+- You must be logged in to YouTube in the specified browser
+- The browser must be installed on your system
+- yt-dlp will automatically extract and use your session cookies
+
+**To disable:**
+```bash
+ytcs set cookies_from_browser ""
+```
+
+## Method 2: Manual Cookie File Export
+
+If automatic extraction doesn't work or you prefer manual control, you can export cookies to a file.
+
+### Setup Instructions
 
 ### 1. Export Your YouTube Cookies
 

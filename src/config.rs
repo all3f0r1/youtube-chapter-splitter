@@ -66,6 +66,12 @@ pub struct Config {
     /// Comportement lors de la détection d'une playlist
     #[serde(default)]
     pub playlist_behavior: PlaylistBehavior,
+
+    /// Navigateur depuis lequel extraire les cookies automatiquement
+    /// Options: "chrome", "firefox", "safari", "edge", "chromium", "brave", "opera", "vivaldi"
+    /// Si non défini, utilise le fichier cookies.txt s'il existe
+    #[serde(default)]
+    pub cookies_from_browser: Option<String>,
 }
 
 // Fonctions de valeur par défaut pour serde
@@ -101,6 +107,7 @@ impl Default for Config {
             max_retries: 3,
             create_playlist: false,
             playlist_behavior: PlaylistBehavior::Ask,
+            cookies_from_browser: None,
         }
     }
 }
@@ -204,6 +211,10 @@ pub fn show_config() -> Result<()> {
     println!("  max_retries        = {}", config.max_retries);
     println!("  create_playlist    = {}", config.create_playlist);
     println!("  playlist_behavior  = {:?}", config.playlist_behavior);
+    println!(
+        "  cookies_from_browser = {:?}",
+        config.cookies_from_browser.as_deref().unwrap_or("None")
+    );
     println!();
     println!("Available placeholders:");
     println!("  Filename: %n (track number), %t (title), %a (artist), %A (album)");
@@ -282,6 +293,24 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
             };
             config.playlist_behavior = behavior;
             println!("✓ Set playlist_behavior to: {:?}", config.playlist_behavior);
+        }
+        "cookies_from_browser" => {
+            let valid_browsers = [
+                "chrome", "firefox", "safari", "edge", "chromium", "brave", "opera", "vivaldi",
+            ];
+            if value.is_empty() {
+                config.cookies_from_browser = None;
+                println!("✓ Disabled cookies_from_browser");
+            } else if valid_browsers.contains(&value.to_lowercase().as_str()) {
+                config.cookies_from_browser = Some(value.to_lowercase());
+                println!("✓ Set cookies_from_browser to: {}", value);
+            } else {
+                return Err(YtcsError::ConfigError(format!(
+                    "Invalid browser '{}'. Valid options: {}",
+                    value,
+                    valid_browsers.join(", ")
+                )));
+            }
         }
         _ => {
             return Err(YtcsError::ConfigError(format!(

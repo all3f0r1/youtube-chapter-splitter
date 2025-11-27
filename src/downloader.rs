@@ -4,7 +4,9 @@
 //! et extraire leurs métadonnées (titre, durée, chapitres).
 
 use crate::chapters::{parse_chapters_from_json, Chapter};
+use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
+use crate::ytdlp_error_parser;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use std::path::{Path, PathBuf};
@@ -171,17 +173,12 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 /// # Errors
 ///
 /// Retourne une erreur si yt-dlp échoue ou si les métadonnées sont invalides
-pub fn get_video_info(url: &str) -> Result<VideoInfo> {
+pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--dump-json").arg("--no-playlist");
 
-    // Add cookies file if it exists
-    if let Some(home) = dirs::home_dir() {
-        let cookies_path = home.join(".config/ytcs/cookies.txt");
-        if cookies_path.exists() {
-            cmd.arg("--cookies").arg(cookies_path);
-        }
-    }
+    // Add cookie arguments
+    cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let output = cmd
         .arg(url)
@@ -189,11 +186,17 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         .map_err(|e| YtcsError::DownloadError(format!("Failed to execute yt-dlp: {}", e)))?;
 
     if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!(
-            "yt-dlp failed: {}",
-            error
-        )));
+        let raw_error = String::from_utf8_lossy(&output.stderr);
+        let (error_msg, suggestion) =
+            ytdlp_error_parser::parse_ytdlp_error(&raw_error, cookies_from_browser);
+
+        let full_error = if let Some(sug) = suggestion {
+            format!("{}\n\n{}", error_msg, sug)
+        } else {
+            error_msg
+        };
+
+        return Err(YtcsError::DownloadError(full_error));
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
@@ -251,7 +254,11 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 /// # Errors
 ///
 /// Retourne une erreur si le téléchargement échoue
-pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
+pub fn download_audio(
+    url: &str,
+    output_path: &Path,
+    cookies_from_browser: Option<&str>,
+) -> Result<PathBuf> {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
         ProgressStyle::default_spinner()
@@ -271,13 +278,8 @@ pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
         .arg(output_path.to_str().unwrap())
         .arg("--no-playlist");
 
-    // Add cookies file if it exists
-    if let Some(home) = dirs::home_dir() {
-        let cookies_path = home.join(".config/ytcs/cookies.txt");
-        if cookies_path.exists() {
-            cmd.arg("--cookies").arg(cookies_path);
-        }
-    }
+    // Add cookie arguments
+    cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let output = cmd
         .arg(url)
@@ -300,10 +302,18 @@ pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
     let mut final_path = output_path.to_path_buf();
     final_path.set_extension("mp3");
 
-    if !final_path.exists() {
-        return Err(YtcsError::DownloadError(
-            "Audio file was not created".to_string(),
-        ));
+    if !output.status.success() {
+        let raw_error = String::from_utf8_lossy(&output.stderr);
+        let (error_msg, suggestion) =
+            ytdlp_error_parser::parse_ytdlp_error(&raw_error, cookies_from_browser);
+
+        let full_error = if let Some(sug) = suggestion {
+            format!("{}\n\n{}", error_msg, sug)
+        } else {
+            error_msg
+        };
+
+        return Err(YtcsError::DownloadError(full_error));
     }
 
     Ok(final_path)

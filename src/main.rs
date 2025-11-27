@@ -214,7 +214,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
     let url = clean_url(url);
     println!("{}", "Fetching video information...".yellow());
-    let video_info = downloader::get_video_info(&url)?;
+    let cookies_from_browser = config.cookies_from_browser.as_deref();
+    let video_info = downloader::get_video_info(&url, cookies_from_browser)?;
 
     // Afficher les infos vidéo avec le nouveau TUI
     ui::print_video_info(
@@ -266,7 +267,11 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         };
 
     // Download audio
-    let audio_file = match downloader::download_audio(&url, &output_dir.join("temp_audio.mp3")) {
+    let audio_file = match downloader::download_audio(
+        &url,
+        &output_dir.join("temp_audio.mp3"),
+        cookies_from_browser,
+    ) {
         Ok(file) => file,
         Err(e) => {
             ui::print_error(&format!("Failed to download audio: {}", e));
@@ -360,7 +365,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 fn download_playlist(url: &str, cli: &DownloadArgs, cfg: &config::Config) -> Result<()> {
     println!("{}", "Fetching playlist information...".yellow());
 
-    let playlist_info = playlist::get_playlist_info(url)?;
+    let cookies_from_browser = cfg.cookies_from_browser.as_deref();
+    let playlist_info = playlist::get_playlist_info(url, cookies_from_browser)?;
 
     println!("{} {}", "Playlist:".bold(), playlist_info.title);
     println!("{} {}", "Videos:".bold(), playlist_info.videos.len());
@@ -476,8 +482,9 @@ fn download_single_video(
     base_output_dir: &std::path::Path,
 ) -> Result<()> {
     let url = clean_url(url);
+    let cookies_from_browser = cfg.cookies_from_browser.as_deref();
 
-    let video_info = downloader::get_video_info(&url)?;
+    let video_info = downloader::get_video_info(&url, cookies_from_browser)?;
 
     // Parse artist and album
     let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
@@ -501,7 +508,11 @@ fn download_single_video(
     }
 
     // Download audio
-    let audio_file = downloader::download_audio(&url, &output_dir.join("temp_audio.mp3"))?;
+    let audio_file = downloader::download_audio(
+        &url,
+        &output_dir.join("temp_audio.mp3"),
+        cookies_from_browser,
+    )?;
 
     // Get chapters
     let chapters_to_use = if !video_info.chapters.is_empty() {

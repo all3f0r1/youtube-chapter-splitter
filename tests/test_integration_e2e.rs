@@ -37,7 +37,7 @@ mod integration_e2e_tests {
         }
 
         // 2. Obtenir les informations vidéo
-        let video_info = downloader::get_video_info(url).unwrap();
+        let video_info = downloader::get_video_info(url, None).unwrap();
         assert!(
             !video_info.title.is_empty(),
             "Video title should not be empty"
@@ -54,7 +54,7 @@ mod integration_e2e_tests {
 
         // 4. Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path).unwrap();
+        let audio_file = downloader::download_audio(url, &audio_path, None).unwrap();
         assert!(audio_file.exists(), "Audio file should exist");
 
         // 5. Télécharger la miniature
@@ -145,7 +145,7 @@ mod integration_e2e_tests {
 
         // Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path).unwrap();
+        let audio_file = downloader::download_audio(url, &audio_path, None).unwrap();
 
         // Détecter les silences
         let chapters = audio::detect_silence_chapters(&audio_file, -30.0, 2.0).unwrap();
@@ -174,7 +174,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let video_info = downloader::get_video_info(url).unwrap();
+        let video_info = downloader::get_video_info(url, None).unwrap();
 
         // Vérifications de base
         assert!(!video_info.title.is_empty());
@@ -228,7 +228,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let result = downloader::get_video_info(url);
+        let result = downloader::get_video_info(url, None);
         assert!(result.is_err(), "Should fail for invalid video ID");
     }
 
@@ -244,7 +244,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let result = downloader::get_video_info(url);
+        let result = downloader::get_video_info(url, None);
         // Devrait échouer car la vidéo est privée
         assert!(result.is_err(), "Expected error for private video");
     }

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.3] - 2024-11-27
+
+### Added
+- Automatic cookie extraction from browser via `cookies_from_browser` configuration option
+- Support for extracting cookies from Chrome, Firefox, Safari, Edge, Chromium, Brave, Opera, and Vivaldi
+- Intelligent error message parsing for yt-dlp errors with actionable suggestions
+- User-friendly error messages for authentication, age-restriction, geo-blocking, and network issues
+- New `ytdlp_error_parser` module for transforming technical errors into helpful messages
+- New `cookie_helper` module for unified cookie management
+
+### Changed
+- yt-dlp errors now show clear, actionable messages instead of raw technical output
+- Cookie authentication now prioritizes browser extraction over file-based cookies
+- Error messages now include specific suggestions based on the type of error and current configuration
+
+### Fixed
+- Better error handling for member-only and private videos
+- Improved error messages when cookies are expired or missing
+- More helpful guidance for users encountering authentication issues
+
 ## [0.10.2] - 2024-11-27
 
 ### Added

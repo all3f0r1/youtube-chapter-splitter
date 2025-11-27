@@ -78,7 +78,7 @@ fn test_remove_playlist_param_with_other_params() {
 #[ignore]
 fn test_get_playlist_info_real() {
     let url = "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
-    let result = get_playlist_info(url);
+    let result = get_playlist_info(url, None);
     assert!(result.is_ok());
 
     let playlist = result.unwrap();
@@ -90,6 +90,6 @@ fn test_get_playlist_info_real() {
 #[ignore]
 fn test_get_playlist_info_invalid() {
     let url = "https://www.youtube.com/playlist?list=INVALID_PLAYLIST_ID";
-    let result = get_playlist_info(url);
+    let result = get_playlist_info(url, None);
     assert!(result.is_err());
 }

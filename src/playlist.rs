@@ -2,7 +2,9 @@
 //!
 //! Ce module détecte si une URL est une playlist et extrait les vidéos.
 
+use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
+use crate::ytdlp_error_parser;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -91,18 +93,13 @@ pub fn extract_video_id(url: &str) -> Option<String> {
 /// # Errors
 ///
 /// Retourne une erreur si yt-dlp échoue ou si le parsing JSON échoue
-pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
+pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Result<PlaylistInfo> {
     // Utiliser yt-dlp pour obtenir les informations de la playlist
     let mut cmd = Command::new("yt-dlp");
     cmd.args(["--dump-json", "--flat-playlist", "--no-warnings"]);
 
-    // Add cookies file if it exists
-    if let Some(home) = dirs::home_dir() {
-        let cookies_path = home.join(".config/ytcs/cookies.txt");
-        if cookies_path.exists() {
-            cmd.arg("--cookies").arg(cookies_path);
-        }
-    }
+    // Add cookie arguments
+    cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let output = cmd
         .arg(url)
@@ -110,11 +107,17 @@ pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
         .map_err(|e| YtcsError::DownloadError(format!("Failed to run yt-dlp: {}", e)))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!(
-            "yt-dlp failed: {}",
-            stderr
-        )));
+        let raw_error = String::from_utf8_lossy(&output.stderr);
+        let (error_msg, suggestion) =
+            ytdlp_error_parser::parse_ytdlp_error(&raw_error, cookies_from_browser);
+
+        let full_error = if let Some(sug) = suggestion {
+            format!("{}\n\n{}", error_msg, sug)
+        } else {
+            error_msg
+        };
+
+        return Err(YtcsError::DownloadError(full_error));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
