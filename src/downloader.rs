@@ -171,9 +171,18 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 ///
 /// Retourne une erreur si yt-dlp échoue ou si les métadonnées sont invalides
 pub fn get_video_info(url: &str) -> Result<VideoInfo> {
-    let output = Command::new("yt-dlp")
-        .arg("--dump-json")
-        .arg("--no-playlist")
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("--dump-json").arg("--no-playlist");
+
+    // Add cookies file if it exists
+    if let Some(home) = dirs::home_dir() {
+        let cookies_path = home.join(".config/ytcs/cookies.txt");
+        if cookies_path.exists() {
+            cmd.arg("--cookies").arg(cookies_path);
+        }
+    }
+
+    let output = cmd
         .arg(url)
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to execute yt-dlp: {}", e)))?;
@@ -248,22 +257,32 @@ pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
     pb.set_message("Downloading audio from YouTube...");
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-    let output = Command::new("yt-dlp")
-        .arg("-x")
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("-x")
         .arg("--audio-format")
         .arg("mp3")
         .arg("--audio-quality")
         .arg("0")
         .arg("-o")
         .arg(output_path.to_str().unwrap())
-        .arg("--no-playlist")
+        .arg("--no-playlist");
+
+    // Add cookies file if it exists
+    if let Some(home) = dirs::home_dir() {
+        let cookies_path = home.join(".config/ytcs/cookies.txt");
+        if cookies_path.exists() {
+            cmd.arg("--cookies").arg(cookies_path);
+        }
+    }
+
+    let output = cmd
         .arg(url)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
 
-    pb.finish_with_message(format!("✓ Audio downloaded: {}", output_path.display()));
+    pb.finish_and_clear();
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);

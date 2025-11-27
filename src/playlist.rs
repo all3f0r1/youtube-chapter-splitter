@@ -93,8 +93,19 @@ pub fn extract_video_id(url: &str) -> Option<String> {
 /// Retourne une erreur si yt-dlp échoue ou si le parsing JSON échoue
 pub fn get_playlist_info(url: &str) -> Result<PlaylistInfo> {
     // Utiliser yt-dlp pour obtenir les informations de la playlist
-    let output = Command::new("yt-dlp")
-        .args(["--dump-json", "--flat-playlist", "--no-warnings", url])
+    let mut cmd = Command::new("yt-dlp");
+    cmd.args(["--dump-json", "--flat-playlist", "--no-warnings"]);
+
+    // Add cookies file if it exists
+    if let Some(home) = dirs::home_dir() {
+        let cookies_path = home.join(".config/ytcs/cookies.txt");
+        if cookies_path.exists() {
+            cmd.arg("--cookies").arg(cookies_path);
+        }
+    }
+
+    let output = cmd
+        .arg(url)
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to run yt-dlp: {}", e)))?;
 

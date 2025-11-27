@@ -171,12 +171,11 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
     // Check if URL contains a playlist
     if let Some(_playlist_id) = playlist::is_playlist_url(url) {
-        println!("{}", "Playlist detected!".yellow().bold());
-        println!();
-
         // Determine action based on config
         let should_download_playlist = match config.playlist_behavior {
             PlaylistBehavior::Ask => {
+                println!("{}", "Playlist detected!".yellow().bold());
+                println!();
                 // Ask user what to do
                 print!(
                     "{}",
@@ -191,14 +190,12 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
                 choice == "p" || choice == "playlist"
             }
             PlaylistBehavior::VideoOnly => {
-                println!(
-                    "{}",
-                    "Downloading video only (configured behavior)...".green()
-                );
-                println!();
+                // Don't show "Playlist detected!" or "Downloading video only" messages
                 false
             }
             PlaylistBehavior::PlaylistOnly => {
+                println!("{}", "Playlist detected!".yellow().bold());
+                println!();
                 println!(
                     "{}",
                     "Downloading entire playlist (configured behavior)...".green()
@@ -210,9 +207,6 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
         if should_download_playlist {
             return download_playlist(url, cli, config);
-        } else {
-            println!("{}", "Downloading video only...".green());
-            println!();
         }
     }
 
@@ -249,24 +243,24 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     std::fs::create_dir_all(&output_dir)?;
 
     // Download cover art and audio with TUI
-    let download_cover = !cli.no_cover && config.download_cover;
+    // Always download cover for embedding in MP3s, but track if we should keep it
+    let keep_cover = !cli.no_cover && config.download_cover;
 
-    let mut cover_status = if download_cover {
-        Status::InProgress
-    } else {
-        Status::Pending
-    };
+    let cover_status;
 
-    // Download cover
-    if download_cover {
+    // Download cover (always, for embedding)
+    let cover_downloaded =
         match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
-            Ok(_) => cover_status = Status::Success,
+            Ok(_) => {
+                cover_status = Status::Success;
+                true
+            }
             Err(e) => {
                 cover_status = Status::Failed;
                 ui::print_warning(&format!("Could not download artwork: {}", e));
+                false
             }
-        }
-    }
+        };
 
     // Download audio
     let audio_file = match downloader::download_audio(&url, &output_dir.join("temp_audio.mp3")) {
@@ -291,7 +285,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
 
     // Split audio with metadata (using config format)
-    let cover_path = if download_cover {
+    // Use cover if it was downloaded successfully
+    let cover_path = if cover_downloaded {
         Some(output_dir.join("cover.jpg"))
     } else {
         None
@@ -324,6 +319,12 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
     // Clean up temporary audio file
     std::fs::remove_file(&audio_file).ok();
+
+    // Clean up cover file if config says not to keep it
+    if cover_downloaded && !keep_cover {
+        let cover_file = output_dir.join("cover.jpg");
+        std::fs::remove_file(&cover_file).ok();
+    }
 
     // Message de succès
     ui::print_success(&output_dir.display().to_string());

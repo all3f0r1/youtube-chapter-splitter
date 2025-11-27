@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- YouTube authentication support via cookies file for member-only and private videos
+- Automatic detection and use of cookies file at `~/.config/ytcs/cookies.txt`
+- New documentation file `COOKIES_SETUP.md` with setup instructions
+
+### Changed
+- Cover art is now always downloaded for embedding in MP3 files
+- Cover art file is automatically deleted after processing if `download_cover` config is false
+- Removed redundant "Playlist detected!" and "Downloading video only" messages when `playlist_behavior` is set to `video_only`
+- Removed verbose "Audio downloaded" message showing temporary file path
+
+### Fixed
+- Member-only YouTube videos can now be downloaded with proper authentication
+- Cleaner console output when downloading videos from playlists with video_only mode
+
 ## [0.3.2] - 2024-11-16
 
 ### Fixed
