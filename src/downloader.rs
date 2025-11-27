@@ -19,6 +19,7 @@ pub struct VideoInfo {
     pub video_id: String,
     pub thumbnail_url: String,
     pub uploader: String,
+    pub description: String,
 }
 
 /// Informations sur une dépendance système manquante.
@@ -211,6 +212,8 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 
     let uploader = data["uploader"].as_str().unwrap_or("Unknown").to_string();
 
+    let description = data["description"].as_str().unwrap_or("").to_string();
+
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
             parse_chapters_from_json(&json_str).unwrap_or_else(|_| Vec::new())
@@ -228,6 +231,7 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         video_id,
         thumbnail_url,
         uploader,
+        description,
     })
 }
 

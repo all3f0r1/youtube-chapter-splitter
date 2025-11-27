@@ -223,6 +223,9 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         video_info.chapters.len(),
     );
 
+    // Section: Downloading video
+    ui::print_section_header("Downloading video");
+
     // Determine output directory
     let output_dir = if let Some(ref output) = cli.output {
         std::path::PathBuf::from(shellexpand::tilde(output).to_string())
@@ -274,12 +277,33 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     // Afficher le statut de téléchargement
     ui::print_download_status(cover_status, Status::Success);
 
-    // Get chapters
+    // Section: Making an album
+    ui::print_section_header("Making an album");
+
+    // Get chapters with fallback strategy:
+    // 1. Use YouTube chapters if available
+    // 2. Try to parse from video description
+    // 3. Fall back to silence detection
     let chapters_to_use = if !video_info.chapters.is_empty() {
         video_info.chapters
     } else {
-        ui::print_info("No tracks found, detecting automatically...");
-        audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
+        ui::print_info("No chapters found in video metadata, checking description...");
+        match youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description(
+            &video_info.description,
+            video_info.duration,
+        ) {
+            Ok(chapters) => {
+                ui::print_info(&format!(
+                    "Found {} chapters in description!",
+                    chapters.len()
+                ));
+                chapters
+            }
+            Err(_) => {
+                ui::print_info("No chapters in description, detecting from silence...");
+                audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
+            }
+        }
     };
 
     let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);

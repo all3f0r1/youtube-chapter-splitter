@@ -49,6 +49,7 @@
 
 pub mod audio;
 pub mod chapters;
+pub mod chapters_from_description;
 pub mod config;
 pub mod downloader;
 pub mod error;

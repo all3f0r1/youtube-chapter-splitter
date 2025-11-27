@@ -11,16 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - YouTube authentication support via cookies file for member-only and private videos
 - Automatic detection and use of cookies file at `~/.config/ytcs/cookies.txt`
 - New documentation file `COOKIES_SETUP.md` with setup instructions
+- Chapter detection from video description as fallback before silence detection
+- Support for multiple timestamp formats in description: `[HH:MM:SS]`, `HH:MM:SS`, `MM:SS`
+- New module `chapters_from_description` for parsing chapters from video descriptions
+- Section headers to distinguish "Downloading video" from "Making an album" phases
 
 ### Changed
 - Cover art is now always downloaded for embedding in MP3 files
 - Cover art file is automatically deleted after processing if `download_cover` config is false
 - Removed redundant "Playlist detected!" and "Downloading video only" messages when `playlist_behavior` is set to `video_only`
 - Removed verbose "Audio downloaded" message showing temporary file path
+- Chapter detection now follows a 3-step fallback: 1) YouTube metadata, 2) Video description, 3) Silence detection
+- Improved output messages to clearly separate download and conversion phases
 
 ### Fixed
 - Member-only YouTube videos can now be downloaded with proper authentication
 - Cleaner console output when downloading videos from playlists with video_only mode
+- Videos without YouTube chapters but with timestamps in description are now properly split
 
 ## [0.3.2] - 2024-11-16
 

@@ -43,7 +43,17 @@ fn status_icon(status: Status) -> ColoredString {
 
 /// Afficher l'en-tête minimal
 pub fn print_header() {
-    println!("{}\n", "ytcs v0.10.0".dimmed());
+    println!(
+        "{}
+",
+        "ytcs v0.10.0".dimmed()
+    );
+}
+
+/// Afficher un en-tête de section
+pub fn print_section_header(title: &str) {
+    println!("{}", title.bright_cyan().bold());
+    println!();
 }
 
 /// Afficher les informations de la vidéo
