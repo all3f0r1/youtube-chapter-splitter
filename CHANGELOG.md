@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4] - 2024-11-30
+
+### Added
+- Fallback to channel name for artist detection when artist is not found in video title
+- Support for track listing format in video descriptions: `1 - Title (0:00)`
+- New test cases for channel name fallback and track number format
+
+### Changed
+- `parse_artist_album` function now accepts channel name as second parameter
+- Artist detection now uses channel name (e.g., "HasvAlner") when title doesn't contain artist-album separator
+- Chapter detection from description now supports track number format: `N - Track Title (MM:SS)`
+
+### Fixed
+- Videos without artist in title now use channel name instead of "Unknown Artist"
+- Better support for music channels that use track listing format in descriptions
+
 ## [0.10.3] - 2024-11-27
 
 ### Added

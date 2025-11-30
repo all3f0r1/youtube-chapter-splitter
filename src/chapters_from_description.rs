@@ -51,12 +51,45 @@ pub fn parse_chapters_from_description(
     // 00:00:00 - Title
     // 00:00 - Title
     // 00:00:00 Title
+    // 1 - Title (0:00)
+    // 2 - Title (4:24)
     let re = Regex::new(r"(?m)^\s*\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*[-–—:]?\s*(.+?)\s*$")
+        .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
+
+    // Regex pour le format avec numéro de piste au début: "1 - Title (0:00)"
+    let re_track_format = Regex::new(r"(?m)^\s*(\d+)\s*[-–—]\s*(.+?)\s*\((\d{1,2}:\d{2}(?::\d{2})?)\)\s*$")
         .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
 
     let mut chapters_data: Vec<(f64, String)> = Vec::new();
 
-    for cap in re.captures_iter(description) {
+    // Essayer d'abord le format avec numéro de piste: "1 - Title (0:00)"
+    for cap in re_track_format.captures_iter(description) {
+        if let (Some(_track_num_match), Some(title_match), Some(timestamp_match)) = (cap.get(1), cap.get(2), cap.get(3)) {
+            let timestamp_str = timestamp_match.as_str();
+            let title = title_match.as_str().trim();
+
+            // Ignorer les lignes vides ou trop courtes
+            if title.is_empty() || title.len() < 2 {
+                continue;
+            }
+
+            // Parser le timestamp
+            if let Ok(start_time) = parse_timestamp(timestamp_str) {
+                // Vérifier que le timestamp est dans la durée de la vidéo
+                if start_time < video_duration {
+                    // Nettoyer le titre
+                    let clean_title = utils::sanitize_title(title);
+                    if !clean_title.is_empty() {
+                        chapters_data.push((start_time, clean_title));
+                    }
+                }
+            }
+        }
+    }
+
+    // Si aucun chapitre trouvé avec le format piste, essayer le format classique
+    if chapters_data.is_empty() {
+        for cap in re.captures_iter(description) {
         if let (Some(timestamp_match), Some(title_match)) = (cap.get(1), cap.get(2)) {
             let timestamp_str = timestamp_match.as_str();
             let title = title_match.as_str().trim();
@@ -77,6 +110,7 @@ pub fn parse_chapters_from_description(
                     }
                 }
             }
+        }
         }
     }
 
@@ -172,5 +206,31 @@ Tracklist:
         let description = "This is a video description without any timestamps.";
         let result = parse_chapters_from_description(description, 300.0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_chapters_track_number_format() {
+        let description = r#"
+1 - The Cornerstone of Some Dream (0:00)
+2 - Architects of Inner Time (Part I) (4:24)
+3 - The Ritual of the Octagonal Chamber (11:01)
+4 - Colors at the Bottom of the Gesture (Instrumental) (17:52)
+5 - The Ballad of the Hourglass Man (22:23)
+6 - Mirror Against the Firmament (Suite in Three Parts) (26:43)
+7 - The Navigation of Rational Ice (31:28)
+8 - The Guardian of the Shadow Papyri (35:24)
+9 - The Cycle of Chalk and Fine Sand (40:29)
+10 - Song for the Submerged Mountains (44:11)
+11 - The Filters of Chronos (48:35)
+12 - Architects of Inner Time (Part II: The Awakening) (51:42)
+"#;
+        let chapters = parse_chapters_from_description(description, 3600.0).unwrap();
+        assert_eq!(chapters.len(), 12);
+        assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
+        assert_eq!(chapters[0].start_time, 0.0);
+        assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
+        assert_eq!(chapters[1].start_time, 264.0); // 4:24
+        assert_eq!(chapters[11].title, "Architects of Inner Time (Part II_ The Awakening)");
+        assert_eq!(chapters[11].start_time, 3102.0); // 51:42
     }
 }

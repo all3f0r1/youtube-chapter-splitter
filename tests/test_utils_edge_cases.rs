@@ -72,28 +72,28 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_no_separator() {
-        let (artist, album) = parse_artist_album("Just A Title");
-        assert_eq!(artist, "Unknown Artist");
+        let (artist, album) = parse_artist_album("Just A Title", "TestChannel");
+        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
         assert_eq!(album, "Just A Title");
     }
 
     #[test]
     fn test_parse_artist_album_empty() {
-        let (artist, album) = parse_artist_album("");
-        assert_eq!(artist, "Unknown Artist");
+        let (artist, album) = parse_artist_album("", "TestChannel");
+        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
         assert_eq!(album, "");
     }
 
     #[test]
     fn test_parse_artist_album_only_artist() {
-        let (artist, _album) = parse_artist_album("Artist -");
-        assert_eq!(artist, "Unknown Artist");
+        let (artist, _album) = parse_artist_album("Artist -", "TestChannel");
+        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
         // Avec un seul élément après split, ça retourne le titre nettoyé
     }
 
     #[test]
     fn test_parse_artist_album_multiple_separators() {
-        let (artist, album) = parse_artist_album("Artist - Album - Extra");
+        let (artist, album) = parse_artist_album("Artist - Album - Extra", "TestChannel");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
         // Le troisième élément est ignoré
@@ -101,14 +101,14 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_pipe_separator() {
-        let (artist, album) = parse_artist_album("Artist | Album");
+        let (artist, album) = parse_artist_album("Artist | Album", "TestChannel");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
     }
 
     #[test]
     fn test_parse_artist_album_with_full_album_tag() {
-        let (artist, album) = parse_artist_album("Artist - Album [FULL ALBUM]");
+        let (artist, album) = parse_artist_album("Artist - Album [FULL ALBUM]", "TestChannel");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
     }
@@ -188,7 +188,7 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_with_em_dash() {
-        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM)");
+        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM)", "TestChannel");
         assert_eq!(artist, "Arcane Voyage");
         assert_eq!(album, "Third");
     }

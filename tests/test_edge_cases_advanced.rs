@@ -69,7 +69,7 @@ mod advanced_edge_cases_tests {
     #[test]
     fn test_parse_artist_album_very_long() {
         let long_title = format!("{} - {}", "A".repeat(500), "B".repeat(500));
-        let (artist, album) = parse_artist_album(&long_title);
+        let (artist, album) = parse_artist_album(&long_title, "TestChannel");
         assert!(!artist.is_empty());
         assert!(!album.is_empty());
     }
@@ -85,7 +85,7 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_nested_brackets() {
-        let (artist, album) = parse_artist_album("Artist - Album [Disc 1 [Remastered]]");
+        let (artist, album) = parse_artist_album("Artist - Album [Disc 1 [Remastered]]", "TestChannel");
         assert_eq!(artist, "Artist");
         // La regex supprime les crochets mais peut laisser des résidus avec des crochets imbriqués
         // C'est un comportement connu et acceptable
@@ -94,21 +94,21 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_multiple_dashes() {
-        let (artist, album) = parse_artist_album("Artist - Name - Album - Title");
+        let (artist, album) = parse_artist_album("Artist - Name - Album - Title", "TestChannel");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Name"); // Prend le premier séparateur
     }
 
     #[test]
     fn test_parse_artist_album_mixed_separators() {
-        let (artist, _album) = parse_artist_album("Artist - Album | Extra Info");
+        let (artist, _album) = parse_artist_album("Artist - Album | Extra Info", "TestChannel");
         assert_eq!(artist, "Artist");
         // Devrait utiliser le premier séparateur trouvé
     }
 
     #[test]
     fn test_parse_artist_album_only_separators() {
-        let (artist, album) = parse_artist_album(" - | - ");
+        let (artist, album) = parse_artist_album(" - | - ", "TestChannel");
         // Avec uniquement des séparateurs, le parsing peut retourner Unknown Artist
         // ou des chaînes vides après nettoyage
         // On vérifie juste que ça ne crash pas
@@ -238,7 +238,7 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_url_encoded() {
-        let (artist, album) = parse_artist_album("Artist%20Name - Album%20Title");
+        let (artist, album) = parse_artist_album("Artist%20Name - Album%20Title", "TestChannel");
         // Devrait gérer les caractères encodés
         assert!(!artist.is_empty());
         assert!(!album.is_empty());
@@ -257,7 +257,7 @@ mod advanced_edge_cases_tests {
         ];
 
         for title in real_titles {
-            let (artist, album) = parse_artist_album(title);
+            let (artist, album) = parse_artist_album(title, "TestChannel");
             assert!(!artist.is_empty(), "Failed for: {}", title);
             assert!(!album.is_empty(), "Failed for: {}", title);
             assert_ne!(artist, "Unknown Artist", "Failed to parse: {}", title);

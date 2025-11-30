@@ -238,7 +238,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
         (utils::clean_folder_name(a), utils::clean_folder_name(al))
     } else {
-        utils::parse_artist_album(&video_info.title)
+        utils::parse_artist_album(&video_info.title, &video_info.uploader)
     };
 
     // Create output directory using config format
@@ -490,7 +490,7 @@ fn download_single_video(
     let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
         (utils::clean_folder_name(a), utils::clean_folder_name(al))
     } else {
-        utils::parse_artist_album(&video_info.title)
+        utils::parse_artist_album(&video_info.title, &video_info.uploader)
     };
 
     // Create output directory using config format

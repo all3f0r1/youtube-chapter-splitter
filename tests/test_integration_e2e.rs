@@ -48,7 +48,7 @@ mod integration_e2e_tests {
         );
 
         // 3. Parser artiste et album
-        let (artist, album) = utils::parse_artist_album(&video_info.title);
+        let (artist, album) = utils::parse_artist_album(&video_info.title, "TestChannel");
         assert!(!artist.is_empty(), "Artist should not be empty");
         assert!(!album.is_empty(), "Album should not be empty");
 
@@ -264,11 +264,11 @@ mod integration_e2e_tests {
                 "Oblivion Gate",
             ),
             ("Artist | Album Name", "Artist", "Album Name"),
-            ("Just A Title", "Unknown Artist", "Just A Title"),
+            ("Just A Title", "Testchannel", "Just A Title"),
         ];
 
         for (title, expected_artist, expected_album) in test_titles {
-            let (artist, album) = utils::parse_artist_album(title);
+            let (artist, album) = utils::parse_artist_album(title, "TestChannel");
             assert_eq!(artist, expected_artist, "Failed for title: {}", title);
             assert_eq!(album, expected_album, "Failed for title: {}", title);
         }

@@ -133,34 +133,31 @@ pub fn format_duration_short(seconds: f64) -> String {
 
 /// Parse le titre d'une vidéo YouTube pour extraire l'artiste et l'album.
 ///
-/// Cette fonction analyse le titre d'une vidéo et tente d'en extraire le nom de l'artiste
-/// et le titre de l'album en se basant sur des conventions de nommage courantes.
-///
-/// # Format attendu
-///
+/// Cette fonction détecte automatiquement les formats courants de titres YouTube :
 /// - `"ARTIST - ALBUM [...]"` (séparateur tiret)
 /// - `"ARTIST | ALBUM [...]"` (séparateur pipe)
 ///
 /// # Arguments
 ///
 /// * `title` - Le titre de la vidéo YouTube
+/// * `uploader` - Le nom de la chaîne YouTube (utilisé comme fallback pour l'artiste)
 ///
 /// # Returns
 ///
 /// Un tuple `(artiste, album)` où :
 /// - Si le parsing réussit : les deux valeurs sont extraites et nettoyées
-/// - Si le parsing échoue : `("Unknown Artist", titre_nettoyé)`
+/// - Si le parsing échoue : `(uploader, titre_nettoyé)` ou `("Unknown Artist", titre_nettoyé)` si uploader est vide
 ///
 /// # Examples
 ///
 /// ```
 /// use youtube_chapter_splitter::utils::parse_artist_album;
 ///
-/// let (artist, album) = parse_artist_album("Pink Floyd - Dark Side [1973]");
+/// let (artist, album) = parse_artist_album("Pink Floyd - Dark Side [1973]", "SomeChannel");
 /// assert_eq!(artist, "Pink Floyd");
 /// assert_eq!(album, "Dark Side");
 /// ```
-pub fn parse_artist_album(title: &str) -> (String, String) {
+pub fn parse_artist_album(title: &str, uploader: &str) -> (String, String) {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM]
     let without_suffix = RE_FULL_ALBUM.replace_all(title, "");
 
@@ -184,7 +181,13 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
         (artist, album)
     } else {
         let cleaned_title = clean_folder_name(cleaned.trim());
-        ("Unknown Artist".to_string(), cleaned_title)
+        // Utiliser le nom de la chaîne comme artiste si disponible
+        let artist = if uploader.is_empty() || uploader == "Unknown" {
+            "Unknown Artist".to_string()
+        } else {
+            clean_folder_name(uploader)
+        };
+        (artist, cleaned_title)
     }
 }
 
@@ -284,15 +287,26 @@ mod tests {
 
     #[test]
     fn test_parse_artist_album() {
-        let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]");
+        let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]", "SomeChannel");
         assert_eq!(artist, "Pink Floyd");
         assert_eq!(album, "Dark Side Of The Moon");
 
         // Test avec em-dash et FULL ALBUM
         let (artist, album) = parse_artist_album(
             "Arcane Voyage – Third (FULL ALBUM) 70s Progressive • Psychedelic Rock",
+            "SomeChannel",
         );
         assert_eq!(artist, "Arcane Voyage");
         assert_eq!(album, "Third");
+
+        // Test avec fallback sur le nom de la chaîne
+        let (artist, album) = parse_artist_album("Some Album Title", "HasvAlner");
+        assert_eq!(artist, "Hasvalner"); // clean_folder_name capitalise le nom
+        assert_eq!(album, "Some Album Title");
+
+        // Test avec uploader vide
+        let (artist, album) = parse_artist_album("Some Album Title", "");
+        assert_eq!(artist, "Unknown Artist");
+        assert_eq!(album, "Some Album Title");
     }
 }
