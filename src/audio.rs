@@ -45,28 +45,6 @@ static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d
 /// # Errors
 ///
 /// Retourne une erreur si le découpage ou l'ajout de métadonnées échoue
-/// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
-///
-/// Cette fonction utilise `ffmpeg` pour découper l'audio et `lofty` pour ajouter
-/// les métadonnées ID3 et la pochette d'album.
-///
-/// # Arguments
-///
-/// * `input_file` - Le fichier audio source
-/// * `chapters` - Les chapitres définissant les points de découpe
-/// * `output_dir` - Le répertoire de sortie pour les pistes
-/// * `artist` - Le nom de l'artiste
-/// * `album` - Le nom de l'album
-/// * `cover_path` - Chemin optionnel vers l'image de pochette
-/// * `cfg` - La configuration pour le formatage des noms de fichiers
-///
-/// # Returns
-///
-/// Un vecteur contenant les chemins des fichiers créés
-///
-/// # Errors
-///
-/// Retourne une erreur si le découpage ou l'ajout de métadonnées échoue
 pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
@@ -76,6 +54,15 @@ pub fn split_audio_by_chapters(
     cover_path: Option<&Path>,
     cfg: &crate::config::Config,
 ) -> Result<Vec<PathBuf>> {
+    let pb = ProgressBar::new(chapters.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█▒-"),
+    );
+    pb.set_message("Splitting audio...");
+
     std::fs::create_dir_all(output_dir)?;
 
     // Charger l'image de couverture une seule fois si elle existe
@@ -105,6 +92,8 @@ pub fn split_audio_by_chapters(
             .join(" ");
         let output_filename = format!("{}.mp3", title_cased);
         let output_path = output_dir.join(&output_filename);
+
+        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
 
@@ -146,8 +135,10 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
+        pb.inc(1);
     }
 
+    pb.finish_with_message("✓ Splitting completed successfully!");
     Ok(output_files)
 }
 

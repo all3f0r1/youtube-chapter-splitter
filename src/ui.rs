@@ -57,7 +57,7 @@ pub fn print_section_header(title: &str) {
 }
 
 /// Afficher les informations de la vidéo
-pub fn print_video_info(title: &str, duration: &str, tracks: usize, tracks_source: &str) {
+pub fn print_video_info(title: &str, duration: &str, tracks: usize) {
     // Nettoyer le titre des éléments inutiles
     let clean_title = clean_title(title);
 
@@ -66,20 +66,11 @@ pub fn print_video_info(title: &str, duration: &str, tracks: usize, tracks_sourc
         "→".cyan().bold(),
         clean_title.bright_white().bold()
     );
-    
-    let track_info = if tracks > 0 {
-        format!("{} tracks", tracks)
-    } else if tracks_source == "silence" {
-        "? tracks → silence detection mode".to_string()
-    } else {
-        "0 tracks".to_string()
-    };
-    
     println!(
         "  {} {} {}",
         duration.dimmed(),
         "•".dimmed(),
-        track_info.dimmed()
+        format!("{} tracks", tracks).dimmed()
     );
     println!();
 }
@@ -107,34 +98,6 @@ fn clean_title(title: &str) -> String {
     for pattern in &patterns {
         cleaned = cleaned.replace(pattern, "");
     }
-    
-    // Remove year in parentheses or brackets (simplified approach)
-    loop {
-        let original = cleaned.clone();
-        // Remove year in parentheses
-        if let Some(start) = cleaned.find('(') {
-            if let Some(end) = cleaned[start..].find(')') {
-                let potential_year = &cleaned[start+1..start+end];
-                if potential_year.len() == 4 && potential_year.chars().all(|c| c.is_ascii_digit()) {
-                    cleaned = format!("{}{}", &cleaned[..start], &cleaned[start+end+1..]);
-                    continue;
-                }
-            }
-        }
-        // Remove year in brackets
-        if let Some(start) = cleaned.find('[') {
-            if let Some(end) = cleaned[start..].find(']') {
-                let potential_year = &cleaned[start+1..start+end];
-                if potential_year.len() == 4 && potential_year.chars().all(|c| c.is_ascii_digit()) {
-                    cleaned = format!("{}{}", &cleaned[..start], &cleaned[start+end+1..]);
-                    continue;
-                }
-            }
-        }
-        if cleaned == original {
-            break;
-        }
-    }
 
     // Nettoyer les espaces multiples et trim
     cleaned = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -149,7 +112,10 @@ pub fn print_download_status(cover_status: Status, audio_status: Status) {
     println!();
 }
 
-
+/// Afficher le début du splitting
+pub fn print_splitting_start() {
+    println!("  {}\n", "Splitting tracks...".dimmed());
+}
 
 /// Afficher une piste
 pub fn print_track(track: &TrackProgress) {
