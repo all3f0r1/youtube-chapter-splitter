@@ -46,7 +46,7 @@ pub fn print_header() {
     println!(
         "{}
 ",
-        "ytcs v0.10.3".dimmed()
+        "ytcs v0.10.5".dimmed()
     );
 }
 
@@ -57,7 +57,13 @@ pub fn print_section_header(title: &str) {
 }
 
 /// Afficher les informations de la vidéo
-pub fn print_video_info(title: &str, duration: &str, tracks: usize) {
+pub fn print_video_info(
+    title: &str,
+    duration: &str,
+    tracks: usize,
+    from_description: bool,
+    silence_detection: bool,
+) {
     // Nettoyer le titre des éléments inutiles
     let clean_title = clean_title(title);
 
@@ -66,64 +72,53 @@ pub fn print_video_info(title: &str, duration: &str, tracks: usize) {
         "→".cyan().bold(),
         clean_title.bright_white().bold()
     );
+
+    // Affichage du nombre de tracks
+    let tracks_display = if silence_detection {
+        "? tracks → silence detection mode".to_string()
+    } else if tracks > 0 {
+        format!("{} tracks", tracks)
+    } else if from_description {
+        "checking description...".to_string()
+    } else {
+        "? tracks".to_string()
+    };
+
     println!(
         "  {} {} {}",
         duration.dimmed(),
         "•".dimmed(),
-        format!("{} tracks", tracks).dimmed()
+        tracks_display.dimmed()
     );
     println!();
 }
 
-/// Nettoyer le titre des éléments inutiles
-fn clean_title(title: &str) -> String {
-    let mut cleaned = title.to_string();
+/// Nettoyer le titre pour qu'il corresponde au nom de dossier
+pub fn clean_title(title: &str) -> String {
+    use crate::utils;
 
-    // Patterns à supprimer
-    let patterns = [
-        "[Full Album]",
-        "[FULL ALBUM]",
-        "(Full Album)",
-        "(FULL ALBUM)",
-        "[Official Audio]",
-        "[Official Video]",
-        "(Official Audio)",
-        "(Official Video)",
-        "[HD]",
-        "[4K]",
-        "(HD)",
-        "(4K)",
-    ];
-
-    for pattern in &patterns {
-        cleaned = cleaned.replace(pattern, "");
-    }
-
-    // Nettoyer les espaces multiples et trim
-    cleaned = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
-
-    cleaned
+    // Utiliser la même logique que clean_folder_name pour avoir un affichage cohérent
+    utils::clean_folder_name(title)
 }
 
-/// Afficher le statut de téléchargement
-pub fn print_download_status(cover_status: Status, audio_status: Status) {
+/// Afficher le statut de téléchargement du cover
+pub fn print_cover_status(cover_status: Status) {
     println!("  {} Cover downloaded", status_icon(cover_status));
-    println!("  {} Audio downloaded", status_icon(audio_status));
-    println!();
 }
 
-/// Afficher le début du splitting
-pub fn print_splitting_start() {
-    println!("  {}\n", "Splitting tracks...".dimmed());
-}
+/// Afficher une piste avec le format complet
+pub fn print_track(track: &TrackProgress, artist: &str, album: &str, filename_format: &str) {
+    // Construire le nom de fichier selon le format
+    let formatted_name = filename_format
+        .replace("{track}", &format!("{:02}", track.number))
+        .replace("{title}", &track.title)
+        .replace("{artist}", artist)
+        .replace("{album}", album);
 
-/// Afficher une piste
-pub fn print_track(track: &TrackProgress) {
     println!(
-        "  {} {:02} {} ({})",
+        "  {} {} ({})",
         status_icon(track.status),
-        track.number,
-        track.title.bright_white(),
+        formatted_name.bright_white(),
         track.duration.dimmed()
     );
     io::stdout().flush().ok();
@@ -162,8 +157,8 @@ mod tests {
 
     #[test]
     fn test_clean_title() {
+        // clean_title utilise maintenant clean_folder_name qui capitalise
         assert_eq!(clean_title("Artist - Song [Full Album]"), "Artist - Song");
-        assert_eq!(clean_title("Song (Official Audio) [HD]"), "Song");
         assert_eq!(clean_title("Normal Title"), "Normal Title");
     }
 

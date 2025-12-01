@@ -5,7 +5,6 @@
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
-use indicatif::{ProgressBar, ProgressStyle};
 
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
@@ -54,15 +53,6 @@ pub fn split_audio_by_chapters(
     cover_path: Option<&Path>,
     cfg: &crate::config::Config,
 ) -> Result<Vec<PathBuf>> {
-    let pb = ProgressBar::new(chapters.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
-            .progress_chars("█▒-"),
-    );
-    pb.set_message("Splitting audio...");
-
     std::fs::create_dir_all(output_dir)?;
 
     // Charger l'image de couverture une seule fois si elle existe
@@ -92,8 +82,6 @@ pub fn split_audio_by_chapters(
             .join(" ");
         let output_filename = format!("{}.mp3", title_cased);
         let output_path = output_dir.join(&output_filename);
-
-        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
 
@@ -135,11 +123,80 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
-        pb.inc(1);
     }
 
-    pb.finish_with_message("✓ Splitting completed successfully!");
     Ok(output_files)
+}
+
+/// Découpe une seule piste audio
+pub fn split_single_track(
+    input_file: &Path,
+    chapter: &Chapter,
+    track_number: usize,
+    total_tracks: usize,
+    output_dir: &Path,
+    artist: &str,
+    album: &str,
+    cover_data: Option<&[u8]>,
+    cfg: &crate::config::Config,
+) -> Result<PathBuf> {
+    let sanitized_title = chapter.sanitize_title();
+    let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
+    // Title Case: première lettre de chaque mot en majuscule
+    let title_cased = filename_base
+        .split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+        .collect::<Vec<String>>()
+        .join(" ");
+    let output_filename = format!("{}.mp3", title_cased);
+    let output_path = output_dir.join(&output_filename);
+
+    let duration = chapter.duration();
+
+    // Découper l'audio avec ffmpeg (sans cover art)
+    let mut cmd = Command::new("ffmpeg");
+    cmd.arg("-i")
+        .arg(input_file)
+        .arg("-ss")
+        .arg(chapter.start_time.to_string())
+        .arg("-t")
+        .arg(duration.to_string())
+        .arg("-c:a")
+        .arg("libmp3lame")
+        .arg("-q:a")
+        .arg("0")
+        .arg("-metadata")
+        .arg(format!("title={}", chapter.title))
+        .arg("-metadata")
+        .arg(format!("artist={}", artist))
+        .arg("-metadata")
+        .arg(format!("album={}", album))
+        .arg("-metadata")
+        .arg(format!("track={}/{}", track_number, total_tracks))
+        .arg("-y")
+        .arg(&output_path);
+
+    let output = cmd
+        .output()
+        .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(YtcsError::AudioError(format!("ffmpeg failed: {}", error)));
+    }
+
+    // Ajouter la pochette d'album avec lofty si elle existe
+    if let Some(cover) = cover_data {
+        add_cover_to_file(&output_path, cover)?;
+    }
+
+    Ok(output_path)
 }
 
 /// Vérifie si les données sont au format WebP.
@@ -217,7 +274,7 @@ fn convert_webp_to_jpeg(webp_path: &Path) -> Result<Vec<u8>> {
 /// # Returns
 ///
 /// Les données de l'image sous forme de vecteur d'octets
-fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
+pub fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
     // Vérifier si le fichier existe
     if !cover_path.exists() {
         return Ok(None);

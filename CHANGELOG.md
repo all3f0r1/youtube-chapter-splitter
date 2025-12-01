@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5] - 2024-12-01
+
+### Added
+- Progress bars for video download, audio conversion, and track splitting
+- Direct URL support: `ytcs <URL>` now works without the `download` subcommand
+- YouTube URL validation with clear error messages
+- Track-by-track progress display with formatted names during splitting
+
+### Changed
+- Video title in UI now matches the output folder name format for consistency
+- Track count display now shows "? tracks → silence detection mode" when using silence detection
+- Track count display shows "checking description..." when checking video description for chapters
+- "Downloading video" section now shows progress bar inline
+- "Making an album out of the video" replaces "Audio downloaded" with progress bar
+- "Making the album..." replaces "Making an album" for clarity
+- Removed "Splitting tracks..." message, replaced with individual track progress
+- Each track now shows formatted name (e.g., "01 - Artist - Title") with progress bar
+- UI version updated to 0.10.5
+
+### Fixed
+- Improved user experience with real-time progress feedback
+- Better error handling for invalid URLs
+- Consistent formatting between UI display and file output
+
 ## [0.10.4] - 2024-11-30
 
 ### Added

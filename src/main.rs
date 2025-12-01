@@ -8,6 +8,26 @@ use youtube_chapter_splitter::{audio, config, downloader, playlist, utils, Resul
 #[command(about = "YouTube Chapter Splitter - Download and split YouTube videos into MP3 tracks", long_about = None)]
 #[command(version)]
 struct Cli {
+    /// YouTube video URL(s) - can be used without 'download' subcommand
+    #[arg(value_name = "URL")]
+    urls: Vec<String>,
+
+    /// Output directory (overrides config)
+    #[arg(short, long)]
+    output: Option<String>,
+
+    /// Force artist name (overrides auto-detection)
+    #[arg(short, long)]
+    artist: Option<String>,
+
+    /// Force album name (overrides auto-detection)
+    #[arg(short = 'A', long)]
+    album: Option<String>,
+
+    /// Skip downloading cover art
+    #[arg(long)]
+    no_cover: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -118,10 +138,29 @@ fn main() -> Result<()> {
         Some(Commands::Reset) => config::reset_config(),
         Some(Commands::Download(args)) => handle_download(args),
         None => {
-            // Si aucune commande, essayer de parser comme download avec les args restants
-            // Cela permet "ytcs URL" au lieu de "ytcs download URL"
-            let args = DownloadArgs::parse();
-            handle_download(args)
+            // Si aucune commande mais des URLs sont fournies, traiter comme download
+            if !cli.urls.is_empty() {
+                let args = DownloadArgs {
+                    urls: cli.urls,
+                    output: cli.output,
+                    artist: cli.artist,
+                    album: cli.album,
+                    no_cover: cli.no_cover,
+                };
+                handle_download(args)
+            } else {
+                // Aucune URL fournie, afficher l'aide
+                eprintln!("{}", "Error: No URL provided".red().bold());
+                eprintln!();
+                eprintln!("Usage: ytcs <URL> [OPTIONS]");
+                eprintln!("       ytcs download <URL> [OPTIONS]");
+                eprintln!("       ytcs config");
+                eprintln!("       ytcs set <KEY> <VALUE>");
+                eprintln!("       ytcs reset");
+                eprintln!();
+                eprintln!("For more information, run: ytcs --help");
+                std::process::exit(1);
+            }
         }
     }
 }
@@ -210,18 +249,38 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         }
     }
 
-    use youtube_chapter_splitter::ui::{self, Status, TrackProgress};
+    use youtube_chapter_splitter::ui::{self, Status};
 
     let url = clean_url(url);
+
+    // Vérifier que c'est bien une URL YouTube
+    if !url.contains("youtube.com") && !url.contains("youtu.be") {
+        ui::print_error("Invalid YouTube URL. Please provide a valid YouTube video URL.");
+        return Err(youtube_chapter_splitter::error::YtcsError::InvalidUrl(
+            "Not a YouTube URL".to_string(),
+        ));
+    }
+
     println!("{}", "Fetching video information...".yellow());
     let cookies_from_browser = config.cookies_from_browser.as_deref();
     let video_info = downloader::get_video_info(&url, cookies_from_browser)?;
 
-    // Afficher les infos vidéo avec le nouveau TUI
+    // Parse artist and album pour l'affichage
+    let (artist_display, album_display) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
+        (utils::clean_folder_name(a), utils::clean_folder_name(al))
+    } else {
+        utils::parse_artist_album(&video_info.title, &video_info.uploader)
+    };
+
+    // Afficher les infos vidéo avec le titre nettoyé (format dossier)
+    let display_title = format!("{} - {}", artist_display, album_display);
+    let has_chapters = !video_info.chapters.is_empty();
     ui::print_video_info(
-        &video_info.title,
+        &display_title,
         &utils::format_duration(video_info.duration),
         video_info.chapters.len(),
+        !has_chapters,
+        false,
     );
 
     // Section: Downloading video
@@ -266,24 +325,32 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
             }
         };
 
-    // Download audio
+    // Afficher le statut du cover
+    ui::print_cover_status(cover_status);
+
+    // Download audio avec barre de progression
+    use youtube_chapter_splitter::progress;
+    let pb_audio = progress::create_audio_progress("Making an album out of the video");
     let audio_file = match downloader::download_audio(
         &url,
         &output_dir.join("temp_audio.mp3"),
         cookies_from_browser,
+        Some(pb_audio.clone()),
     ) {
-        Ok(file) => file,
+        Ok(file) => {
+            pb_audio.finish_with_message("  ✓ Audio ready");
+            println!();
+            file
+        }
         Err(e) => {
+            pb_audio.finish_and_clear();
             ui::print_error(&format!("Failed to download audio: {}", e));
             return Err(e);
         }
     };
 
-    // Afficher le statut de téléchargement
-    ui::print_download_status(cover_status, Status::Success);
-
-    // Section: Making an album
-    ui::print_section_header("Making an album");
+    // Section: Making the album...
+    ui::print_section_header("Making the album...");
 
     // Get chapters with fallback strategy:
     // 1. Use YouTube chapters if available
@@ -321,29 +388,44 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         None
     };
 
-    // Afficher le début du splitting
-    ui::print_splitting_start();
+    // Charger l'image de couverture une seule fois si elle existe
+    let cover_data = if let Some(ref cover) = cover_path {
+        audio::load_cover_image(cover)?
+    } else {
+        None
+    };
 
-    // Découper toutes les pistes
-    let _output_files = audio::split_audio_by_chapters(
-        &audio_file,
-        &final_chapters,
-        &output_dir,
-        &final_artist,
-        &final_album,
-        cover_path.as_deref(),
-        config,
-    )?;
-
-    // Afficher chaque piste terminée
+    // Découper chaque piste avec barre de progression
     for (i, ch) in final_chapters.iter().enumerate() {
-        let track = TrackProgress {
-            number: i + 1,
-            title: ch.title.clone(),
-            status: Status::Success,
-            duration: utils::format_duration(ch.duration()),
-        };
-        ui::print_track(&track);
+        let track_number = i + 1;
+        let duration_str = utils::format_duration(ch.duration());
+
+        // Construire le nom de fichier selon le format
+        let formatted_name = config
+            .filename_format
+            .replace("%n", &format!("{:02}", track_number))
+            .replace("%t", &ch.title)
+            .replace("%a", &final_artist)
+            .replace("%A", &final_album);
+
+        let message = format!("{} ({})", formatted_name, duration_str);
+        let pb = progress::create_track_progress(&message);
+
+        // Découper la piste
+        audio::split_single_track(
+            &audio_file,
+            ch,
+            track_number,
+            final_chapters.len(),
+            &output_dir,
+            &final_artist,
+            &final_album,
+            cover_data.as_deref(),
+            config,
+        )?;
+
+        pb.finish_and_clear();
+        println!("  ✓ {} ({})", formatted_name, duration_str);
     }
 
     // Clean up temporary audio file
@@ -512,6 +594,7 @@ fn download_single_video(
         &url,
         &output_dir.join("temp_audio.mp3"),
         cookies_from_browser,
+        None,
     )?;
 
     // Get chapters

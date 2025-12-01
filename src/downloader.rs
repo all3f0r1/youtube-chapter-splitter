@@ -258,15 +258,19 @@ pub fn download_audio(
     url: &str,
     output_path: &Path,
     cookies_from_browser: Option<&str>,
+    pb: Option<ProgressBar>,
 ) -> Result<PathBuf> {
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.green} {msg}")
-            .unwrap(),
-    );
-    pb.set_message("Downloading audio from YouTube...");
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    let progress_bar = pb.unwrap_or_else(|| {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap(),
+        );
+        pb.set_message("Downloading audio from YouTube...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        pb
+    });
 
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("-x")
@@ -288,7 +292,7 @@ pub fn download_audio(
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
 
-    pb.finish_and_clear();
+    progress_bar.finish_and_clear();
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);

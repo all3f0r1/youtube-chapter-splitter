@@ -287,7 +287,8 @@ mod tests {
 
     #[test]
     fn test_parse_artist_album() {
-        let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]", "SomeChannel");
+        let (artist, album) =
+            parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]", "SomeChannel");
         assert_eq!(artist, "Pink Floyd");
         assert_eq!(album, "Dark Side Of The Moon");
 
