@@ -20,7 +20,7 @@
 //!     
 //!     // Télécharger l'audio
 //!     let output_path = PathBuf::from("temp_audio");
-//!     let audio_file = downloader::download_audio(url, &output_path, None)?;
+//!     let audio_file = downloader::download_audio(url, &output_path, None, None)?;
 //!     
 //!     // Découper par chapitres
 //!     let output_dir = PathBuf::from("output");
@@ -55,6 +55,7 @@ pub mod cookie_helper;
 pub mod downloader;
 pub mod error;
 pub mod playlist;
+pub mod progress;
 pub mod ui;
 pub mod utils;
 pub mod ytdlp_error_parser;

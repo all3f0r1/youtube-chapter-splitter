@@ -57,14 +57,17 @@ pub fn parse_chapters_from_description(
         .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
 
     // Regex pour le format avec numéro de piste au début: "1 - Title (0:00)"
-    let re_track_format = Regex::new(r"(?m)^\s*(\d+)\s*[-–—]\s*(.+?)\s*\((\d{1,2}:\d{2}(?::\d{2})?)\)\s*$")
-        .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
+    let re_track_format =
+        Regex::new(r"(?m)^\s*(\d+)\s*[-–—]\s*(.+?)\s*\((\d{1,2}:\d{2}(?::\d{2})?)\)\s*$")
+            .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
 
     let mut chapters_data: Vec<(f64, String)> = Vec::new();
 
     // Essayer d'abord le format avec numéro de piste: "1 - Title (0:00)"
     for cap in re_track_format.captures_iter(description) {
-        if let (Some(_track_num_match), Some(title_match), Some(timestamp_match)) = (cap.get(1), cap.get(2), cap.get(3)) {
+        if let (Some(_track_num_match), Some(title_match), Some(timestamp_match)) =
+            (cap.get(1), cap.get(2), cap.get(3))
+        {
             let timestamp_str = timestamp_match.as_str();
             let title = title_match.as_str().trim();
 
@@ -90,27 +93,27 @@ pub fn parse_chapters_from_description(
     // Si aucun chapitre trouvé avec le format piste, essayer le format classique
     if chapters_data.is_empty() {
         for cap in re.captures_iter(description) {
-        if let (Some(timestamp_match), Some(title_match)) = (cap.get(1), cap.get(2)) {
-            let timestamp_str = timestamp_match.as_str();
-            let title = title_match.as_str().trim();
+            if let (Some(timestamp_match), Some(title_match)) = (cap.get(1), cap.get(2)) {
+                let timestamp_str = timestamp_match.as_str();
+                let title = title_match.as_str().trim();
 
-            // Ignorer les lignes vides ou trop courtes
-            if title.is_empty() || title.len() < 2 {
-                continue;
-            }
+                // Ignorer les lignes vides ou trop courtes
+                if title.is_empty() || title.len() < 2 {
+                    continue;
+                }
 
-            // Parser le timestamp
-            if let Ok(start_time) = parse_timestamp(timestamp_str) {
-                // Vérifier que le timestamp est dans la durée de la vidéo
-                if start_time < video_duration {
-                    // Nettoyer le titre
-                    let clean_title = utils::sanitize_title(title);
-                    if !clean_title.is_empty() {
-                        chapters_data.push((start_time, clean_title));
+                // Parser le timestamp
+                if let Ok(start_time) = parse_timestamp(timestamp_str) {
+                    // Vérifier que le timestamp est dans la durée de la vidéo
+                    if start_time < video_duration {
+                        // Nettoyer le titre
+                        let clean_title = utils::sanitize_title(title);
+                        if !clean_title.is_empty() {
+                            chapters_data.push((start_time, clean_title));
+                        }
                     }
                 }
             }
-        }
         }
     }
 
@@ -230,7 +233,10 @@ Tracklist:
         assert_eq!(chapters[0].start_time, 0.0);
         assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
         assert_eq!(chapters[1].start_time, 264.0); // 4:24
-        assert_eq!(chapters[11].title, "Architects of Inner Time (Part II_ The Awakening)");
+        assert_eq!(
+            chapters[11].title,
+            "Architects of Inner Time (Part II_ The Awakening)"
+        );
         assert_eq!(chapters[11].start_time, 3102.0); // 51:42
     }
 }

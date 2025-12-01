@@ -88,7 +88,7 @@ mod utils_edge_cases_tests {
     fn test_parse_artist_album_only_artist() {
         let (artist, _album) = parse_artist_album("Artist -", "TestChannel");
         assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
-        // Avec un seul élément après split, ça retourne le titre nettoyé
+                                           // Avec un seul élément après split, ça retourne le titre nettoyé
     }
 
     #[test]
@@ -188,7 +188,8 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_with_em_dash() {
-        let (artist, album) = parse_artist_album("Arcane Voyage – Third (FULL ALBUM)", "TestChannel");
+        let (artist, album) =
+            parse_artist_album("Arcane Voyage – Third (FULL ALBUM)", "TestChannel");
         assert_eq!(artist, "Arcane Voyage");
         assert_eq!(album, "Third");
     }

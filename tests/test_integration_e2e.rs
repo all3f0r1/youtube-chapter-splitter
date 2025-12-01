@@ -54,7 +54,7 @@ mod integration_e2e_tests {
 
         // 4. Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path, None).unwrap();
+        let audio_file = downloader::download_audio(url, &audio_path, None, None).unwrap();
         assert!(audio_file.exists(), "Audio file should exist");
 
         // 5. Télécharger la miniature
@@ -145,7 +145,7 @@ mod integration_e2e_tests {
 
         // Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path, None).unwrap();
+        let audio_file = downloader::download_audio(url, &audio_path, None, None).unwrap();
 
         // Détecter les silences
         let chapters = audio::detect_silence_chapters(&audio_file, -30.0, 2.0).unwrap();

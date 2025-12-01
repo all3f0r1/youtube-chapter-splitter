@@ -85,7 +85,8 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_nested_brackets() {
-        let (artist, album) = parse_artist_album("Artist - Album [Disc 1 [Remastered]]", "TestChannel");
+        let (artist, album) =
+            parse_artist_album("Artist - Album [Disc 1 [Remastered]]", "TestChannel");
         assert_eq!(artist, "Artist");
         // La regex supprime les crochets mais peut laisser des résidus avec des crochets imbriqués
         // C'est un comportement connu et acceptable
