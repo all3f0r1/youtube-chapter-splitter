@@ -108,6 +108,15 @@ fn check_dependencies() -> Result<()> {
     Ok(())
 }
 
+fn is_youtube_url(url: &str) -> bool {
+    // Check if URL matches YouTube patterns using regex
+    let youtube_regex = regex::Regex::new(
+        r"(?i)^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/|youtube\.com/embed/)[a-zA-Z0-9_-]{11}"
+    ).unwrap();
+    
+    youtube_regex.is_match(url)
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -121,6 +130,15 @@ fn main() -> Result<()> {
             // Si aucune commande, essayer de parser comme download avec les args restants
             // Cela permet "ytcs URL" au lieu de "ytcs download URL"
             let args = DownloadArgs::parse();
+            
+            // Validate that the provided arguments are actually YouTube URLs
+            for url in &args.urls {
+                if !is_youtube_url(url) {
+                    eprintln!("Error: '{}' is not a valid YouTube URL", url);
+                    std::process::exit(1);
+                }
+            }
+            
             handle_download(args)
         }
     }
@@ -217,15 +235,30 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     let cookies_from_browser = config.cookies_from_browser.as_deref();
     let video_info = downloader::get_video_info(&url, cookies_from_browser)?;
 
+    // Determine track source for display
+    let tracks_source = if !video_info.chapters.is_empty() {
+        "chapters"
+    } else {
+        "description_or_silence"
+    };
+
     // Afficher les infos vidéo avec le nouveau TUI
     ui::print_video_info(
         &video_info.title,
         &utils::format_duration(video_info.duration),
         video_info.chapters.len(),
+        tracks_source,
     );
 
-    // Section: Downloading video
-    ui::print_section_header("Downloading video");
+    // Section: Downloading video with progress
+    use indicatif::{ProgressBar, ProgressStyle};
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} Downloading video {msg}")
+            .unwrap(),
+    );
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
     // Determine output directory
     let output_dir = if let Some(ref output) = cli.output {
@@ -266,14 +299,18 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
             }
         };
 
-    // Download audio
+    // Download audio with progress bar
     let audio_file = match downloader::download_audio(
         &url,
         &output_dir.join("temp_audio.mp3"),
         cookies_from_browser,
     ) {
-        Ok(file) => file,
+        Ok(file) => {
+            pb.finish_with_message("✓ Downloading video");
+            file
+        }
         Err(e) => {
+            pb.finish_with_message("✗ Downloading video");
             ui::print_error(&format!("Failed to download audio: {}", e));
             return Err(e);
         }
@@ -282,8 +319,14 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     // Afficher le statut de téléchargement
     ui::print_download_status(cover_status, Status::Success);
 
-    // Section: Making an album
-    ui::print_section_header("Making an album");
+    // Audio processing with progress
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} Making an album out of the video {msg}")
+            .unwrap(),
+    );
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
     // Get chapters with fallback strategy:
     // 1. Use YouTube chapters if available
@@ -311,6 +354,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         }
     };
 
+    pb.finish_with_message("✓ Audio ready");
+
     let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
 
     // Split audio with metadata (using config format)
@@ -321,8 +366,6 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         None
     };
 
-    // Afficher le début du splitting
-    ui::print_splitting_start();
 
     // Découper toutes les pistes
     let _output_files = audio::split_audio_by_chapters(
@@ -335,16 +378,44 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         config,
     )?;
 
-    // Afficher chaque piste terminée
+    // Afficher chaque piste terminée avec le format de la config
+    use indicatif::{ProgressBar, ProgressStyle};
+    let pb = ProgressBar::new(final_chapters.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█▒-"),
+    );
+    pb.set_message("Processing tracks...");
+
     for (i, ch) in final_chapters.iter().enumerate() {
-        let track = TrackProgress {
-            number: i + 1,
-            title: ch.title.clone(),
-            status: Status::Success,
-            duration: utils::format_duration(ch.duration()),
-        };
-        ui::print_track(&track);
+        let track_number = i + 1;
+        let sanitized_title = ch.sanitize_title();
+        let filename_base = config.format_filename(track_number, &sanitized_title, &final_artist, &final_album);
+        // Title Case: première lettre de chaque mot en majuscule
+        let title_cased = filename_base
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+        
+        pb.set_message(format!("{} - {} ({})", 
+            format!("{:02}", track_number),
+            title_cased,
+            utils::format_duration(ch.duration())
+        ));
+
+        pb.inc(1);
     }
+
+    pb.finish_with_message("✓ All tracks processed successfully!");
 
     // Clean up temporary audio file
     std::fs::remove_file(&audio_file).ok();
