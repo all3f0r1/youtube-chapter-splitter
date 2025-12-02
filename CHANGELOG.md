@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.8] - 2024-12-02
+
+### Fixed
+- **Ultimate fallback:** Add a final fallback that doesn't specify any format, letting yt-dlp choose automatically
+- Fixes cases where all explicit format selectors fail due to severe nsig extraction or SABR streaming issues
+- Now tries 4 strategies: `bestaudio[ext=m4a]/bestaudio` → `140` → `bestaudio` → **no format (auto)**
+
+### Technical Details
+- When all explicit format selectors fail with "Requested format is not available", the downloader now tries one last time without specifying any format
+- This allows yt-dlp to use its internal logic to select the best available format, bypassing format selection issues entirely
+- The auto-selection fallback works even when YouTube's signature system is completely broken
+
 ## [0.10.7] - 2024-12-02
 
 ### Fixed

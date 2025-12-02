@@ -274,18 +274,23 @@ pub fn download_audio(
 
     // Try multiple format selectors with fallback
     let format_selectors = vec![
-        "bestaudio[ext=m4a]/bestaudio",
-        "140",       // YouTube M4A audio format
-        "bestaudio", // Generic best audio
+        Some("bestaudio[ext=m4a]/bestaudio"),
+        Some("140"),       // YouTube M4A audio format
+        Some("bestaudio"), // Generic best audio
+        None,              // No format specification - let yt-dlp choose automatically
     ];
 
     let mut last_error = String::new();
 
     for (i, format) in format_selectors.iter().enumerate() {
         let mut cmd = Command::new("yt-dlp");
-        cmd.arg("-f")
-            .arg(format)
-            .arg("-x")
+
+        // Only add format selector if specified
+        if let Some(fmt) = format {
+            cmd.arg("-f").arg(fmt);
+        }
+
+        cmd.arg("-x")
             .arg("--audio-format")
             .arg("mp3")
             .arg("--audio-quality")
