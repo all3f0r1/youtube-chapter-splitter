@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.6] - 2024-12-02
+
+### Changed
+- **Performance:** Download audio directly in M4A format (`bestaudio[ext=m4a]`) instead of full video, significantly reducing download time
+- **UI:** Changed "Downloading video" to "Downloading the album..."
+- **UI:** Changed "Making an album out of the video" to "Audio downloaded" with progress bar
+- **UI:** Changed "Making the album..." to "Splitting into the album..."
+
+### Technical Details
+- yt-dlp now uses `-f "bestaudio[ext=m4a]/bestaudio"` to download only the audio stream (typically format 140 on YouTube)
+- FFmpeg still converts M4A to MP3 as before, but the initial download is much faster
+- This change reduces bandwidth usage and speeds up the entire process
+
 ## [0.10.5] - 2024-12-01
 
 ### Added

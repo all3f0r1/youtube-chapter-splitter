@@ -273,7 +273,9 @@ pub fn download_audio(
     });
 
     let mut cmd = Command::new("yt-dlp");
-    cmd.arg("-x")
+    cmd.arg("-f")
+        .arg("bestaudio[ext=m4a]/bestaudio")
+        .arg("-x")
         .arg("--audio-format")
         .arg("mp3")
         .arg("--audio-quality")

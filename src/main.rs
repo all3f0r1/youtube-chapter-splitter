@@ -283,8 +283,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         false,
     );
 
-    // Section: Downloading video
-    ui::print_section_header("Downloading video");
+    // Section: Downloading the album...
+    ui::print_section_header("Downloading the album...");
 
     // Determine output directory
     let output_dir = if let Some(ref output) = cli.output {
@@ -330,7 +330,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
     // Download audio avec barre de progression
     use youtube_chapter_splitter::progress;
-    let pb_audio = progress::create_audio_progress("Making an album out of the video");
+    let pb_audio = progress::create_audio_progress("Audio downloaded");
     let audio_file = match downloader::download_audio(
         &url,
         &output_dir.join("temp_audio.mp3"),
@@ -338,7 +338,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         Some(pb_audio.clone()),
     ) {
         Ok(file) => {
-            pb_audio.finish_with_message("  ✓ Audio ready");
+            pb_audio.finish_with_message("  ✓ Audio downloaded");
             println!();
             file
         }
@@ -349,8 +349,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         }
     };
 
-    // Section: Making the album...
-    ui::print_section_header("Making the album...");
+    // Section: Splitting into the album...
+    ui::print_section_header("Splitting into the album...");
 
     // Get chapters with fallback strategy:
     // 1. Use YouTube chapters if available
