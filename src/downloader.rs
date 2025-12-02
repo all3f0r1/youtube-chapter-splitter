@@ -272,55 +272,60 @@ pub fn download_audio(
         pb
     });
 
-    let mut cmd = Command::new("yt-dlp");
-    cmd.arg("-f")
-        .arg("bestaudio[ext=m4a]/bestaudio")
-        .arg("-x")
-        .arg("--audio-format")
-        .arg("mp3")
-        .arg("--audio-quality")
-        .arg("0")
-        .arg("-o")
-        .arg(output_path.to_str().unwrap())
-        .arg("--no-playlist");
+    // Try multiple format selectors with fallback
+    let format_selectors = vec![
+        "bestaudio[ext=m4a]/bestaudio",
+        "140",       // YouTube M4A audio format
+        "bestaudio", // Generic best audio
+    ];
 
-    // Add cookie arguments
-    cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+    let mut last_error = String::new();
 
-    let output = cmd
-        .arg(url)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
+    for (i, format) in format_selectors.iter().enumerate() {
+        let mut cmd = Command::new("yt-dlp");
+        cmd.arg("-f")
+            .arg(format)
+            .arg("-x")
+            .arg("--audio-format")
+            .arg("mp3")
+            .arg("--audio-quality")
+            .arg("0")
+            .arg("-o")
+            .arg(output_path.to_str().unwrap())
+            .arg("--no-playlist");
 
-    progress_bar.finish_and_clear();
+        // Add cookie arguments
+        cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!(
-            "yt-dlp failed: {}",
-            error
-        )));
+        let output = cmd
+            .arg(url)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
+
+        if output.status.success() {
+            progress_bar.finish_and_clear();
+            break;
+        } else {
+            last_error = String::from_utf8_lossy(&output.stderr).to_string();
+            // If this is not the last format, try the next one
+            if i < format_selectors.len() - 1 {
+                continue;
+            } else {
+                // All formats failed, return error
+                progress_bar.finish_and_clear();
+                return Err(YtcsError::DownloadError(format!(
+                    "yt-dlp failed with all format selectors. Last error: {}",
+                    last_error
+                )));
+            }
+        }
     }
 
     // yt-dlp adds .mp3 automatically
     let mut final_path = output_path.to_path_buf();
     final_path.set_extension("mp3");
-
-    if !output.status.success() {
-        let raw_error = String::from_utf8_lossy(&output.stderr);
-        let (error_msg, suggestion) =
-            ytdlp_error_parser::parse_ytdlp_error(&raw_error, cookies_from_browser);
-
-        let full_error = if let Some(sug) = suggestion {
-            format!("{}\n\n{}", error_msg, sug)
-        } else {
-            error_msg
-        };
-
-        return Err(YtcsError::DownloadError(full_error));
-    }
 
     Ok(final_path)
 }

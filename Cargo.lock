@@ -1567,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "youtube_chapter_splitter"
-version = "0.10.6"
+version = "0.10.7"
 dependencies = [
  "clap",
  "colored",

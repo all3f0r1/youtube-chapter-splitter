@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.7] - 2024-12-02
+
+### Fixed
+- **Download robustness:** Implement fallback mechanism for format selection to handle yt-dlp signature extraction issues
+- Try multiple format selectors in order: `bestaudio[ext=m4a]/bestaudio` → `140` → `bestaudio`
+- Improved error messages showing which format selector failed and why
+- Better handling of YouTube SABR streaming and nsig extraction warnings
+
+### Technical Details
+- When the preferred format selector fails (e.g., due to signature issues), the downloader now automatically tries alternative formats
+- Format 140 is YouTube's standard M4A audio format and works reliably even when signature extraction fails
+- The generic `bestaudio` selector serves as a final fallback for edge cases
+
 ## [0.10.6] - 2024-12-02
 
 ### Changed
