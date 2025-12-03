@@ -46,7 +46,7 @@ pub fn print_header() {
     println!(
         "{}
 ",
-        "ytcs v0.13.0".dimmed()
+        "ytcs v0.14.0".dimmed()
     );
 }
 

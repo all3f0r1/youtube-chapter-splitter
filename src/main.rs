@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{audio, config, downloader, playlist, utils, Result};
 
 #[derive(Parser)]
@@ -217,17 +218,36 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
     Ok(())
 }
 
-fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) -> Result<()> {
+// ============================================================================
+// HELPER FUNCTIONS FOR PROCESS_SINGLE_URL
+// ============================================================================
+
+/// Structure contenant les informations vidéo traitées
+struct VideoContext {
+    info: downloader::VideoInfo,
+    artist: String,
+    album: String,
+}
+
+/// Structure contenant les fichiers téléchargés
+struct DownloadedAssets {
+    audio_file: PathBuf,
+    cover_data: Option<Vec<u8>>,
+    _temp_audio: youtube_chapter_splitter::temp_file::TempFile,
+    _temp_cover: youtube_chapter_splitter::temp_file::TempFile,
+}
+
+/// 1. Gère la détection de playlist et demande à l'utilisateur
+///
+/// Retourne `true` si une playlist doit être téléchargée, `false` sinon
+fn handle_playlist_detection(url: &str, config: &config::Config) -> Result<bool> {
     use config::PlaylistBehavior;
 
-    // Check if URL contains a playlist
     if let Some(_playlist_id) = playlist::is_playlist_url(url) {
-        // Determine action based on config
         let should_download_playlist = match config.playlist_behavior {
             PlaylistBehavior::Ask => {
                 println!("{}", "Playlist detected!".yellow().bold());
                 println!();
-                // Ask user what to do
                 print!(
                     "{}",
                     "Do you want to download (v)ideo only or (p)laylist? [v/p]: ".bold()
@@ -240,10 +260,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 
                 choice == "p" || choice == "playlist"
             }
-            PlaylistBehavior::VideoOnly => {
-                // Don't show "Playlist detected!" or "Downloading video only" messages
-                false
-            }
+            PlaylistBehavior::VideoOnly => false,
             PlaylistBehavior::PlaylistOnly => {
                 println!("{}", "Playlist detected!".yellow().bold());
                 println!();
@@ -256,35 +273,34 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
             }
         };
 
-        if should_download_playlist {
-            return download_playlist(url, cli, config);
-        }
+        return Ok(should_download_playlist);
     }
 
-    use youtube_chapter_splitter::ui::{self, Status};
+    Ok(false)
+}
 
-    let url = clean_url(url);
-
-    // Vérifier que c'est bien une URL YouTube
-    if !url.contains("youtube.com") && !url.contains("youtu.be") {
-        ui::print_error("Invalid YouTube URL. Please provide a valid YouTube video URL.");
-        return Err(youtube_chapter_splitter::error::YtcsError::InvalidUrl(
-            "Not a YouTube URL".to_string(),
-        ));
-    }
+/// 2. Récupère les informations vidéo et les affiche
+///
+/// Retourne un `VideoContext` contenant toutes les infos nécessaires
+fn fetch_and_display_video_info(
+    url: &str,
+    cli_artist: Option<&String>,
+    cli_album: Option<&String>,
+    cookies_from_browser: Option<&str>,
+) -> Result<VideoContext> {
+    use youtube_chapter_splitter::ui;
 
     println!("{}", "Fetching video information...".yellow());
-    let cookies_from_browser = config.cookies_from_browser.as_deref();
-    let video_info = downloader::get_video_info(&url, cookies_from_browser)?;
+    let video_info = downloader::get_video_info(url, cookies_from_browser)?;
 
     // Parse artist and album pour l'affichage
-    let (artist_display, album_display) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
+    let (artist_display, album_display) = if let (Some(a), Some(al)) = (cli_artist, cli_album) {
         (utils::clean_folder_name(a), utils::clean_folder_name(al))
     } else {
         utils::parse_artist_album(&video_info.title, &video_info.uploader)
     };
 
-    // Afficher les infos vidéo avec le titre nettoyé (format dossier)
+    // Afficher les infos vidéo
     let display_title = format!("{} - {}", artist_display, album_display);
     let has_chapters = !video_info.chapters.is_empty();
     ui::print_video_info(
@@ -295,43 +311,59 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         false,
     );
 
-    // Section: Downloading the album...
-    ui::print_section_header("Downloading the album...");
+    Ok(VideoContext {
+        info: video_info,
+        artist: artist_display,
+        album: album_display,
+    })
+}
 
-    // Determine output directory
-    let output_dir = if let Some(ref output) = cli.output {
-        std::path::PathBuf::from(shellexpand::tilde(output).to_string())
+/// 3. Configure le répertoire de sortie
+///
+/// Crée le répertoire si nécessaire et retourne son chemin
+fn setup_output_directory(
+    cli_output: Option<&String>,
+    artist: &str,
+    album: &str,
+    config: &config::Config,
+) -> Result<PathBuf> {
+    let base_dir = if let Some(ref output) = cli_output {
+        PathBuf::from(shellexpand::tilde(output).to_string())
     } else {
         config.get_output_dir()
     };
 
-    // Parse artist and album
-    let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
-        (utils::clean_folder_name(a), utils::clean_folder_name(al))
-    } else {
-        utils::parse_artist_album(&video_info.title, &video_info.uploader)
-    };
-
-    // Create output directory using config format
-    let dir_name = config.format_directory(&artist, &album);
-    let output_dir = output_dir.join(&dir_name);
+    let dir_name = config.format_directory(artist, album);
+    let output_dir = base_dir.join(&dir_name);
     std::fs::create_dir_all(&output_dir)?;
 
-    // Download cover art and audio with TUI
-    // Always download cover for embedding in MP3s, but track if we should keep it
-    let keep_cover = !cli.no_cover && config.download_cover;
+    Ok(output_dir)
+}
 
-    let cover_status;
+/// 4. Télécharge la couverture et l'audio
+///
+/// Retourne une structure `DownloadedAssets` contenant les fichiers et données
+fn download_cover_and_audio(
+    url: &str,
+    video_info: &downloader::VideoInfo,
+    output_dir: &Path,
+    keep_cover: bool,
+    cookies_from_browser: Option<&str>,
+) -> Result<DownloadedAssets> {
+    use youtube_chapter_splitter::ui::Status;
+    use youtube_chapter_splitter::{progress, temp_file::TempFile, ui};
 
-    // Download cover (always, for embedding)
+    ui::print_section_header("Downloading the album...");
+
+    // Download cover
     let cover_path = output_dir.join("cover.jpg");
     let mut temp_cover = TempFile::new(&cover_path);
 
+    let cover_status;
     let cover_downloaded =
-        match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
+        match downloader::download_thumbnail(&video_info.thumbnail_url, output_dir) {
             Ok(_) => {
                 cover_status = Status::Success;
-                // Si on doit garder le cover, appeler keep()
                 if keep_cover {
                     temp_cover.keep();
                 }
@@ -344,19 +376,15 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
             }
         };
 
-    // Afficher le statut du cover
     ui::print_cover_status(cover_status);
 
-    // Download audio avec barre de progression
-    use youtube_chapter_splitter::{progress, temp_file::TempFile};
+    // Download audio
     let pb_audio = progress::create_audio_progress("Audio downloaded");
-
-    // Créer un fichier temporaire avec nettoyage automatique RAII
     let temp_audio_path = output_dir.join("temp_audio.mp3");
     let temp_audio = TempFile::new(&temp_audio_path);
 
     let audio_file = match downloader::download_audio(
-        &url,
+        url,
         temp_audio.path(),
         cookies_from_browser,
         Some(pb_audio.clone()),
@@ -373,54 +401,72 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         }
     };
 
-    // Section: Splitting into the album...
+    // Charger l'image de couverture si elle existe
+    let cover_data = if cover_downloaded {
+        audio::load_cover_image(&cover_path)?
+    } else {
+        None
+    };
+
+    Ok(DownloadedAssets {
+        audio_file,
+        cover_data,
+        _temp_audio: temp_audio,
+        _temp_cover: temp_cover,
+    })
+}
+
+/// 5. Récupère les chapitres avec stratégie de fallback
+///
+/// 1. Chapitres YouTube
+/// 2. Parsing de la description
+/// 3. Détection de silence
+fn get_chapters_with_fallback(
+    video_info: &downloader::VideoInfo,
+    audio_file: &Path,
+) -> Result<Vec<youtube_chapter_splitter::chapters::Chapter>> {
+    use youtube_chapter_splitter::ui;
+
+    if !video_info.chapters.is_empty() {
+        return Ok(video_info.chapters.clone());
+    }
+
+    ui::print_info("No chapters found in video metadata, checking description...");
+    match youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description(
+        &video_info.description,
+        video_info.duration,
+    ) {
+        Ok(chapters) => {
+            ui::print_info(&format!(
+                "Found {} chapters in description!",
+                chapters.len()
+            ));
+            Ok(chapters)
+        }
+        Err(_) => {
+            ui::print_info("No chapters in description, detecting from silence...");
+            audio::detect_silence_chapters(audio_file, -30.0, 2.0)
+        }
+    }
+}
+
+/// 6. Découpe l'audio en pistes individuelles
+///
+/// Utilise les chapitres et métadonnées pour créer les fichiers MP3
+fn split_into_tracks(
+    chapters: &[youtube_chapter_splitter::chapters::Chapter],
+    audio_file: &Path,
+    output_dir: &Path,
+    artist: &str,
+    album: &str,
+    cover_data: Option<&[u8]>,
+    config: &config::Config,
+) -> Result<()> {
+    use youtube_chapter_splitter::{progress, ui};
+
     ui::print_section_header("Splitting into the album...");
 
-    // Get chapters with fallback strategy:
-    // 1. Use YouTube chapters if available
-    // 2. Try to parse from video description
-    // 3. Fall back to silence detection
-    let chapters_to_use = if !video_info.chapters.is_empty() {
-        video_info.chapters
-    } else {
-        ui::print_info("No chapters found in video metadata, checking description...");
-        match youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description(
-            &video_info.description,
-            video_info.duration,
-        ) {
-            Ok(chapters) => {
-                ui::print_info(&format!(
-                    "Found {} chapters in description!",
-                    chapters.len()
-                ));
-                chapters
-            }
-            Err(_) => {
-                ui::print_info("No chapters in description, detecting from silence...");
-                audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
-            }
-        }
-    };
-
-    let (final_chapters, final_artist, final_album) = (chapters_to_use, artist, album);
-
-    // Split audio with metadata (using config format)
-    // Use cover if it was downloaded successfully
-    let cover_path = if cover_downloaded {
-        Some(output_dir.join("cover.jpg"))
-    } else {
-        None
-    };
-
-    // Charger l'image de couverture une seule fois si elle existe
-    let cover_data = if let Some(ref cover) = cover_path {
-        audio::load_cover_image(cover)?
-    } else {
-        None
-    };
-
-    // Découper chaque piste avec barre de progression
-    for (i, ch) in final_chapters.iter().enumerate() {
+    for (i, ch) in chapters.iter().enumerate() {
         let track_number = i + 1;
         let duration_str = utils::format_duration(ch.duration());
 
@@ -429,22 +475,22 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
             .filename_format
             .replace("%n", &format!("{:02}", track_number))
             .replace("%t", &ch.title)
-            .replace("%a", &final_artist)
-            .replace("%A", &final_album);
+            .replace("%a", artist)
+            .replace("%A", album);
 
         let message = format!("{} ({})", formatted_name, duration_str);
         let pb = progress::create_track_progress(&message);
 
         // Découper la piste
         audio::split_single_track(audio::TrackSplitParams {
-            input_file: &audio_file,
+            input_file: audio_file,
             chapter: ch,
             track_number,
-            total_tracks: final_chapters.len(),
-            output_dir: &output_dir,
-            artist: &final_artist,
-            album: &final_album,
-            cover_data: cover_data.as_deref(),
+            total_tracks: chapters.len(),
+            output_dir,
+            artist,
+            album,
+            cover_data,
             config,
         })?;
 
@@ -452,15 +498,78 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         println!("  ✓ {} ({})", formatted_name, duration_str);
     }
 
-    // Les fichiers temporaires (audio et cover) seront automatiquement supprimés par TempFile (RAII)
-    // quand ils sortiront du scope, sauf si keep() a été appelé
+    Ok(())
+}
+
+// ============================================================================
+// REFACTORED PROCESS_SINGLE_URL
+// ============================================================================
+
+fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) -> Result<()> {
+    use youtube_chapter_splitter::ui;
+
+    // 1. Vérifier si c'est une playlist
+    if handle_playlist_detection(url, config)? {
+        return download_playlist(url, cli, config);
+    }
+
+    // Nettoyer l'URL
+    let url = clean_url(url);
+
+    // Vérifier que c'est bien une URL YouTube
+    if !url.contains("youtube.com") && !url.contains("youtu.be") {
+        ui::print_error("Invalid YouTube URL. Please provide a valid YouTube video URL.");
+        return Err(youtube_chapter_splitter::error::YtcsError::InvalidUrl(
+            "Not a YouTube URL".to_string(),
+        ));
+    }
+
+    // 2. Récupérer et afficher les informations vidéo
+    let cookies_from_browser = config.cookies_from_browser.as_deref();
+    let video_ctx = fetch_and_display_video_info(
+        &url,
+        cli.artist.as_ref(),
+        cli.album.as_ref(),
+        cookies_from_browser,
+    )?;
+
+    // 3. Configurer le répertoire de sortie
+    let output_dir = setup_output_directory(
+        cli.output.as_ref(),
+        &video_ctx.artist,
+        &video_ctx.album,
+        config,
+    )?;
+
+    // 4. Télécharger la couverture et l'audio
+    let keep_cover = !cli.no_cover && config.download_cover;
+    let assets = download_cover_and_audio(
+        &url,
+        &video_ctx.info,
+        &output_dir,
+        keep_cover,
+        cookies_from_browser,
+    )?;
+
+    // 5. Récupérer les chapitres avec fallback
+    let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file)?;
+
+    // 6. Découper en pistes
+    split_into_tracks(
+        &chapters,
+        &assets.audio_file,
+        &output_dir,
+        &video_ctx.artist,
+        &video_ctx.album,
+        assets.cover_data.as_deref(),
+        config,
+    )?;
 
     // Message de succès
     ui::print_success(&output_dir.display().to_string());
 
     Ok(())
 }
-// Fonction à ajouter à main.rs
 
 fn download_playlist(url: &str, cli: &DownloadArgs, cfg: &config::Config) -> Result<()> {
     println!("{}", "Fetching playlist information...".yellow());

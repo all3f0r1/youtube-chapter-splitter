@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2024-12-03
+
+### Changed
+- **MAJOR REFACTORING**: Refactored `process_single_url` from 240+ lines to ~60 lines
+- Extracted 6 modular helper functions:
+  - `handle_playlist_detection`: Gestion de la détection de playlist
+  - `fetch_and_display_video_info`: Récupération et affichage des infos vidéo
+  - `setup_output_directory`: Configuration du répertoire de sortie
+  - `download_cover_and_audio`: Téléchargement cover + audio
+  - `get_chapters_with_fallback`: Récupération des chapitres avec fallback
+  - `split_into_tracks`: Découpage en pistes
+- Improved code maintainability and readability (75% complexity reduction)
+- Added 2 new structures: `VideoContext` and `DownloadedAssets`
+
+### Added
+- 10 new unit tests for refactored helper functions
+- Documentation for all helper functions
+- Test coverage for modular architecture
+
+### Fixed
+- Improved code organization and separation of concerns
+- Better error handling in modular functions
+
 ## [0.13.0] - 2024-12-03
 
 ### Added
