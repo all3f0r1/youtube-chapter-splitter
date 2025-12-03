@@ -324,10 +324,17 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     let cover_status;
 
     // Download cover (always, for embedding)
+    let cover_path = output_dir.join("cover.jpg");
+    let mut temp_cover = TempFile::new(&cover_path);
+
     let cover_downloaded =
         match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
             Ok(_) => {
                 cover_status = Status::Success;
+                // Si on doit garder le cover, appeler keep()
+                if keep_cover {
+                    temp_cover.keep();
+                }
                 true
             }
             Err(e) => {
@@ -445,14 +452,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         println!("  ✓ {} ({})", formatted_name, duration_str);
     }
 
-    // Le fichier audio temporaire sera automatiquement supprimé par TempFile (RAII)
-    // quand il sortira du scope
-
-    // Clean up cover file if config says not to keep it
-    if cover_downloaded && !keep_cover {
-        let cover_file = output_dir.join("cover.jpg");
-        std::fs::remove_file(&cover_file).ok();
-    }
+    // Les fichiers temporaires (audio et cover) seront automatiquement supprimés par TempFile (RAII)
+    // quand ils sortiront du scope, sauf si keep() a été appelé
 
     // Message de succès
     ui::print_success(&output_dir.display().to_string());

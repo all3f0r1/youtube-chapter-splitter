@@ -51,8 +51,12 @@ pub fn split_audio_by_chapters(
     artist: &str,
     album: &str,
     cover_path: Option<&Path>,
-    cfg: &crate::config::Config,
+    config: &crate::config::Config,
 ) -> Result<Vec<PathBuf>> {
+    log::info!("Starting audio splitting: {} chapters", chapters.len());
+    log::debug!("Input file: {:?}", input_file);
+    log::debug!("Output directory: {:?}", output_dir);
+    log::debug!("Artist: {}, Album: {}", artist, album);
     std::fs::create_dir_all(output_dir)?;
 
     // Charger l'image de couverture une seule fois si elle existe
@@ -67,7 +71,7 @@ pub fn split_audio_by_chapters(
     for (index, chapter) in chapters.iter().enumerate() {
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
-        let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
+        let filename_base = config.format_filename(track_number, &sanitized_title, artist, album);
         // Title Case: première lettre de chaque mot en majuscule
         let title_cased = filename_base
             .split_whitespace()
@@ -155,6 +159,12 @@ pub struct TrackSplitParams<'a> {
 ///
 /// Retourne une erreur si FFmpeg échoue ou si l'ajout de la pochette échoue
 pub fn split_single_track(params: TrackSplitParams) -> Result<PathBuf> {
+    log::debug!(
+        "Splitting track #{}: {}",
+        params.track_number,
+        params.chapter.title
+    );
+
     let TrackSplitParams {
         input_file,
         chapter,
@@ -182,6 +192,7 @@ pub fn split_single_track(params: TrackSplitParams) -> Result<PathBuf> {
         .join(" ");
     let output_filename = format!("{}.mp3", title_cased);
     let output_path = output_dir.join(&output_filename);
+    log::debug!("Output path: {:?}", output_path);
 
     let duration = chapter.duration();
 

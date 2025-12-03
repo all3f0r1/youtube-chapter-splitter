@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.11.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.11.0
+ytcs v0.13.0
 
 Fetching video information...
 → Paradox - Chemical Love Theory
@@ -147,6 +147,33 @@ ytcs -a "Pink Floyd" -A "The Wall" "https://youtube.com/..."
 
 # Skip cover art
 ytcs --no-cover "https://youtube.com/..."
+```
+
+### Debugging with Logs
+
+`ytcs` includes structured logging for troubleshooting. Control log verbosity with the `RUST_LOG` environment variable:
+
+```bash
+# Show debug logs (very verbose, includes all operations)
+RUST_LOG=debug ytcs "https://youtube.com/..."
+
+# Show info logs (important events only)
+RUST_LOG=info ytcs "https://youtube.com/..."
+
+# Show warnings only (default)
+ytcs "https://youtube.com/..."
+```
+
+**What's logged:**
+- Download attempts and format selector fallbacks
+- Chapter detection and parsing
+- Audio splitting progress
+- Temporary file creation and cleanup
+- Error details for troubleshooting
+
+**Save logs to file:**
+```bash
+RUST_LOG=debug ytcs "https://youtube.com/..." 2>&1 | tee debug.log
 ```
 
 ### Manage Configuration

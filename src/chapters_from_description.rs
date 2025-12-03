@@ -44,6 +44,10 @@ pub fn parse_chapters_from_description(
     description: &str,
     video_duration: f64,
 ) -> Result<Vec<Chapter>> {
+    log::info!("Attempting to parse chapters from description");
+    log::debug!("Video duration: {:.2}s", video_duration);
+    log::debug!("Description length: {} characters", description.len());
+
     // Regex pour détecter: timestamp optionnel entre crochets + séparateur + titre
     // Formats supportés:
     // [00:00:00] - Title
@@ -144,11 +148,16 @@ pub fn parse_chapters_from_description(
     }
 
     if chapters.is_empty() {
+        log::warn!("No valid chapters found in description");
         return Err(YtcsError::ChapterError(
             "No valid chapters found in description".to_string(),
         ));
     }
 
+    log::info!(
+        "Successfully parsed {} chapters from description",
+        chapters.len()
+    );
     Ok(chapters)
 }
 

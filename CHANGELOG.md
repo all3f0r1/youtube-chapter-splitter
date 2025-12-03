@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2024-12-03
+
+### Added
+- **Extended logging**: Added structured logs in `audio.rs` and `chapters_from_description.rs`
+  - Log chapter splitting progress and details
+  - Log chapter parsing attempts and results
+  - Track number and title logged for each split operation
+- **RAII cover file management**: Cover files now use `TempFile` for automatic cleanup
+  - Cover files are automatically deleted unless `--no-cover` is not used
+  - Consistent with audio file management from v0.12.0
+- **Debugging section in README**: New documentation section explaining logging usage
+  - Examples for different log levels (debug, info, warn)
+  - Instructions for saving logs to file
+  - List of what gets logged
+
+### Improved
+- **Better observability**: More detailed logs throughout the pipeline
+- **Consistent resource management**: All temporary files now use RAII pattern
+- **Documentation**: README updated with debugging instructions
+
+### Technical Details
+- Added `log::info!` and `log::debug!` calls in audio splitting functions
+- Added `log::info!` and `log::warn!` in chapter parsing
+- Refactored cover file handling to use `TempFile` with `.keep()` method
+- Updated README with logging examples and version badges
+
 ## [0.12.0] - 2024-12-03
 
 ### Added
