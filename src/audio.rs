@@ -128,18 +128,44 @@ pub fn split_audio_by_chapters(
     Ok(output_files)
 }
 
+/// Paramètres pour le découpage d'une piste audio
+pub struct TrackSplitParams<'a> {
+    pub input_file: &'a Path,
+    pub chapter: &'a Chapter,
+    pub track_number: usize,
+    pub total_tracks: usize,
+    pub output_dir: &'a Path,
+    pub artist: &'a str,
+    pub album: &'a str,
+    pub cover_data: Option<&'a [u8]>,
+    pub config: &'a crate::config::Config,
+}
+
 /// Découpe une seule piste audio
-pub fn split_single_track(
-    input_file: &Path,
-    chapter: &Chapter,
-    track_number: usize,
-    total_tracks: usize,
-    output_dir: &Path,
-    artist: &str,
-    album: &str,
-    cover_data: Option<&[u8]>,
-    cfg: &crate::config::Config,
-) -> Result<PathBuf> {
+///
+/// # Arguments
+///
+/// * `params` - Paramètres de découpage encapsulés dans une structure
+///
+/// # Returns
+///
+/// Le chemin du fichier MP3 créé
+///
+/// # Errors
+///
+/// Retourne une erreur si FFmpeg échoue ou si l'ajout de la pochette échoue
+pub fn split_single_track(params: TrackSplitParams) -> Result<PathBuf> {
+    let TrackSplitParams {
+        input_file,
+        chapter,
+        track_number,
+        total_tracks,
+        output_dir,
+        artist,
+        album,
+        cover_data,
+        config: cfg,
+    } = params;
     let sanitized_title = chapter.sanitize_title();
     let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
     // Title Case: première lettre de chaque mot en majuscule

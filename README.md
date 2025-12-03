@@ -2,7 +2,9 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.10.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/) [![CI](https://github.com/all3f0r1/youtube-chapter-splitter/workflows/CI/badge.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.11.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
 ---
 
@@ -15,22 +17,26 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.10.1
+ytcs v0.11.0
 
-→ Marigold - Oblivion Gate
-  29m 29s • 5 tracks
+Fetching video information...
+→ Paradox - Chemical Love Theory
+  21m 47s • 5 tracks
+
+Downloading the album...
 
   ✓ Cover downloaded
   ✓ Audio downloaded
 
-  Splitting tracks...
-  ✓ 01 Oblivion Gate (5m 54s)
-  ✓ 02 Obsidian Throne (5m 35s)
-  ✓ 03 Crimson Citadel (5m 47s)
-  ✓ 04 Silver Spire (6m 30s)
-  ✓ 05 Eternal Pyre (5m 43s)
+Splitting into the album...
 
-✓ Done → ~/Music/Marigold - Oblivion Gate
+  ✓ 01 - Paradox - Light Years Apart (4m 10s)
+  ✓ 02 - Paradox - Event Horizon (4m 54s)
+  ✓ 03 - Paradox - Orbit of Silence (3m 10s)
+  ✓ 04 - Paradox - Chemical Love Theory (4m 03s)
+  ✓ 05 - Paradox - Singularity Within (5m 30s)
+
+✓ Done → /home/alex/Musique/Paradox - Chemical Love Theory
 ```
 
 ## Features
@@ -38,12 +44,19 @@ ytcs v0.10.1
 - **MP3 Download**: High-quality audio (192 kbps by default).
 - **Automatic Cover Art**: Album artwork embedded in MP3 metadata.
 - **Chapter-based Splitting**: Automatic detection of YouTube chapters.
+- **Description Parsing**: Detects chapters in video descriptions (multiple formats supported).
+  - Standard format: `00:00 - Track Title`
+  - Numbered format: `1 - Track Title (0:00)`
 - **Silence Detection**: Fallback if the video has no chapters.
+- **Smart Artist Detection**: Uses channel name if artist not in title.
 - **Complete Metadata**: Title, artist, album, track number, cover art.
 - **Persistent Configuration**: `config.toml` file for your preferences.
-- **Customizable Formatting**: File names (`%n`, `%t`) and folders (`%a`, `%A`).
+- **Customizable Formatting**: File names (`%n`, `%t`, `%a`, `%A`) and folders (`%a`, `%A`).
 - **Smart Cleanup**: Removes `[Full Album]`, `(Official Audio)`, etc.
 - **Playlist Support**: Interactive playlist handling.
+- **Robust Download**: 4-level fallback system for maximum reliability.
+- **Progress Bars**: Real-time progress indicators for downloads and processing.
+- **Direct URL Support**: Use `ytcs <URL>` without the `download` command.
 - **Dependency Verification**: `yt-dlp` and `ffmpeg` are checked at startup.
 
 ## Installation
@@ -104,14 +117,14 @@ cargo install youtube_chapter_splitter
 
 ### Download a Video
 
-The default command is `download`. You can omit it for quick usage.
+The simplest way to use ytcs:
 
 ```bash
-# Full syntax
-ytcs download "https://www.youtube.com/watch?v=..."
-
-# Quick syntax (recommended)
+# Direct URL (recommended)
 ytcs "https://www.youtube.com/watch?v=..."
+
+# Explicit download command (also works)
+ytcs download "https://www.youtube.com/watch?v=..."
 ```
 
 **Download options:**
@@ -180,42 +193,63 @@ Customize `ytcs` according to your needs. Edit the `config.toml` file directly o
 - `%a` - Artist name
 - `%A` - Album name
 
+## Robustness
+
+`ytcs` uses a **4-level fallback system** for maximum download reliability:
+
+1. **`bestaudio[ext=m4a]/bestaudio`** - Best quality M4A audio (preferred)
+2. **`140`** - YouTube's standard M4A format (very reliable)
+3. **`bestaudio`** - Generic best audio selector
+4. **Auto-selection** - Let yt-dlp choose automatically (ultimate fallback)
+
+This ensures downloads work even when YouTube's signature system has issues.
+
+### Performance
+
+- **80-90% faster downloads** by downloading audio directly in M4A format instead of full video
+- Typical 20-minute album: ~25 MB instead of ~150 MB downloaded
+
 ## Changelog
 
-### [0.10.1] - 2025-11-24
-- **Fixed:** CLI subcommands (`config`, `set`, `reset`) now work correctly.
-- **Technical:** Refactored CLI structure to properly handle subcommands with `clap`.
+See [CHANGELOG.md](CHANGELOG.md) for the complete changelog.
 
-### [0.10.0] - 2025-11-24
-- **Changed:** Complete UI redesign - minimal, clean, and pragmatic.
-- **Removed:** Unnecessary borders, boxes, and visual noise.
-- **Removed:** Emojis from main output (kept only status checkmarks).
-- **Improved:** Auto-clean video titles (removes `[Full Album]`, `[Official Audio]`, etc.).
-- **Improved:** More direct and readable output format.
-- **Philosophy:** Pragmatic • Direct • Classy
+### Recent Updates
 
-### [0.9.3] - 2025-11-24
-- **Fixed:** Configuration parsing error for users upgrading from older versions.
-- **Added:** Serde default values for all configuration fields to ensure backward compatibility.
-- **Technical:** Old config files missing `playlist_behavior` field now work correctly.
+**[0.11.0] - 2024-12-02**
+- **Improved:** Code quality with Clippy warnings fixed
+- **Refactored:** `split_single_track` now uses `TrackSplitParams` struct (reduced from 9 to 1 parameter)
+- **Refactored:** `progress.rs` module to eliminate code duplication
+- **Improved:** Documentation with examples and better docstrings
+- **Added:** Tests for progress bars
+- **Changed:** Format selectors now use const array instead of vec
+- **Updated:** README.md with current version and features
 
-### [0.9.2] - 2025-11-24
-- **Changed:** MP3 filename capitalization from UPPERCASE to Title Case for better readability.
-- **Example:** `01 - Oblivion Gate.mp3` instead of `01 - OBLIVION GATE.MP3`.
+**[0.10.8] - 2024-12-02**
+- **Fixed:** Add ultimate fallback with auto format selection
+- Works even when all explicit format selectors fail
 
-### [0.9.1] - 2025-11-24
-- **Added:** Complete code audit with all clippy warnings fixed.
-- **Removed:** Obsolete documentation files and examples.
-- **Improved:** Code quality and maintainability.
-- **Changed:** Capitalized MP3 filenames (reverted in 0.9.2).
+**[0.10.7] - 2024-12-02**
+- **Fixed:** Implement fallback mechanism for format selection
+- Better handling of yt-dlp signature extraction issues
 
-### [0.9.0] - 2025-11-24
-- **Added:** Playlist support with configurable behavior.
-- **Added:** Configuration management commands (`config`, `set`, `reset`).
-- **Added:** Customizable file and directory naming formats.
-- **Improved:** Better error handling and user feedback.
+**[0.10.6] - 2024-12-02**
+- **Performance:** Download audio directly in M4A format (80-90% faster!)
+- **UI:** Improved progress messages
+
+**[0.10.5] - 2024-12-01**
+- **Added:** Progress bars for downloads and processing
+- **Added:** Direct URL support without `download` command
+- **Added:** URL validation
+
+**[0.10.4] - 2024-12-01**
+- **Added:** Artist detection from channel name
+- **Added:** Support for numbered track format in descriptions
 
 ---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 

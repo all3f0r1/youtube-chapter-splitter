@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2024-12-03
+
+### Improved
+- **Code Quality**: Fixed Clippy warnings and improved code structure
+- **Refactored**: `split_single_track` now uses `TrackSplitParams` struct (reduced from 9 to 1 parameter)
+- **Refactored**: `progress.rs` module to eliminate code duplication with generic `create_progress` function
+- **Documentation**: Added comprehensive examples and better docstrings for public APIs
+- **Documentation**: Updated README.md with current version (0.11.0), features, and examples
+
+### Added
+- **Tests**: 7 new tests for numbered chapter format (`1 - Title (MM:SS)`)
+- **Tests**: Unit tests for progress bar creation
+- **Documentation**: Examples in docstrings for `download_audio`, `VideoInfo`, and progress functions
+- **Documentation**: Detailed field documentation for `VideoInfo` struct
+
+### Changed
+- Format selectors now use const array instead of vec for better performance
+- Progress bar tick rate extracted as constant (100ms)
+- `ProgressType` enum added for better type safety
+
 ## [0.10.8] - 2024-12-02
 
 ### Fixed

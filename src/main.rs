@@ -412,17 +412,17 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         let pb = progress::create_track_progress(&message);
 
         // Découper la piste
-        audio::split_single_track(
-            &audio_file,
-            ch,
+        audio::split_single_track(audio::TrackSplitParams {
+            input_file: &audio_file,
+            chapter: ch,
             track_number,
-            final_chapters.len(),
-            &output_dir,
-            &final_artist,
-            &final_album,
-            cover_data.as_deref(),
+            total_tracks: final_chapters.len(),
+            output_dir: &output_dir,
+            artist: &final_artist,
+            album: &final_album,
+            cover_data: cover_data.as_deref(),
             config,
-        )?;
+        })?;
 
         pb.finish_and_clear();
         println!("  ✓ {} ({})", formatted_name, duration_str);

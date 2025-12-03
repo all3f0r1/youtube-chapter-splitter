@@ -13,14 +13,42 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Informations sur une vidéo YouTube.
+///
+/// Cette structure contient toutes les métadonnées nécessaires
+/// pour télécharger et découper une vidéo en pistes audio.
+///
+/// # Examples
+///
+/// ```no_run
+/// use youtube_chapter_splitter::downloader::get_video_info;
+///
+/// let video_info = get_video_info("https://youtube.com/watch?v=...", None)?;
+/// println!("Title: {}", video_info.title);
+/// println!("Duration: {} seconds", video_info.duration);
+/// println!("Chapters: {}", video_info.chapters.len());
+/// # Ok::<(), youtube_chapter_splitter::error::YtcsError>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct VideoInfo {
+    /// Titre de la vidéo (ex: "Artist - Album Name")
     pub title: String,
+
+    /// Durée totale en secondes
     pub duration: f64,
+
+    /// Liste des chapitres détectés dans la vidéo
     pub chapters: Vec<Chapter>,
+
+    /// Identifiant unique de la vidéo (11 caractères)
     pub video_id: String,
+
+    /// URL de la miniature (thumbnail)
     pub thumbnail_url: String,
+
+    /// Nom de la chaîne qui a uploadé la vidéo
     pub uploader: String,
+
+    /// Description complète de la vidéo
     pub description: String,
 }
 
@@ -240,12 +268,19 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
 
 /// Télécharge l'audio d'une vidéo YouTube en format MP3.
 ///
-/// Utilise `yt-dlp` avec une barre de progression pour télécharger et convertir l'audio.
+/// Cette fonction utilise `yt-dlp` avec une stratégie de fallback à 4 niveaux
+/// pour maximiser la fiabilité du téléchargement :
+/// 1. `bestaudio[ext=m4a]/bestaudio` - Audio M4A de meilleure qualité (préféré)
+/// 2. `140` - Format M4A standard de YouTube (très fiable)
+/// 3. `bestaudio` - Sélecteur audio générique
+/// 4. Auto-sélection - Laisse yt-dlp choisir automatiquement
 ///
 /// # Arguments
 ///
 /// * `url` - L'URL de la vidéo YouTube
-/// * `output_path` - Le chemin de sortie (sans extension)
+/// * `output_path` - Le chemin de sortie (sans extension, .mp3 sera ajouté automatiquement)
+/// * `cookies_from_browser` - Optionnel : navigateur pour extraire les cookies (ex: "firefox", "chrome")
+/// * `pb` - Optionnel : barre de progression personnalisée
 ///
 /// # Returns
 ///
@@ -253,7 +288,26 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le téléchargement échoue
+/// Retourne une erreur si :
+/// - yt-dlp n'est pas installé
+/// - Tous les sélecteurs de format échouent
+/// - Le téléchargement est interrompu
+///
+/// # Examples
+///
+/// ```no_run
+/// use youtube_chapter_splitter::downloader::download_audio;
+/// use std::path::Path;
+///
+/// let audio_file = download_audio(
+///     "https://youtube.com/watch?v=dQw4w9WgXcQ",
+///     Path::new("/tmp/audio"),
+///     None,
+///     None,
+/// )?;
+/// println!("Downloaded to: {:?}", audio_file);
+/// # Ok::<(), youtube_chapter_splitter::error::YtcsError>(())
+/// ```
 pub fn download_audio(
     url: &str,
     output_path: &Path,
@@ -273,16 +327,21 @@ pub fn download_audio(
     });
 
     // Try multiple format selectors with fallback
-    let format_selectors = vec![
+    // Format selection fallback strategy:
+    // 1. bestaudio[ext=m4a]/bestaudio - Best quality M4A audio (preferred)
+    // 2. 140 - YouTube's standard M4A format (very reliable)
+    // 3. bestaudio - Generic best audio selector
+    // 4. None - Auto-selection (let yt-dlp choose automatically)
+    const FORMAT_SELECTORS: &[Option<&str>] = &[
         Some("bestaudio[ext=m4a]/bestaudio"),
-        Some("140"),       // YouTube M4A audio format
-        Some("bestaudio"), // Generic best audio
-        None,              // No format specification - let yt-dlp choose automatically
+        Some("140"),
+        Some("bestaudio"),
+        None,
     ];
 
-    let mut last_error = String::new();
+    let mut last_error = None;
 
-    for (i, format) in format_selectors.iter().enumerate() {
+    for (i, format) in FORMAT_SELECTORS.iter().enumerate() {
         let mut cmd = Command::new("yt-dlp");
 
         // Only add format selector if specified
@@ -313,16 +372,17 @@ pub fn download_audio(
             progress_bar.finish_and_clear();
             break;
         } else {
-            last_error = String::from_utf8_lossy(&output.stderr).to_string();
+            let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+            last_error = Some(error_msg);
             // If this is not the last format, try the next one
-            if i < format_selectors.len() - 1 {
+            if i < FORMAT_SELECTORS.len() - 1 {
                 continue;
             } else {
                 // All formats failed, return error
                 progress_bar.finish_and_clear();
                 return Err(YtcsError::DownloadError(format!(
                     "yt-dlp failed with all format selectors. Last error: {}",
-                    last_error
+                    last_error.unwrap_or_else(|| "Unknown error".to_string())
                 )));
             }
         }
