@@ -12,10 +12,14 @@ static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static RE_TRACK_PREFIX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap());
 
+static RE_GENRE_TAGS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s+\d{2,4}s?\s+[\w\s]+[•·].*$").unwrap());
+
 /// Nettoie et formate le nom de dossier selon les règles définies.
 ///
 /// Cette fonction applique plusieurs transformations pour normaliser les noms de dossiers :
 /// - Retire tout le contenu après `[FULL ALBUM]` ou `(FULL ALBUM)` (insensible à la casse)
+/// - Supprime les tags de genre musical (ex: "70s Psychedelic • Progressive Rock")
 /// - Supprime tous les crochets `[]` et parenthèses `()` avec leur contenu
 /// - Remplace les underscores `_`, pipes `|` et slashes `/` par des tirets `-`
 /// - Normalise les espaces multiples en un seul espace
@@ -42,8 +46,11 @@ pub fn clean_folder_name(name: &str) -> String {
     // Retirer tout après (FULL ALBUM) ou [FULL ALBUM] (case insensitive)
     let without_suffix = RE_FULL_ALBUM.replace_all(name, "");
 
+    // Retirer les tags de genre musical (ex: "70s Psychedelic • Progressive Rock")
+    let without_genre = RE_GENRE_TAGS.replace_all(&without_suffix, "");
+
     // Retirer les [] et () avec leur contenu restants
-    let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
+    let cleaned = RE_BRACKETS.replace_all(&without_genre, "");
 
     // Remplacer les underscores, pipes et slashes par des tirets
     let with_dashes = cleaned.replace(['_', '|', '/'], "-");

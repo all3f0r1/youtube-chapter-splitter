@@ -193,4 +193,24 @@ mod utils_edge_cases_tests {
         assert_eq!(artist, "Arcane Voyage");
         assert_eq!(album, "Third");
     }
+
+    #[test]
+    fn test_clean_folder_name_genre_tags() {
+        let result = clean_folder_name(
+            "Ethereal Compass - Nebula's Embrace 70s Psychedelic • Progressive Rock",
+        );
+        assert_eq!(result, "Ethereal Compass - Nebula's Embrace");
+    }
+
+    #[test]
+    fn test_clean_folder_name_genre_tags_with_decades() {
+        let result = clean_folder_name("Artist - Album 80s Rock • Metal");
+        assert_eq!(result, "Artist - Album");
+    }
+
+    #[test]
+    fn test_clean_folder_name_genre_tags_with_dot_separator() {
+        let result = clean_folder_name("Band - Title 90s Alternative · Indie Rock");
+        assert_eq!(result, "Band - Title");
+    }
 }

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.3] - 2024-12-03
+
+### Changed
+- **UI Improvement**: Changed "Audio downloaded" to "Audio downloading" during download, then "✓ Audio downloaded" when complete
+- **Genre Tag Cleanup**: Automatically remove genre tags from folder names (e.g., "70s Psychedelic • Progressive Rock")
+- **Minimalist Fallback Messages**: Replaced aggressive log warnings with subtle progress bar messages (e.g., "option 1/4 failed")
+
+### Added
+- **Tests**: Added 3 new tests for genre tag cleanup functionality
+
+### Technical Details
+- Added `RE_GENRE_TAGS` regex to detect and remove decade-based genre tags
+- Changed `log::warn!` to `log::debug!` for format selector failures
+- Progress bar now shows minimal fallback status during download attempts
+
 ## [0.14.2] - 2024-12-03
 
 ### Changed

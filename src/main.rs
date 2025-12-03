@@ -379,7 +379,7 @@ fn download_cover_and_audio(
     ui::print_cover_status(cover_status);
 
     // Download audio
-    let pb_audio = progress::create_audio_progress("Audio downloaded");
+    let pb_audio = progress::create_audio_progress("Audio downloading");
     let temp_audio_path = output_dir.join("temp_audio.mp3");
     let temp_audio = TempFile::new(&temp_audio_path);
 

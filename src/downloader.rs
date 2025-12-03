@@ -379,11 +379,21 @@ pub fn download_audio(
             break;
         } else {
             let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
-            log::warn!(
+            log::debug!(
                 "Format selector #{} failed: {}",
                 i + 1,
                 error_msg.lines().next().unwrap_or("Unknown error")
             );
+
+            // Show minimal fallback message on progress bar
+            if i < FORMAT_SELECTORS.len() - 1 {
+                progress_bar.set_message(format!(
+                    "Audio downloading (option {}/{} failed)",
+                    i + 1,
+                    FORMAT_SELECTORS.len()
+                ));
+            }
+
             last_error = Some(error_msg);
             // If this is not the last format, try the next one
             if i < FORMAT_SELECTORS.len() - 1 {

@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.14.2-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![Version](https://img.shields.io/badge/version-0.14.3-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.14.2
+ytcs v0.14.3
 
 Fetching video information...
 → Paradox - Chemical Love Theory
@@ -265,6 +265,12 @@ This ensures downloads work even when YouTube's signature system has issues.
 See [CHANGELOG.md](CHANGELOG.md) for the complete changelog.
 
 ### Recent Updates
+
+**[0.14.3] - 2024-12-03**
+- **Changed:** UI improvement - "Audio downloading" during download, then "✓ Audio downloaded" when complete
+- **Changed:** Genre tag cleanup - automatically remove tags like "70s Psychedelic • Progressive Rock" from folder names
+- **Changed:** Minimalist fallback messages - replaced aggressive warnings with subtle progress bar updates
+- **Added:** 3 new tests for genre tag cleanup functionality
 
 **[0.14.2] - 2024-12-03**
 - **Changed:** Complete English translation of all French comments and documentation
