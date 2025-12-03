@@ -1,7 +1,7 @@
 //! Traitement audio et découpage par chapitres.
 //!
-//! Ce module gère le découpage des fichiers audio en pistes individuelles
-//! et l'ajout de métadonnées ID3 avec pochettes d'album.
+//! This module handles audio file splitting into individual tracks
+//! and adding metadata ID3 with album artwork.
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
@@ -23,27 +23,27 @@ static RE_SILENCE_START: Lazy<Regex> =
 
 static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d.]+)").unwrap());
 
-/// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
+/// Splits an audio file into individual tracks based on chapters.
 ///
-/// Cette fonction utilise `ffmpeg` pour découper l'audio et `lofty` pour ajouter
-/// les métadonnées ID3 et la pochette d'album.
+/// This function uses `ffmpeg` to split the audio et `lofty` pour ajouter
+/// les métadonnées ID3 and the album artwork.
 ///
 /// # Arguments
 ///
-/// * `input_file` - Le fichier audio source
-/// * `chapters` - Les chapitres définissant les points de découpe
-/// * `output_dir` - Le répertoire de sortie pour les pistes
-/// * `artist` - Le nom de l'artiste
-/// * `album` - Le nom de l'album
-/// * `cover_path` - Chemin optionnel vers l'image de pochette
+/// * `input_file` - The source audio file
+/// * `chapters` - The chapters defining the split points
+/// * `output_dir` - The output directory for tracks
+/// * `artist` - The artist name
+/// * `album` - The album name
+/// * `cover_path` - Optional path to the cover image
 ///
 /// # Returns
 ///
-/// Un vecteur contenant les chemins des fichiers créés
+/// A vector containing the paths of created files
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le découpage ou l'ajout de métadonnées échoue
+/// Returns an error if splitting or metadata addition fails
 pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
@@ -157,7 +157,7 @@ pub struct TrackSplitParams<'a> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si FFmpeg échoue ou si l'ajout de la pochette échoue
+/// Returns an error if FFmpeg fails or if adding the cover fails
 pub fn split_single_track(params: TrackSplitParams) -> Result<PathBuf> {
     log::debug!(
         "Splitting track #{}: {}",
@@ -453,7 +453,7 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
 
 /// Détecte les chapitres automatiquement en analysant les périodes de silence.
 ///
-/// Utilise `ffmpeg` avec le filtre `silencedetect` pour identifier les points
+/// Uses `ffmpeg` with the filter `silencedetect` to identify the points
 /// de découpe potentiels dans l'audio.
 ///
 /// # Arguments
@@ -468,7 +468,7 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si aucun silence n'est détecté ou si ffmpeg échoue
+/// Returns an error if no silence is detected or if ffmpeg fails
 pub fn detect_silence_chapters(
     input_file: &Path,
     silence_threshold: f64,
@@ -545,7 +545,7 @@ pub fn detect_silence_chapters(
 
 /// Obtient la durée totale d'un fichier audio.
 ///
-/// Utilise `ffprobe` pour extraire la durée du fichier.
+/// Uses `ffprobe` to extract the file duration.
 ///
 /// # Arguments
 ///
@@ -557,7 +557,7 @@ pub fn detect_silence_chapters(
 ///
 /// # Errors
 ///
-/// Retourne une erreur si ffprobe échoue ou si la durée est invalide
+/// Returns an error if ffprobe échoue ou si la durée est invalide
 pub fn get_audio_duration(input_file: &Path) -> Result<f64> {
     let output = Command::new("ffprobe")
         .arg("-v")

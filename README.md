@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.14.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![Version](https://img.shields.io/badge/version-0.14.2-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.14.1
+ytcs v0.14.2
 
 Fetching video information...
 → Paradox - Chemical Love Theory
@@ -58,6 +58,9 @@ Splitting into the album...
 - **Progress Bars**: Real-time progress indicators for downloads and processing.
 - **Direct URL Support**: Use `ytcs <URL>` without the `download` command.
 - **Dependency Verification**: `yt-dlp` and `ffmpeg` are checked at startup.
+- **Structured Logging**: Debug mode with `RUST_LOG` environment variable.
+- **RAII File Management**: Automatic cleanup of temporary files.
+- **Multi-platform Binaries**: Pre-built binaries for Linux, macOS (Intel + Apple Silicon), and Windows.
 
 ## Installation
 
@@ -262,6 +265,32 @@ This ensures downloads work even when YouTube's signature system has issues.
 See [CHANGELOG.md](CHANGELOG.md) for the complete changelog.
 
 ### Recent Updates
+
+**[0.14.2] - 2024-12-03**
+- **Changed:** Complete English translation of all French comments and documentation
+- **Improved:** Documentation with enhanced docstrings and better examples
+- **Updated:** README with latest features (logging, RAII, multi-platform binaries)
+- **Fixed:** Clippy warning for unused assignment in downloader
+
+**[0.14.1] - 2024-12-03**
+- **Fixed:** macOS compatibility with build instructions
+- **Changed:** Cargo.toml with comprehensive metadata for crates.io
+- **Improved:** Documentation with English translations
+
+**[0.14.0] - 2024-12-03**
+- **Major Refactoring:** Reduced `process_single_url` from 240+ lines to ~60 lines
+- **Added:** 6 modular helper functions for better code organization
+- **Added:** 10 new unit tests for refactored functions
+
+**[0.13.0] - 2024-12-03**
+- **Added:** Extended logging throughout the pipeline
+- **Added:** RAII cover file management with automatic cleanup
+- **Improved:** Debugging section in README
+
+**[0.12.0] - 2024-12-03**
+- **Added:** Logging system with `log` and `env_logger`
+- **Added:** RAII temp file management for automatic cleanup
+- **Added:** Download timeout configuration
 
 **[0.11.0] - 2024-12-02**
 - **Improved:** Code quality with Clippy warnings fixed

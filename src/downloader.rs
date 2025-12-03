@@ -1,6 +1,6 @@
 //! Téléchargement de vidéos YouTube et extraction de métadonnées.
 //!
-//! Ce module gère l'interaction avec `yt-dlp` pour télécharger les vidéos
+//! This module handles l'interaction avec `yt-dlp` pour télécharger les vidéos
 //! et extraire leurs métadonnées (titre, durée, chapitres).
 
 use crate::chapters::{parse_chapters_from_json, Chapter};
@@ -66,7 +66,7 @@ pub struct MissingDependency {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si `yt-dlp` ou `ffmpeg` sont manquants
+/// Returns an error if `yt-dlp` or `ffmpeg` are missing
 pub fn check_dependencies() -> Result<()> {
     let mut missing = Vec::new();
 
@@ -111,7 +111,7 @@ pub fn check_dependencies() -> Result<()> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si l'installation échoue
+/// Returns an error if installation fails
 pub fn install_dependency(tool: &str) -> Result<()> {
     let command = match tool {
         "yt-dlp" => "pip install yt-dlp",
@@ -167,7 +167,7 @@ pub fn install_dependency(tool: &str) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si l'URL est invalide ou si l'ID ne peut pas être extrait
+/// Returns an error if the URL is invalid or if the ID cannot be extracted
 pub fn extract_video_id(url: &str) -> Result<String> {
     let patterns = [r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})"];
 
@@ -186,9 +186,9 @@ pub fn extract_video_id(url: &str) -> Result<String> {
     )))
 }
 
-/// Récupère les informations d'une vidéo YouTube.
+/// Retrieves information from a YouTube video.
 ///
-/// Utilise `yt-dlp` pour extraire les métadonnées de la vidéo.
+/// Uses `yt-dlp` to extract video metadata.
 ///
 /// # Arguments
 ///
@@ -200,7 +200,7 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si yt-dlp échoue ou si les métadonnées sont invalides
+/// Returns an error if yt-dlp échoue ou si les métadonnées sont invalides
 pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--dump-json").arg("--no-playlist");
@@ -268,7 +268,7 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
 
 /// Télécharge l'audio d'une vidéo YouTube en format MP3.
 ///
-/// Cette fonction utilise `yt-dlp` avec une stratégie de fallback à 4 niveaux
+/// This function uses `yt-dlp` avec une stratégie de fallback à 4 niveaux
 /// pour maximiser la fiabilité du téléchargement :
 /// 1. `bestaudio[ext=m4a]/bestaudio` - Audio M4A de meilleure qualité (préféré)
 /// 2. `140` - Format M4A standard de YouTube (très fiable)
@@ -288,7 +288,7 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
 ///
 /// # Errors
 ///
-/// Retourne une erreur si :
+/// Returns an error if :
 /// - yt-dlp n'est pas installé
 /// - Tous les sélecteurs de format échouent
 /// - Le téléchargement est interrompu
@@ -342,7 +342,8 @@ pub fn download_audio(
         None,
     ];
 
-    let mut last_error = None;
+    #[allow(unused_assignments)]
+    let mut last_error: Option<String> = None;
 
     for (i, format) in FORMAT_SELECTORS.iter().enumerate() {
         log::debug!("Trying format selector #{}: {:?}", i + 1, format);
@@ -421,7 +422,7 @@ pub fn download_audio(
 ///
 /// # Errors
 ///
-/// Retourne une erreur si aucune miniature n'a pu être téléchargée
+/// Returns an error if aucune miniature n'a pu être téléchargée
 pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
     // Si l'URL est déjà une URL d'image, l'utiliser directement
     let thumbnail_urls = if url.contains("ytimg.com") || url.contains("img.youtube.com") {

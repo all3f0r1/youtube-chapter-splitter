@@ -43,7 +43,7 @@ pub struct PlaylistInfo {
     pub videos: Vec<PlaylistVideo>,
 }
 
-/// Vérifier si une URL contient une playlist
+/// Check if a URL contains a playlist
 ///
 /// # Arguments
 ///
@@ -65,7 +65,7 @@ pub fn is_playlist_url(url: &str) -> Option<String> {
     PLAYLIST_REGEX.captures(url).map(|cap| cap[1].to_string())
 }
 
-/// Extraire l'ID de vidéo d'une URL YouTube
+/// Extract video ID from a YouTube URL
 ///
 /// # Arguments
 ///
@@ -92,7 +92,7 @@ pub fn extract_video_id(url: &str) -> Option<String> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si yt-dlp échoue ou si le parsing JSON échoue
+/// Returns an error if yt-dlp fails or if JSON parsing fails
 pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Result<PlaylistInfo> {
     // Utiliser yt-dlp pour obtenir les informations de la playlist
     let mut cmd = Command::new("yt-dlp");
@@ -179,7 +179,7 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
     })
 }
 
-/// Supprimer le paramètre de playlist d'une URL
+/// Remove playlist parameter from a URL
 ///
 /// # Arguments
 ///

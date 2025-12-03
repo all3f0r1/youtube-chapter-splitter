@@ -239,7 +239,7 @@ struct DownloadedAssets {
 
 /// 1. Gère la détection de playlist et demande à l'utilisateur
 ///
-/// Retourne `true` si une playlist doit être téléchargée, `false` sinon
+/// Returns `true` if a playlist should be downloaded, `false` otherwise
 fn handle_playlist_detection(url: &str, config: &config::Config) -> Result<bool> {
     use config::PlaylistBehavior;
 
@@ -279,9 +279,9 @@ fn handle_playlist_detection(url: &str, config: &config::Config) -> Result<bool>
     Ok(false)
 }
 
-/// 2. Récupère les informations vidéo et les affiche
+/// 2. Retrieves video information and displays it
 ///
-/// Retourne un `VideoContext` contenant toutes les infos nécessaires
+/// Returns a `VideoContext` containing all necessary information
 fn fetch_and_display_video_info(
     url: &str,
     cli_artist: Option<&String>,
@@ -318,9 +318,9 @@ fn fetch_and_display_video_info(
     })
 }
 
-/// 3. Configure le répertoire de sortie
+/// 3. Sets up the output directory
 ///
-/// Crée le répertoire si nécessaire et retourne son chemin
+/// Creates the directory if necessary and returns its path
 fn setup_output_directory(
     cli_output: Option<&String>,
     artist: &str,
@@ -340,9 +340,9 @@ fn setup_output_directory(
     Ok(output_dir)
 }
 
-/// 4. Télécharge la couverture et l'audio
+/// 4. Downloads the cover and audio
 ///
-/// Retourne une structure `DownloadedAssets` contenant les fichiers et données
+/// Returns a `DownloadedAssets` structure containing the files and data
 fn download_cover_and_audio(
     url: &str,
     video_info: &downloader::VideoInfo,
@@ -416,11 +416,12 @@ fn download_cover_and_audio(
     })
 }
 
-/// 5. Récupère les chapitres avec stratégie de fallback
+/// 5. Retrieves chapters with fallback strategy
 ///
-/// 1. Chapitres YouTube
-/// 2. Parsing de la description
-/// 3. Détection de silence
+/// 3-step strategy:
+/// 1. YouTube chapters
+/// 2. Description parsing
+/// 3. Silence detection
 fn get_chapters_with_fallback(
     video_info: &downloader::VideoInfo,
     audio_file: &Path,
@@ -450,9 +451,9 @@ fn get_chapters_with_fallback(
     }
 }
 
-/// 6. Découpe l'audio en pistes individuelles
+/// 6. Splits the audio into individual tracks
 ///
-/// Utilise les chapitres et métadonnées pour créer les fichiers MP3
+/// Uses chapters and metadata to create MP3 files
 fn split_into_tracks(
     chapters: &[youtube_chapter_splitter::chapters::Chapter],
     audio_file: &Path,

@@ -17,7 +17,7 @@ pub enum ProgressType {
     Track,
 }
 
-/// Créer une barre de progression selon le type spécifié
+/// Create a progress bar according to the specified type
 ///
 /// # Arguments
 ///
@@ -52,7 +52,7 @@ pub fn create_progress(message: &str, progress_type: ProgressType) -> ProgressBa
     pb
 }
 
-/// Créer une barre de progression pour le téléchargement
+/// Create a progress bar for download
 ///
 /// # Arguments
 ///
@@ -65,7 +65,7 @@ pub fn create_download_progress(message: &str) -> ProgressBar {
     create_progress(message, ProgressType::Download)
 }
 
-/// Créer une barre de progression pour le traitement audio
+/// Create a progress bar for audio processing
 ///
 /// # Arguments
 ///
@@ -78,7 +78,7 @@ pub fn create_audio_progress(message: &str) -> ProgressBar {
     create_progress(message, ProgressType::Audio)
 }
 
-/// Créer une barre de progression pour le splitting d'une piste
+/// Create a progress bar for track splitting
 ///
 /// # Arguments
 ///

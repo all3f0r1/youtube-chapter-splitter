@@ -8,7 +8,7 @@ use crate::error::{Result, YtcsError};
 use crate::utils;
 use regex::Regex;
 
-/// Parse les chapitres depuis la description d'une vidéo.
+/// Parses chapters from a video description.
 ///
 /// Détecte les lignes contenant un timestamp suivi d'un titre.
 /// Format attendu: [HH:MM:SS] - Titre ou HH:MM:SS - Titre
@@ -24,7 +24,7 @@ use regex::Regex;
 ///
 /// # Errors
 ///
-/// Retourne une erreur si aucun chapitre valide n'est trouvé dans la description
+/// Returns an error if no valid chapter is found in the description
 ///
 /// # Examples
 ///

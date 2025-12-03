@@ -131,7 +131,7 @@ pub fn format_duration_short(seconds: f64) -> String {
     format!("{}m {:02}s", minutes, secs)
 }
 
-/// Parse le titre d'une vidéo YouTube pour extraire l'artiste et l'album.
+/// Parses a YouTube video title to extract artist and album.
 ///
 /// Cette fonction détecte automatiquement les formats courants de titres YouTube :
 /// - `"ARTIST - ALBUM [...]"` (séparateur tiret)

@@ -3,7 +3,7 @@
 //! Cette bibliothèque fournit des outils pour :
 //! - Télécharger des vidéos YouTube et extraire l'audio en MP3
 //! - Parser les chapitres depuis les métadonnées YouTube
-//! - Découper l'audio en pistes individuelles basées sur les chapitres
+//! - Découper l'audio into individual tracks based on chapters
 //! - Ajouter des métadonnées ID3 complètes et des pochettes d'album
 //!
 //! # Exemple d'utilisation

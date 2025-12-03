@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] - 2024-12-03
+
+### Changed
+- **Complete English Translation**: All French comments and documentation translated to English
+- **Documentation Improvements**: Enhanced docstrings with better examples and explanations
+- **README Updates**: Added new features (logging, RAII, multi-platform binaries) to Features section
+- **Version badges**: Updated README version badges to 0.14.2
+
+### Fixed
+- **Clippy Warning**: Fixed `last_error` unused assignment warning in downloader by adding explicit type annotation
+
+### Note
+- GitHub Actions workflow for multi-platform builds (Linux, macOS Intel, macOS Apple Silicon, Windows) already exists and is fully functional
+- All future code and documentation will be written in English
+
 ## [0.14.1] - 2024-12-03
 
 ### Fixed

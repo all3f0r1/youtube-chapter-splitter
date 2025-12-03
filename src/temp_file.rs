@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 ///
 /// {
 ///     let temp = TempFile::new(Path::new("/tmp/audio.mp3"));
-///     // Utiliser le fichier...
+///     // Use the file...
 ///     // Le fichier sera automatiquement supprimé ici
 /// }
 /// ```
@@ -52,7 +52,7 @@ impl TempFile {
         }
     }
 
-    /// Retourne le chemin du fichier temporaire
+    /// Returns the path of the temporary file
     ///
     /// # Examples
     ///

@@ -1,6 +1,6 @@
 //! Module de gestion de la configuration persistante.
 //!
-//! Ce module gère la configuration de l'application stockée dans un fichier TOML.
+//! This module handles la configuration de l'application stockée dans un fichier TOML.
 
 use crate::error::{Result, YtcsError};
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlaylistBehavior {
-    /// Demander à l'utilisateur ce qu'il veut faire (défaut)
+    /// Ask the user what they want to do (default)
     #[default]
     Ask,
     /// Toujours télécharger uniquement la vidéo
@@ -20,7 +20,7 @@ pub enum PlaylistBehavior {
     PlaylistOnly,
 }
 
-/// Configuration de l'application
+/// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Répertoire de téléchargement par défaut
@@ -59,7 +59,7 @@ pub struct Config {
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
 
-    /// Créer un fichier playlist (.m3u)
+    /// Create a playlist file (.m3u)
     #[serde(default)]
     pub create_playlist: bool,
 
@@ -133,7 +133,7 @@ impl Config {
         Ok(ytcs_config_dir.join("config.toml"))
     }
 
-    /// Charger la configuration depuis le fichier
+    /// Load configuration from file
     pub fn load() -> Result<Self> {
         let config_path = Self::config_path()?;
 
@@ -198,7 +198,7 @@ impl Config {
     }
 }
 
-/// Afficher la configuration actuelle
+/// Display current configuration
 pub fn show_config() -> Result<()> {
     let config = Config::load()?;
     let config_path = Config::config_path()?;

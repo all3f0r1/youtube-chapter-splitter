@@ -70,7 +70,7 @@ impl Chapter {
     }
 }
 
-/// Parse les chapitres depuis la sortie JSON de yt-dlp.
+/// Parses chapters from yt-dlp JSON output.
 ///
 /// Extrait les chapitres depuis les métadonnées JSON d'une vidéo YouTube.
 ///
@@ -84,7 +84,7 @@ impl Chapter {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si :
+/// Returns an error if :
 /// - Le JSON est mal formaté
 /// - Le champ "chapters" est absent
 /// - Les champs start_time ou end_time sont invalides
@@ -116,7 +116,7 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     Ok(chapters)
 }
 
-/// Parse un timestamp au format HH:MM:SS, MM:SS ou SS.
+/// Parses a timestamp in format HH:MM:SS, MM:SS ou SS.
 ///
 /// # Arguments
 ///
@@ -128,7 +128,7 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le format du timestamp est invalide
+/// Returns an error if the timestamp format is invalid
 pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
     let parts: Vec<&str> = timestamp.split(':').collect();
 
