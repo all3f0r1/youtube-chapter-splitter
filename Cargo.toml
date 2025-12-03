@@ -1,14 +1,24 @@
 [package]
 name = "youtube_chapter_splitter"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2021"
+rust-version = "1.70"
 authors = ["YouTube Chapter Splitter Contributors"]
-description = "Download YouTube videos, extract audio to MP3, and split by chapters"
+description = "Download YouTube videos, extract audio to MP3, and split by chapters with automatic metadata tagging"
 license = "MIT"
 repository = "https://github.com/all3f0r1/youtube-chapter-splitter"
+homepage = "https://github.com/all3f0r1/youtube-chapter-splitter"
+documentation = "https://github.com/all3f0r1/youtube-chapter-splitter#readme"
 keywords = ["youtube", "audio", "mp3", "chapters", "downloader"]
 categories = ["command-line-utilities", "multimedia::audio"]
 readme = "README.md"
+exclude = [
+    "tests/fixtures/*",
+    ".github/*",
+    "*.md",
+    "!README.md",
+    "!CHANGELOG.md",
+]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

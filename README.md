@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.13.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![Version](https://img.shields.io/badge/version-0.14.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.13.0
+ytcs v0.14.1
 
 Fetching video information...
 → Paradox - Chemical Love Theory
@@ -110,6 +110,27 @@ ytcs --version
 ```bash
 cargo install youtube_chapter_splitter
 ```
+
+### 3. Build from Source
+
+**Note for macOS users:** Pre-compiled Linux binaries won't work on macOS due to different architectures. You need to compile from source:
+
+```bash
+# Clone the repository
+git clone https://github.com/all3f0r1/youtube-chapter-splitter.git
+cd youtube-chapter-splitter
+
+# Build in release mode
+cargo build --release
+
+# Install the binary
+sudo cp target/release/ytcs /usr/local/bin/
+
+# Verify installation
+ytcs --version
+```
+
+**For Linux users**, you can also build from source using the same commands above.
 
 ## Usage
 
