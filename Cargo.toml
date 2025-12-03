@@ -1,6 +1,6 @@
 [package]
 name = "youtube_chapter_splitter"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 authors = ["YouTube Chapter Splitter Contributors"]
 description = "Download YouTube videos, extract audio to MP3, and split by chapters"
@@ -25,6 +25,8 @@ toml = "0.8"
 indicatif = "0.17"
 shellexpand = "3.1"
 term_size = "0.3"
+log = "0.4"
+env_logger = "0.11"
 
 [[bin]]
 name = "ytcs"

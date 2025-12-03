@@ -129,6 +129,18 @@ fn check_dependencies() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    // Initialize logger
+    // Set RUST_LOG environment variable to control log level:
+    // RUST_LOG=debug ytcs <url>  (for debug logs)
+    // RUST_LOG=info ytcs <url>   (for info logs, default)
+    // RUST_LOG=warn ytcs <url>   (for warnings only)
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+        .format_timestamp(None)
+        .format_module_path(false)
+        .init();
+
+    log::debug!("ytcs started");
+
     let cli = Cli::parse();
 
     // Handle commands
@@ -329,11 +341,16 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     ui::print_cover_status(cover_status);
 
     // Download audio avec barre de progression
-    use youtube_chapter_splitter::progress;
+    use youtube_chapter_splitter::{progress, temp_file::TempFile};
     let pb_audio = progress::create_audio_progress("Audio downloaded");
+
+    // Créer un fichier temporaire avec nettoyage automatique RAII
+    let temp_audio_path = output_dir.join("temp_audio.mp3");
+    let temp_audio = TempFile::new(&temp_audio_path);
+
     let audio_file = match downloader::download_audio(
         &url,
-        &output_dir.join("temp_audio.mp3"),
+        temp_audio.path(),
         cookies_from_browser,
         Some(pb_audio.clone()),
     ) {
@@ -428,8 +445,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         println!("  ✓ {} ({})", formatted_name, duration_str);
     }
 
-    // Clean up temporary audio file
-    std::fs::remove_file(&audio_file).ok();
+    // Le fichier audio temporaire sera automatiquement supprimé par TempFile (RAII)
+    // quand il sortira du scope
 
     // Clean up cover file if config says not to keep it
     if cover_downloaded && !keep_cover {

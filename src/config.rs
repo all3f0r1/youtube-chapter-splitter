@@ -72,6 +72,10 @@ pub struct Config {
     /// Si non défini, utilise le fichier cookies.txt s'il existe
     #[serde(default)]
     pub cookies_from_browser: Option<String>,
+
+    /// Timeout pour les téléchargements en secondes (0 = pas de timeout)
+    #[serde(default = "default_download_timeout")]
+    pub download_timeout: u64,
 }
 
 // Fonctions de valeur par défaut pour serde
@@ -95,6 +99,10 @@ fn default_max_retries() -> u32 {
     3
 }
 
+fn default_download_timeout() -> u64 {
+    300 // 5 minutes par défaut
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -108,6 +116,7 @@ impl Default for Config {
             create_playlist: false,
             playlist_behavior: PlaylistBehavior::Ask,
             cookies_from_browser: None,
+            download_timeout: 300,
         }
     }
 }

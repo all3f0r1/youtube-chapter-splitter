@@ -314,6 +314,9 @@ pub fn download_audio(
     cookies_from_browser: Option<&str>,
     pb: Option<ProgressBar>,
 ) -> Result<PathBuf> {
+    log::info!("Starting audio download from: {}", url);
+    log::debug!("Output path: {:?}", output_path);
+
     let progress_bar = pb.unwrap_or_else(|| {
         let pb = ProgressBar::new_spinner();
         pb.set_style(
@@ -342,6 +345,7 @@ pub fn download_audio(
     let mut last_error = None;
 
     for (i, format) in FORMAT_SELECTORS.iter().enumerate() {
+        log::debug!("Trying format selector #{}: {:?}", i + 1, format);
         let mut cmd = Command::new("yt-dlp");
 
         // Only add format selector if specified
@@ -369,10 +373,16 @@ pub fn download_audio(
             .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
 
         if output.status.success() {
+            log::info!("Audio download successful with format selector #{}", i + 1);
             progress_bar.finish_and_clear();
             break;
         } else {
             let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+            log::warn!(
+                "Format selector #{} failed: {}",
+                i + 1,
+                error_msg.lines().next().unwrap_or("Unknown error")
+            );
             last_error = Some(error_msg);
             // If this is not the last format, try the next one
             if i < FORMAT_SELECTORS.len() - 1 {

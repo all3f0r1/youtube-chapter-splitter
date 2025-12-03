@@ -56,6 +56,7 @@ pub mod downloader;
 pub mod error;
 pub mod playlist;
 pub mod progress;
+pub mod temp_file;
 pub mod ui;
 pub mod utils;
 pub mod ytdlp_error_parser;

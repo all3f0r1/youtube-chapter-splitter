@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2024-12-03
+
+### Added
+- **Logging system**: Integrated `log` and `env_logger` for structured logging
+  - Use `RUST_LOG=debug ytcs <url>` for debug logs
+  - Use `RUST_LOG=info ytcs <url>` for info logs
+  - Default level is `warn` for minimal output
+- **RAII temp file management**: New `TempFile` struct for automatic cleanup of temporary files
+  - Temporary audio files are now automatically deleted when out of scope
+  - Prevents leftover files in case of errors or interruptions
+- **Download timeout configuration**: Added `download_timeout` config option (default: 300s)
+  - Can be configured via `ytcs set download_timeout <seconds>`
+  - Set to 0 to disable timeout
+
+### Improved
+- **Better debugging**: Log messages throughout download and processing pipeline
+- **Resource management**: Automatic cleanup of temporary files using RAII pattern
+- **Error tracking**: Detailed logs for format selector fallbacks and failures
+
+### Technical Details
+- Added `log` (0.4) and `env_logger` (0.11) dependencies
+- Created `temp_file` module with `TempFile` struct implementing `Drop` trait
+- Added logging in `download_audio` for format selector attempts and results
+- Removed manual `fs::remove_file` calls in favor of RAII cleanup
+
 ## [0.11.0] - 2024-12-03
 
 ### Improved
