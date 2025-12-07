@@ -213,4 +213,46 @@ mod utils_edge_cases_tests {
         let result = clean_folder_name("Band - Title 90s Alternative · Indie Rock");
         assert_eq!(result, "Band - Title");
     }
+
+    #[test]
+    fn test_parse_artist_album_with_stuck_dash() {
+        // Test avec tiret collé comme "Mammoth- Solar Crown Of Fire"
+        let (artist, album) = parse_artist_album("Mammoth- Solar Crown Of Fire", "Dark Chord");
+        assert_eq!(artist, "Mammoth");
+        assert_eq!(album, "Solar Crown Of Fire");
+    }
+
+    #[test]
+    fn test_parse_artist_album_with_stuck_dash_both_sides() {
+        // Test avec tiret collé des deux côtés
+        let (artist, album) = parse_artist_album("Mammoth-Solar Crown Of Fire", "Dark Chord");
+        assert_eq!(artist, "Mammoth");
+        assert_eq!(album, "Solar Crown Of Fire");
+    }
+
+    #[test]
+    fn test_parse_artist_album_with_stuck_dash_left() {
+        // Test avec tiret collé à gauche
+        let (artist, album) = parse_artist_album("Mammoth -Solar Crown Of Fire", "Dark Chord");
+        assert_eq!(artist, "Mammoth");
+        assert_eq!(album, "Solar Crown Of Fire");
+    }
+
+    #[test]
+    fn test_clean_folder_name_truncated_parenthesis() {
+        // Test avec parenthèse tronquée
+        let result = clean_folder_name("Thornshade - Heat At The Edge Of The Mirror (psychedel");
+        println!("Result: '{}'", result);
+        // La parenthèse non fermée est supprimée par RE_BRACKETS
+        assert_eq!(result, "Thornshade - Heat At The Edge Of The Mirror");
+    }
+
+    #[test]
+    fn test_clean_folder_name_complete_parenthesis() {
+        // Test avec parenthèse complète
+        let result =
+            clean_folder_name("Thornshade - Heat At The Edge Of The Mirror (psychedelic rock)");
+        println!("Result: '{}'", result);
+        assert_eq!(result, "Thornshade - Heat At The Edge Of The Mirror");
+    }
 }

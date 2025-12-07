@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.14.3-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
+[![Version](https://img.shields.io/badge/version-0.14.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.14.3
+ytcs v0.14.4
 
 Fetching video information...
 → Paradox - Chemical Love Theory
@@ -265,6 +265,12 @@ This ensures downloads work even when YouTube's signature system has issues.
 See [CHANGELOG.md](CHANGELOG.md) for the complete changelog.
 
 ### Recent Updates
+
+**[0.14.4] - 2024-12-03**
+- **Fixed:** Artist detection for titles with stuck dashes (e.g., "Mammoth- Solar Crown Of Fire")
+- **Fixed:** Title display with unclosed brackets/parentheses (e.g., "Heat At The Edge Of The Mirror (psychedel")
+- **Fixed:** Artist now properly extracted from title instead of falling back to channel name
+- **Added:** 5 new tests (3 for stuck dash normalization, 2 for unclosed brackets)
 
 **[0.14.3] - 2024-12-03**
 - **Changed:** UI improvement - "Audio downloading" during download, then "✓ Audio downloaded" when complete

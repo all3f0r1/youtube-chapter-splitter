@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.4] - 2024-12-03
+
+### Fixed
+- **Artist Detection**: Fixed artist detection for titles with stuck dashes (e.g., "Mammoth- Solar Crown Of Fire")
+- **Title Truncation**: Fixed display of titles with unclosed brackets/parentheses (e.g., "Heat At The Edge Of The Mirror (psychedel")
+- Now correctly normalizes all dash variations ("Artist-Album", "Artist- Album", "Artist -Album") to "Artist - Album"
+- Artist is now properly extracted from the title instead of falling back to channel name
+- Unclosed brackets/parentheses at end of string are now properly removed
+
+### Added
+- **Tests**: Added 5 new tests (3 for stuck dash normalization, 2 for unclosed brackets)
+
+### Technical Details
+- Improved `parse_artist_album` function to normalize dashes before parsing
+- Split by dash, trim each part, filter empty parts, then rejoin with " - "
+- Handles all edge cases: stuck left, stuck right, stuck both sides
+- Enhanced `RE_BRACKETS` regex to match unclosed brackets/parentheses at end of string: `\[.*$|\(.*$`
+
 ## [0.14.3] - 2024-12-03
 
 ### Changed

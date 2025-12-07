@@ -5,7 +5,7 @@ use regex::Regex;
 static RE_FULL_ALBUM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
-static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)").unwrap());
+static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)|\[.*$|\(.*$").unwrap());
 
 static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 
@@ -171,15 +171,25 @@ pub fn parse_artist_album(title: &str, uploader: &str) -> (String, String) {
     // Retirer les [] et () restants
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
 
+    // Normaliser les tirets collés (ex: "Mammoth-" -> "Mammoth - ")
+    // Utiliser une regex pour remplacer tous les tirets par " - "
+    let normalized = cleaned
+        .as_ref()
+        .split('-')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<&str>>()
+        .join(" - ");
+
     // Séparer par - (tiret), – (tiret long/em-dash), ou |
-    let parts: Vec<&str> = if cleaned.contains(" - ") {
-        cleaned.split(" - ").collect()
-    } else if cleaned.contains(" – ") {
-        cleaned.split(" – ").collect()
-    } else if cleaned.contains(" | ") {
-        cleaned.split(" | ").collect()
+    let parts: Vec<&str> = if normalized.contains(" - ") {
+        normalized.split(" - ").collect()
+    } else if normalized.contains(" – ") {
+        normalized.split(" – ").collect()
+    } else if normalized.contains(" | ") {
+        normalized.split(" | ").collect()
     } else {
-        vec![cleaned.trim()]
+        vec![normalized.trim()]
     };
 
     if parts.len() >= 2 {

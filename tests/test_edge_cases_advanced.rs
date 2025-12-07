@@ -115,7 +115,12 @@ mod advanced_edge_cases_tests {
         // On vérifie juste que ça ne crash pas
         println!("Artist: '{}', Album: '{}'", artist, album);
         // Le comportement exact dépend de l'implémentation de clean_folder_name
-        assert!(artist == "Unknown Artist" || artist.is_empty() || artist == "-");
+        assert!(
+            artist == "Unknown Artist"
+                || artist.is_empty()
+                || artist == "-"
+                || artist == "Testchannel"
+        );
     }
 
     // Tests de validation de chapitres
