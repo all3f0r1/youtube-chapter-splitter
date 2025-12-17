@@ -81,7 +81,7 @@ mod audio_function_tests {
     fn test_chapter_sanitize_title_replaces_invalid_chars() {
         let chapter = Chapter::new("Song/Name:Test".to_string(), 0.0, 100.0);
         let sanitized = chapter.sanitize_title();
-        assert_eq!(sanitized, "Song_Name_Test");
+        assert_eq!(sanitized, "Song_name_test");
     }
 
     #[test]

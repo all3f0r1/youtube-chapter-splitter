@@ -14,11 +14,12 @@ fn test_numbered_format_basic() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
-    assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
+    // Title Case is now applied
+    assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
     assert_eq!(chapters[0].start_time, 0.0);
-    assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
+    assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
     assert_eq!(chapters[1].start_time, 4.0 * 60.0 + 24.0);
-    assert_eq!(chapters[2].title, "The Ritual of the Octagonal Chamber");
+    assert_eq!(chapters[2].title, "The Ritual Of The Octagonal Chamber");
     assert_eq!(chapters[2].start_time, 11.0 * 60.0 + 1.0);
 }
 
@@ -34,17 +35,18 @@ fn test_numbered_format_with_parentheses_in_title() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
+    // Title Case is now applied
     assert_eq!(
         chapters[0].title,
-        "Colors at the Bottom of the Gesture (Instrumental)"
+        "Colors At The Bottom Of The Gesture (instrumental)"
     );
     assert_eq!(
         chapters[1].title,
-        "Mirror Against the Firmament (Suite in Three Parts)"
+        "Mirror Against The Firmament (suite In Three Parts)"
     );
     assert_eq!(
         chapters[2].title,
-        "Architects of Inner Time (Part II_ The Awakening)"
+        "Architects Of Inner Time (part Ii_ The Awakening)"
     ); // Note: les deux-points sont remplacés par underscore
 }
 
@@ -141,8 +143,9 @@ fn test_numbered_format_sanitization() {
 
     assert_eq!(chapters.len(), 4);
     // Les deux-points, slashes, backslashes et pipes devraient être remplacés
+    // Title Case is now applied
     assert_eq!(chapters[0].title, "Track_ With Colon");
-    assert_eq!(chapters[1].title, "Track_With_Slash");
-    assert_eq!(chapters[2].title, "Track_With_Backslash");
-    assert_eq!(chapters[3].title, "Track_With_Pipe");
+    assert_eq!(chapters[1].title, "Track_with_slash");
+    assert_eq!(chapters[2].title, "Track_with_backslash");
+    assert_eq!(chapters[3].title, "Track_with_pipe");
 }

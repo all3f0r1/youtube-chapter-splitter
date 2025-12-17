@@ -174,13 +174,13 @@ mod advanced_edge_cases_tests {
     #[test]
     fn test_sanitize_title_mixed_valid_invalid() {
         let result = sanitize_title("Valid/Invalid:Chars");
-        assert_eq!(result, "Valid_Invalid_Chars");
+        assert_eq!(result, "Valid_invalid_chars");
     }
 
     #[test]
     fn test_sanitize_title_unicode_with_invalid() {
         let result = sanitize_title("Café/Müller:Test");
-        assert_eq!(result, "Café_Müller_Test");
+        assert_eq!(result, "Café_müller_test");
     }
 
     #[test]

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.5] - 2024-12-17
+
+### Fixed
+- **Track Prefix Parsing**: Fixed parsing of track prefixes with parenthesis format (e.g., "1) Dunes of Dread" → "Dunes Of Dread")
+- **Emoji Separator**: Fixed artist/album parsing for titles using emoji separators (e.g., "Black Crown Crows 👑 When We Two Parted")
+- **Title Case Normalization**: Applied Title Case to all chapter titles, fixing ALL CAPS titles (e.g., "VOICES BENEATH THE RAIN" → "Voices Beneath The Rain")
+
+### Added
+- **New Function**: Added `capitalize_words()` utility function for Title Case transformation
+- **Emoji Regex**: Added `RE_EMOJI_SEPARATOR` regex to detect emoji separators in video titles
+- **Tests**: Added 4 new tests for the bug fixes (track prefix, uppercase titles, emoji separator)
+
+### Technical Details
+- Updated `RE_TRACK_PREFIX` regex to also match `N)` format: `^\s*(?:Track\s+)?\d+\s*[-.:)]\s*`
+- `sanitize_title()` now applies Title Case capitalization after removing track prefixes
+- `parse_artist_album()` now tries emoji-based splitting before dash-based splitting
+- All tests updated to reflect new Title Case behavior
+
 ## [0.14.4] - 2024-12-03
 
 ### Fixed

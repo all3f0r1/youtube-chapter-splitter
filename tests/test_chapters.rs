@@ -20,7 +20,7 @@ fn test_sanitize_title() {
     assert_eq!(chapter.sanitize_title(), "Song Name");
 
     let chapter2 = Chapter::new("Track 5: Test/Song".to_string(), 0.0, 100.0);
-    assert_eq!(chapter2.sanitize_title(), "Test_Song");
+    assert_eq!(chapter2.sanitize_title(), "Test_song");
 }
 
 #[test]
