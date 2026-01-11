@@ -2,7 +2,10 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use youtube_chapter_splitter::{audio, config, downloader, playlist, utils, Result};
+use youtube_chapter_splitter::{
+    audio, config, downloader, playlist, utils, print_refinement_report, refine_chapters_with_silence,
+    download_audio_with_progress, Result,
+};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -29,6 +32,10 @@ struct Cli {
     #[arg(long)]
     no_cover: bool,
 
+    /// Refine chapter markers using silence detection (improves split accuracy)
+    #[arg(long, default_value = "true")]
+    refine_chapters: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -54,6 +61,10 @@ struct DownloadArgs {
     /// Skip downloading cover art
     #[arg(long)]
     no_cover: bool,
+
+    /// Refine chapter markers using silence detection (improves split accuracy)
+    #[arg(long, default_value = "true")]
+    refine_chapters: bool,
 }
 
 #[derive(Subcommand)]
@@ -159,6 +170,7 @@ fn main() -> Result<()> {
                     artist: cli.artist,
                     album: cli.album,
                     no_cover: cli.no_cover,
+                    refine_chapters: cli.refine_chapters,
                 };
                 handle_download(args)
             } else {
@@ -351,7 +363,7 @@ fn download_cover_and_audio(
     cookies_from_browser: Option<&str>,
 ) -> Result<DownloadedAssets> {
     use youtube_chapter_splitter::ui::Status;
-    use youtube_chapter_splitter::{progress, temp_file::TempFile, ui};
+    use youtube_chapter_splitter::{temp_file::TempFile, ui};
 
     ui::print_section_header("Downloading the album...");
 
@@ -378,28 +390,16 @@ fn download_cover_and_audio(
 
     ui::print_cover_status(cover_status);
 
-    // Download audio
-    let pb_audio = progress::create_audio_progress("Audio downloading");
+    // Download audio with real-time progress bar
     let temp_audio_path = output_dir.join("temp_audio.mp3");
     let temp_audio = TempFile::new(&temp_audio_path);
 
-    let audio_file = match downloader::download_audio(
+    let audio_file = download_audio_with_progress(
         url,
         temp_audio.path(),
         cookies_from_browser,
-        Some(pb_audio.clone()),
-    ) {
-        Ok(file) => {
-            pb_audio.finish_with_message("  ✓ Audio downloaded");
-            println!();
-            file
-        }
-        Err(e) => {
-            pb_audio.finish_and_clear();
-            ui::print_error(&format!("Failed to download audio: {}", e));
-            return Err(e);
-        }
-    };
+        None, // Progress bar will be created automatically
+    )?;
 
     // Charger l'image de couverture si elle existe
     let cover_data = if cover_downloaded {
@@ -422,32 +422,59 @@ fn download_cover_and_audio(
 /// 1. YouTube chapters
 /// 2. Description parsing
 /// 3. Silence detection
+///
+/// If chapters are found and `refine` is true, chapter markers are refined
+/// using silence detection for improved split accuracy.
 fn get_chapters_with_fallback(
     video_info: &downloader::VideoInfo,
     audio_file: &Path,
+    refine: bool,
 ) -> Result<Vec<youtube_chapter_splitter::chapters::Chapter>> {
     use youtube_chapter_splitter::ui;
 
-    if !video_info.chapters.is_empty() {
-        return Ok(video_info.chapters.clone());
-    }
+    let original_chapters = if !video_info.chapters.is_empty() {
+        video_info.chapters.clone()
+    } else {
+        ui::print_info("No chapters found in video metadata, checking description...");
+        match youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description(
+            &video_info.description,
+            video_info.duration,
+        ) {
+            Ok(chapters) => {
+                ui::print_info(&format!(
+                    "Found {} chapters in description!",
+                    chapters.len()
+                ));
+                chapters
+            }
+            Err(_) => {
+                ui::print_info("No chapters in description, detecting from silence...");
+                audio::detect_silence_chapters(audio_file, -30.0, 2.0)?
+            }
+        }
+    };
 
-    ui::print_info("No chapters found in video metadata, checking description...");
-    match youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description(
-        &video_info.description,
-        video_info.duration,
-    ) {
-        Ok(chapters) => {
-            ui::print_info(&format!(
-                "Found {} chapters in description!",
-                chapters.len()
-            ));
-            Ok(chapters)
+    // Affiner les chapitres avec la détection de silence si demandé
+    if refine && !original_chapters.is_empty() {
+        ui::print_info("Refining chapter markers with silence detection...");
+        match refine_chapters_with_silence(
+            &original_chapters,
+            audio_file,
+            5.0,   // fenêtre de ±5 secondes
+            -35.0, // seuil de silence en dB
+            1.0,   // durée minimale de silence en secondes
+        ) {
+            Ok(refined) => {
+                print_refinement_report(&original_chapters, &refined);
+                Ok(refined)
+            }
+            Err(e) => {
+                ui::print_warning(&format!("Chapter refinement failed: {}. Using original chapters.", e));
+                Ok(original_chapters)
+            }
         }
-        Err(_) => {
-            ui::print_info("No chapters in description, detecting from silence...");
-            audio::detect_silence_chapters(audio_file, -30.0, 2.0)
-        }
+    } else {
+        Ok(original_chapters)
     }
 }
 
@@ -553,7 +580,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     )?;
 
     // 5. Récupérer les chapitres avec fallback
-    let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file)?;
+    let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, cli.refine_chapters)?;
 
     // 6. Découper en pistes
     split_into_tracks(

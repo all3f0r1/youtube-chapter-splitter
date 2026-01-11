@@ -2,8 +2,8 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.14.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases) 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[![Version](https://img.shields.io/badge/version-0.14.5-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
 ---
@@ -17,26 +17,37 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.14.4
+ytcs v0.14.5
 
-Fetching video information...
 → Paradox - Chemical Love Theory
   21m 47s • 5 tracks
 
 Downloading the album...
-
   ✓ Cover downloaded
+  ⏓ [==============================>] 100% | 45.2MiB | 2.34MiB/s | ETA: 00:00
   ✓ Audio downloaded
 
+Refining chapter markers with silence detection...
+
+Chapter refinement report:
+      Title                           Original    → Refined    (Delta)
+----------------------------------------------------------------------
+1.   Light Years Apart                0.0s    →   0.0s      (—      )
+2.   Event Horizon                   250.0s   → 249.8s     (-0.2s  )
+3.   Orbit of Silence                294.5s   → 295.1s     (+0.6s  )
+4.   Chemical Love Theory             348.0s   → 347.9s     (-0.1s  )
+5.   Singularity Within               403.0s   → 403.0s     (—      )
+
+  Average adjustment: 0.09s | Max adjustment: 0.60s
+
 Splitting into the album...
+  ✓ 01 - Light Years Apart
+  ✓ 02 - Event Horizon
+  ✓ 03 - Orbit of Silence
+  ✓ 04 - Chemical Love Theory
+  ✓ 05 - Singularity Within
 
-  ✓ 01 - Paradox - Light Years Apart (4m 10s)
-  ✓ 02 - Paradox - Event Horizon (4m 54s)
-  ✓ 03 - Paradox - Orbit of Silence (3m 10s)
-  ✓ 04 - Paradox - Chemical Love Theory (4m 03s)
-  ✓ 05 - Paradox - Singularity Within (5m 30s)
-
-✓ Done → /home/alex/Musique/Paradox - Chemical Love Theory
+✓ Done → /home/alex/Music/Paradox - Chemical Love Theory
 ```
 
 ## Features
@@ -48,6 +59,8 @@ Splitting into the album...
   - Standard format: `00:00 - Track Title`
   - Numbered format: `1 - Track Title (0:00)`
 - **Silence Detection**: Fallback if the video has no chapters.
+- **Chapter Refinement**: Adjusts chapter markers using silence detection for precise splits (enabled by default).
+- **Real-time Progress**: Live download progress with percentage, speed, and ETA.
 - **Smart Artist Detection**: Uses channel name if artist not in title.
 - **Complete Metadata**: Title, artist, album, track number, cover art.
 - **Persistent Configuration**: `config.toml` file for your preferences.
@@ -55,7 +68,6 @@ Splitting into the album...
 - **Smart Cleanup**: Removes `[Full Album]`, `(Official Audio)`, etc.
 - **Playlist Support**: Interactive playlist handling.
 - **Robust Download**: 4-level fallback system for maximum reliability.
-- **Progress Bars**: Real-time progress indicators for downloads and processing.
 - **Direct URL Support**: Use `ytcs <URL>` without the `download` command.
 - **Dependency Verification**: `yt-dlp` and `ffmpeg` are checked at startup.
 - **Structured Logging**: Debug mode with `RUST_LOG` environment variable.
@@ -156,6 +168,8 @@ ytcs download "https://www.youtube.com/watch?v=..."
 - `-a, --artist <ARTIST>`: Force the artist name.
 - `-A, --album <ALBUM>`: Force the album name.
 - `--no-cover`: Disable cover art download.
+- `--refine-chapters`: Enable chapter refinement with silence detection (default: true).
+- `--no-refine-chapters`: Disable chapter refinement.
 
 **Examples:**
 
@@ -171,6 +185,9 @@ ytcs -a "Pink Floyd" -A "The Wall" "https://youtube.com/..."
 
 # Skip cover art
 ytcs --no-cover "https://youtube.com/..."
+
+# Disable chapter refinement (faster, less precise splits)
+ytcs --no-refine-chapters "https://youtube.com/..."
 ```
 
 ### Debugging with Logs
@@ -265,6 +282,13 @@ This ensures downloads work even when YouTube's signature system has issues.
 See [CHANGELOG.md](CHANGELOG.md) for the complete changelog.
 
 ### Recent Updates
+
+**[0.14.5] - 2025-01-11**
+- **Added:** Real-time download progress with percentage, speed, and ETA
+- **Added:** Chapter refinement using silence detection for precise split points
+- **Added:** `--refine-chapters` flag to enable/disable refinement (enabled by default)
+- **Added:** Chapter refinement report showing original vs refined timestamps
+- **Improved:** Download progress bar shows actual progress from yt-dlp output
 
 **[0.14.4] - 2024-12-03**
 - **Fixed:** Artist detection for titles with stuck dashes (e.g., "Mammoth- Solar Crown Of Fire")
