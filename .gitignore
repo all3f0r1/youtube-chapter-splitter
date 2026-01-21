@@ -26,3 +26,7 @@ Thumbs.db
 # Temporary files
 temp_*
 .tmp/
+
+_bmad
+_bmad-output
+docs
