@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.6] - 2025-01-21
+
+### Fixed
+- **Cookie Fallback**: Automatic retry without cookies when expired/invalid cookies cause HTTP 403/401 errors
+- Previously, expired cookies would cause the download to fail; now the tool automatically falls back to no cookies
+- User-friendly warning message displayed when cookie fallback is triggered
+
+### Technical Details
+- Added `is_cookie_related_error()` function to detect cookie-related errors (HTTP 403, 401, "forbidden", "unauthorized", "invalid cookies", "cookies have expired")
+- Refactored `get_video_info()` and `download_audio()` to use internal implementations with a `with_cookies` parameter
+- Automatic fallback: try with cookies first, then retry without cookies on cookie-related errors
+- Code formatting improvements for clippy compliance
+
 ## [0.14.5] - 2024-12-17
 
 ### Fixed
