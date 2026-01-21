@@ -3,8 +3,8 @@ use colored::Colorize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
-    audio, config, downloader, playlist, utils, print_refinement_report, refine_chapters_with_silence,
-    download_audio_with_progress, Result,
+    audio, config, download_audio_with_progress, downloader, playlist, print_refinement_report,
+    refine_chapters_with_silence, utils, Result,
 };
 
 #[derive(Parser)]
@@ -469,7 +469,10 @@ fn get_chapters_with_fallback(
                 Ok(refined)
             }
             Err(e) => {
-                ui::print_warning(&format!("Chapter refinement failed: {}. Using original chapters.", e));
+                ui::print_warning(&format!(
+                    "Chapter refinement failed: {}. Using original chapters.",
+                    e
+                ));
                 Ok(original_chapters)
             }
         }
@@ -580,7 +583,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     )?;
 
     // 5. Récupérer les chapitres avec fallback
-    let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, cli.refine_chapters)?;
+    let chapters =
+        get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, cli.refine_chapters)?;
 
     // 6. Découper en pistes
     split_into_tracks(

@@ -200,7 +200,11 @@ fn is_cookie_related_error(stderr: &str) -> bool {
 }
 
 /// Try to get video info, automatically retrying without cookies if cookie-related error occurs.
-fn get_video_info_impl(url: &str, cookies_from_browser: Option<&str>, with_cookies: bool) -> Result<VideoInfo> {
+fn get_video_info_impl(
+    url: &str,
+    cookies_from_browser: Option<&str>,
+    with_cookies: bool,
+) -> Result<VideoInfo> {
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--dump-json").arg("--no-playlist");
 
@@ -295,7 +299,10 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
         Ok(info) => Ok(info),
         Err(YtcsError::DownloadError(e)) if is_cookie_related_error(&e) => {
             // Cookie-related error, retry without cookies
-            eprintln!("{}", "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow());
+            eprintln!(
+                "{}",
+                "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow()
+            );
             get_video_info_impl(url, cookies_from_browser, false)
         }
         Err(e) => Err(e),
@@ -310,7 +317,11 @@ fn download_audio_impl(
     pb: Option<ProgressBar>,
     with_cookies: bool,
 ) -> Result<PathBuf> {
-    log::info!("Starting audio download from: {} (with_cookies: {})", url, with_cookies);
+    log::info!(
+        "Starting audio download from: {} (with_cookies: {})",
+        url,
+        with_cookies
+    );
     log::debug!("Output path: {:?}", output_path);
 
     let progress_bar = pb.unwrap_or_else(|| {
@@ -463,7 +474,10 @@ pub fn download_audio(
         Ok(path) => Ok(path),
         Err(YtcsError::DownloadError(e)) if is_cookie_related_error(&e) => {
             // Cookie-related error, retry without cookies
-            eprintln!("{}", "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow());
+            eprintln!(
+                "{}",
+                "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow()
+            );
             download_audio_impl(url, output_path, cookies_from_browser, pb, false)
         }
         Err(e) => Err(e),

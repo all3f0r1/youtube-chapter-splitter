@@ -121,14 +121,20 @@ fn detect_all_silences(
 /// * `silences` - Liste des points de silence
 /// * `target` - Position cible en secondes
 /// * `window` - Fenêtre de recherche en secondes (ex: 5.0 = ±5s)
-fn find_nearest_silence(silences: &[SilencePoint], target: f64, window: f64) -> Option<&SilencePoint> {
+fn find_nearest_silence(
+    silences: &[SilencePoint],
+    target: f64,
+    window: f64,
+) -> Option<&SilencePoint> {
     silences
         .iter()
         .filter(|s| (s.position - target).abs() <= window)
         .min_by(|a, b| {
             let dist_a = (a.position - target).abs();
             let dist_b = (b.position - target).abs();
-            dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            dist_a
+                .partial_cmp(&dist_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
 }
 
@@ -180,11 +186,15 @@ pub fn refine_chapters_with_silence(
         let new_start = if i == 0 {
             // Première piste : garder le début ou chercher avant
             let before = find_nearest_silence(&silences, chapter.start_time, window);
-            before.map(|s| s.position).filter(|&pos| pos <= chapter.start_time + 0.5)
+            before
+                .map(|s| s.position)
+                .filter(|&pos| pos <= chapter.start_time + 0.5)
         } else {
             // Pistes suivantes : chercher après le timecode
             let after = find_nearest_silence(&silences, chapter.start_time, window);
-            after.map(|s| s.position).filter(|&pos| pos >= chapter.start_time - 0.5)
+            after
+                .map(|s| s.position)
+                .filter(|&pos| pos >= chapter.start_time - 0.5)
         };
 
         let new_end = if is_last {
@@ -249,7 +259,10 @@ pub fn print_refinement_report(original: &[Chapter], refined: &[Chapter]) {
 
     println!();
     println!("{}", "Chapter refinement report:".dimmed());
-    println!("{:<5} {:<30} {:>12} → {:>12} ({:>8})", "", "Title", "Original", "Refined", "Delta");
+    println!(
+        "{:<5} {:<30} {:>12} → {:>12} ({:>8})",
+        "", "Title", "Original", "Refined", "Delta"
+    );
     println!("{}", "-".repeat(70).dimmed());
 
     for (i, (orig, refn)) in original.iter().zip(refined.iter()).enumerate() {
@@ -293,15 +306,12 @@ pub fn print_refinement_report(original: &[Chapter], refined: &[Chapter]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
 
     /// Crée un fichier audio de test avec des silences artificiels.
     /// Note: nécessite ffmpeg dans le PATH.
     #[test]
     #[ignore] // Ignoré par défaut car lent et nécessite ffmpeg
     fn test_refine_chapters() {
-        use std::fs::File;
-
         // Créer un fichier audio de test avec silence
         // Ce test est principalement documentatif
         let test_audio = std::path::PathBuf::from("/tmp/test_silence.mp3");
@@ -319,20 +329,19 @@ mod tests {
     }
 
     #[test]
-    fn test_silence_point_confidence() {
+    fn test_silence_point_position() {
         let s1 = SilencePoint::new(10.0, 11.0);
         let s2 = SilencePoint::new(10.0, 14.0);
 
-        // Un silence plus long a une confiance plus élevée
-        assert!(s2.confidence > s1.confidence);
-        assert_eq!(s1.confidence, 0.2); // 1s / 5s
-        assert_eq!(s2.confidence, 0.8); // 4s / 5s
+        // La position est le point médian du silence
+        assert_eq!(s1.position, 10.5); // (10 + 11) / 2
+        assert_eq!(s2.position, 12.0); // (10 + 14) / 2
     }
 
     #[test]
     fn test_find_nearest_silence() {
         let silences = vec![
-            SilencePoint::new(0.0, 1.0),    // position: 0.5
+            SilencePoint::new(0.0, 1.0),   // position: 0.5
             SilencePoint::new(9.5, 10.5),  // position: 10.0
             SilencePoint::new(19.0, 20.0), // position: 19.5
         ];
