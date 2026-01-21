@@ -7,6 +7,7 @@ use crate::chapters::{parse_chapters_from_json, Chapter};
 use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
 use crate::ytdlp_error_parser;
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use std::path::{Path, PathBuf};
@@ -186,27 +187,26 @@ pub fn extract_video_id(url: &str) -> Result<String> {
     )))
 }
 
-/// Retrieves information from a YouTube video.
-///
-/// Uses `yt-dlp` to extract video metadata.
-///
-/// # Arguments
-///
-/// * `url` - L'URL de la vidéo YouTube
-///
-/// # Returns
-///
-/// Les informations de la vidéo (titre, durée, chapitres, ID)
-///
-/// # Errors
-///
-/// Returns an error if yt-dlp échoue ou si les métadonnées sont invalides
-pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
+/// Check if an error is likely caused by expired/invalid cookies.
+fn is_cookie_related_error(stderr: &str) -> bool {
+    let error_lower = stderr.to_lowercase();
+    // HTTP 403 Forbidden, 401 Unauthorized, or explicit cookie/auth errors
+    error_lower.contains("http error 403")
+        || error_lower.contains("http error 401")
+        || error_lower.contains("forbidden")
+        || error_lower.contains(" unauthorized")
+        || error_lower.contains("invalid cookies")
+        || error_lower.contains("cookies have expired")
+}
+
+/// Try to get video info, automatically retrying without cookies if cookie-related error occurs.
+fn get_video_info_impl(url: &str, cookies_from_browser: Option<&str>, with_cookies: bool) -> Result<VideoInfo> {
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--dump-json").arg("--no-playlist");
 
-    // Add cookie arguments
-    cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+    if with_cookies {
+        cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+    }
 
     let output = cmd
         .arg(url)
@@ -266,6 +266,142 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
     })
 }
 
+/// Retrieves information from a YouTube video.
+///
+/// Uses `yt-dlp` to extract video metadata. Automatically falls back to no cookies
+/// if cookies are expired/invalid (HTTP 403/401 errors).
+///
+/// # Arguments
+///
+/// * `url` - L'URL de la vidéo YouTube
+///
+/// # Returns
+///
+/// Les informations de la vidéo (titre, durée, chapitres, ID)
+///
+/// # Errors
+///
+/// Returns an error if yt-dlp échoue ou si les métadonnées sont invalides
+pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
+    // Check if we have cookies available
+    let has_cookies = cookie_helper::cookies_available(cookies_from_browser);
+
+    if !has_cookies {
+        return get_video_info_impl(url, cookies_from_browser, false);
+    }
+
+    // Try with cookies first
+    match get_video_info_impl(url, cookies_from_browser, true) {
+        Ok(info) => Ok(info),
+        Err(YtcsError::DownloadError(e)) if is_cookie_related_error(&e) => {
+            // Cookie-related error, retry without cookies
+            eprintln!("{}", "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow());
+            get_video_info_impl(url, cookies_from_browser, false)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Internal implementation for audio download with specific cookie setting.
+fn download_audio_impl(
+    url: &str,
+    output_path: &Path,
+    cookies_from_browser: Option<&str>,
+    pb: Option<ProgressBar>,
+    with_cookies: bool,
+) -> Result<PathBuf> {
+    log::info!("Starting audio download from: {} (with_cookies: {})", url, with_cookies);
+    log::debug!("Output path: {:?}", output_path);
+
+    let progress_bar = pb.unwrap_or_else(|| {
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap(),
+        );
+        pb.set_message("Downloading audio from YouTube...");
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        pb
+    });
+
+    const FORMAT_SELECTORS: &[Option<&str>] = &[
+        Some("bestaudio[ext=m4a]/bestaudio"),
+        Some("140"),
+        Some("bestaudio"),
+        None,
+    ];
+
+    #[allow(unused_assignments)]
+    let mut last_error: Option<String> = None;
+
+    for (i, format) in FORMAT_SELECTORS.iter().enumerate() {
+        log::debug!("Trying format selector #{}: {:?}", i + 1, format);
+        let mut cmd = Command::new("yt-dlp");
+
+        if let Some(fmt) = format {
+            cmd.arg("-f").arg(fmt);
+        }
+
+        cmd.arg("-x")
+            .arg("--audio-format")
+            .arg("mp3")
+            .arg("--audio-quality")
+            .arg("0")
+            .arg("-o")
+            .arg(output_path.to_str().unwrap())
+            .arg("--no-playlist");
+
+        if with_cookies {
+            cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+        }
+
+        let output = cmd
+            .arg(url)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
+
+        if output.status.success() {
+            log::info!("Audio download successful with format selector #{}", i + 1);
+            progress_bar.finish_and_clear();
+            break;
+        } else {
+            let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+            log::debug!(
+                "Format selector #{} failed: {}",
+                i + 1,
+                error_msg.lines().next().unwrap_or("Unknown error")
+            );
+
+            if i < FORMAT_SELECTORS.len() - 1 {
+                progress_bar.set_message(format!(
+                    "Audio downloading (option {}/{} failed)",
+                    i + 1,
+                    FORMAT_SELECTORS.len()
+                ));
+            }
+
+            last_error = Some(error_msg);
+            if i < FORMAT_SELECTORS.len() - 1 {
+                continue;
+            } else {
+                progress_bar.finish_and_clear();
+                return Err(YtcsError::DownloadError(format!(
+                    "yt-dlp failed with all format selectors. Last error: {}",
+                    last_error.unwrap_or_else(|| "Unknown error".to_string())
+                )));
+            }
+        }
+    }
+
+    let mut final_path = output_path.to_path_buf();
+    final_path.set_extension("mp3");
+
+    Ok(final_path)
+}
+
 /// Télécharge l'audio d'une vidéo YouTube en format MP3.
 ///
 /// This function uses `yt-dlp` avec une stratégie de fallback à 4 niveaux
@@ -274,6 +410,8 @@ pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<V
 /// 2. `140` - Format M4A standard de YouTube (très fiable)
 /// 3. `bestaudio` - Sélecteur audio générique
 /// 4. Auto-sélection - Laisse yt-dlp choisir automatiquement
+///
+/// Automatically falls back to no cookies if cookies are expired/invalid (HTTP 403/401 errors).
 ///
 /// # Arguments
 ///
@@ -314,106 +452,22 @@ pub fn download_audio(
     cookies_from_browser: Option<&str>,
     pb: Option<ProgressBar>,
 ) -> Result<PathBuf> {
-    log::info!("Starting audio download from: {}", url);
-    log::debug!("Output path: {:?}", output_path);
+    let has_cookies = cookie_helper::cookies_available(cookies_from_browser);
 
-    let progress_bar = pb.unwrap_or_else(|| {
-        let pb = ProgressBar::new_spinner();
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.green} {msg}")
-                .unwrap(),
-        );
-        pb.set_message("Downloading audio from YouTube...");
-        pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        pb
-    });
-
-    // Try multiple format selectors with fallback
-    // Format selection fallback strategy:
-    // 1. bestaudio[ext=m4a]/bestaudio - Best quality M4A audio (preferred)
-    // 2. 140 - YouTube's standard M4A format (very reliable)
-    // 3. bestaudio - Generic best audio selector
-    // 4. None - Auto-selection (let yt-dlp choose automatically)
-    const FORMAT_SELECTORS: &[Option<&str>] = &[
-        Some("bestaudio[ext=m4a]/bestaudio"),
-        Some("140"),
-        Some("bestaudio"),
-        None,
-    ];
-
-    #[allow(unused_assignments)]
-    let mut last_error: Option<String> = None;
-
-    for (i, format) in FORMAT_SELECTORS.iter().enumerate() {
-        log::debug!("Trying format selector #{}: {:?}", i + 1, format);
-        let mut cmd = Command::new("yt-dlp");
-
-        // Only add format selector if specified
-        if let Some(fmt) = format {
-            cmd.arg("-f").arg(fmt);
-        }
-
-        cmd.arg("-x")
-            .arg("--audio-format")
-            .arg("mp3")
-            .arg("--audio-quality")
-            .arg("0")
-            .arg("-o")
-            .arg(output_path.to_str().unwrap())
-            .arg("--no-playlist");
-
-        // Add cookie arguments
-        cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
-
-        let output = cmd
-            .arg(url)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| YtcsError::DownloadError(format!("Download failed: {}", e)))?;
-
-        if output.status.success() {
-            log::info!("Audio download successful with format selector #{}", i + 1);
-            progress_bar.finish_and_clear();
-            break;
-        } else {
-            let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
-            log::debug!(
-                "Format selector #{} failed: {}",
-                i + 1,
-                error_msg.lines().next().unwrap_or("Unknown error")
-            );
-
-            // Show minimal fallback message on progress bar
-            if i < FORMAT_SELECTORS.len() - 1 {
-                progress_bar.set_message(format!(
-                    "Audio downloading (option {}/{} failed)",
-                    i + 1,
-                    FORMAT_SELECTORS.len()
-                ));
-            }
-
-            last_error = Some(error_msg);
-            // If this is not the last format, try the next one
-            if i < FORMAT_SELECTORS.len() - 1 {
-                continue;
-            } else {
-                // All formats failed, return error
-                progress_bar.finish_and_clear();
-                return Err(YtcsError::DownloadError(format!(
-                    "yt-dlp failed with all format selectors. Last error: {}",
-                    last_error.unwrap_or_else(|| "Unknown error".to_string())
-                )));
-            }
-        }
+    if !has_cookies {
+        return download_audio_impl(url, output_path, cookies_from_browser, pb, false);
     }
 
-    // yt-dlp adds .mp3 automatically
-    let mut final_path = output_path.to_path_buf();
-    final_path.set_extension("mp3");
-
-    Ok(final_path)
+    // Try with cookies first
+    match download_audio_impl(url, output_path, cookies_from_browser, pb.clone(), true) {
+        Ok(path) => Ok(path),
+        Err(YtcsError::DownloadError(e)) if is_cookie_related_error(&e) => {
+            // Cookie-related error, retry without cookies
+            eprintln!("{}", "WARNING: Cookies failed (expired/invalid). Retrying without cookies...".yellow());
+            download_audio_impl(url, output_path, cookies_from_browser, pb, false)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Télécharge la miniature d'une vidéo YouTube.

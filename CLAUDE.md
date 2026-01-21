@@ -54,10 +54,29 @@ The `process_single_url` function was refactored from 240+ lines to ~60 lines us
 - **`audio.rs`** - Uses `ffmpeg` for splitting audio and `lofty` for ID3 metadata/cover art embedding. Handles WebP→JPEG conversion for thumbnails.
 - **`chapters.rs`** - Core `Chapter` struct with `start_time`, `end_time`, `title`. Parses JSON chapters from yt-dlp.
 - **`chapters_from_description.rs`** - Parses chapter timestamps from video descriptions (multiple formats: "00:00 - Title", "1. Title (0:00)")
+- **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection for precise split points. Uses ffmpeg's silencedetect to find optimal boundaries within ±5 second windows.
 - **`config.rs`** - TOML-based persistent config at `~/.config/ytcs/config.toml`. Supports format strings like `%n` (track number), `%t` (title), `%a` (artist), `%A` (album).
 - **`error.rs`** - `YtcsError` enum covering all error types with `thiserror`.
 - **`temp_file.rs`** - RAII wrapper for automatic cleanup of temporary files.
 - **`cookie_helper.rs`** - YouTube authentication via browser cookies (for member-only/private videos).
+- **`playlist.rs`** - Playlist URL detection and video enumeration.
+- **`ui.rs`** - Minimalist TUI with "Pragmatic • Direct • Classy" design philosophy.
+- **`progress.rs`** - Progress bar utilities using `indicatif`.
+- **`yt_dlp_progress.rs`** - Real-time download progress parsing from yt-dlp stderr output.
+- **`ytdlp_error_parser.rs`** - Parses yt-dlp error messages for user-friendly reporting.
+
+### RAII Pattern for Temporary Files
+
+`temp_file.rs` implements a RAII (Resource Acquisition Is Initialization) wrapper for temporary files:
+
+```rust
+let temp = TempFile::new(&path);
+// ... use the file ...
+// File is automatically deleted when `temp` goes out of scope
+temp.keep(); // Optional: prevent deletion
+```
+
+This pattern is used throughout the codebase for audio files and cover art.
 
 ### External Dependencies
 
@@ -67,6 +86,7 @@ The `process_single_url` function was refactored from 240+ lines to ~60 lines us
 - **clap** - CLI argument parsing
 - **regex** - Chapter/description parsing
 - **indicatif** - Progress bars
+- **colored** - Terminal color output
 
 ### Testing
 
