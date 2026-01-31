@@ -62,6 +62,7 @@ pub mod ui;
 pub mod utils;
 pub mod yt_dlp_progress;
 pub mod ytdlp_error_parser;
+pub mod ytdlp_helper;
 
 pub use chapter_refinement::{print_refinement_report, refine_chapters_with_silence};
 pub use chapters::Chapter;

@@ -5,11 +5,14 @@
 //! [download]  45.0% of  ~120.00MiB at  1.23MiB/s ETA 01:23
 
 use crate::error::{Result, YtcsError};
+use crate::ytdlp_helper;
+use colored::Colorize;
 use indicatif::ProgressBar;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -136,6 +139,7 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
 /// Télécharge l'audio avec une barre de progression en temps réel.
 ///
 /// Cette fonction lit stderr de yt-dlp en continu pour afficher la progression.
+/// En cas d'erreur, propose de mettre à jour yt-dlp si nécessaire.
 ///
 /// # Arguments
 ///
@@ -151,7 +155,7 @@ pub fn download_audio_with_progress(
 ) -> Result<std::path::PathBuf> {
     use indicatif::ProgressStyle;
 
-    let progress_bar = pb.unwrap_or_else(|| {
+    let mut progress_bar = pb.unwrap_or_else(|| {
         let pb = ProgressBar::new(100);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -164,6 +168,96 @@ pub fn download_audio_with_progress(
         pb
     });
 
+    // Try downloading, with auto-update retry on failure
+    let mut attempts = 0;
+    const MAX_ATTEMPTS: usize = 2; // Initial try + one retry after update
+
+    loop {
+        attempts += 1;
+
+        let result = download_audio_with_progress_impl(
+            url,
+            output_path,
+            cookies_from_browser,
+            &progress_bar,
+        );
+
+        match result {
+            Ok(path) => {
+                progress_bar.finish_with_message("  ✓ Audio downloaded");
+                println!();
+                return Ok(path);
+            }
+            Err(YtcsError::DownloadError(ref e)) if attempts < MAX_ATTEMPTS => {
+                // Check if error is due to outdated yt-dlp
+                if ytdlp_helper::is_outdated_error(e) {
+                    progress_bar.abandon();
+
+                    println!();
+                    println!(
+                        "{}",
+                        "Download failed - this may be due to an outdated yt-dlp version."
+                            .red()
+                            .bold()
+                    );
+
+                    match ytdlp_helper::prompt_and_update_ytdlp() {
+                        Ok(true) => {
+                            // Update successful, retry download
+                            println!();
+                            println!("{}", "Retrying download with updated yt-dlp...".cyan());
+                            println!();
+
+                            // Recreate progress bar after abandon
+                            let new_pb = ProgressBar::new(100);
+                            new_pb.set_style(
+                                ProgressStyle::default_bar()
+                                    .template("{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}")
+                                    .unwrap()
+                                    .progress_chars("=> "),
+                            );
+                            new_pb.set_message("Downloading audio...");
+                            new_pb.enable_steady_tick(Duration::from_millis(100));
+
+                            // Swap the progress bar reference
+                            drop(std::mem::replace(&mut progress_bar, new_pb));
+
+                            continue;
+                        }
+                        Ok(false) => {
+                            // User declined update
+                            return Err(YtcsError::DownloadError(e.clone()));
+                        }
+                        Err(update_err) => {
+                            // Update failed
+                            println!();
+                            println!(
+                                "{}",
+                                format!("Update failed: {}. Original error: {}", update_err, e).red()
+                            );
+                            return Err(YtcsError::DownloadError(e.clone()));
+                        }
+                    }
+                } else {
+                    // Not an outdated version error, return the original error
+                    return Err(YtcsError::DownloadError(e.clone()));
+                }
+            }
+            Err(e) => {
+                progress_bar.abandon();
+                return Err(e);
+            }
+        }
+    }
+}
+
+/// Implementation of the download function with progress tracking.
+fn download_audio_with_progress_impl(
+    url: &str,
+    output_path: &std::path::Path,
+    cookies_from_browser: Option<&str>,
+    progress_bar: &ProgressBar,
+) -> Result<std::path::PathBuf> {
     // Fallback strategy pour les formats
     const FORMAT_SELECTORS: &[Option<&str>] = &[
         Some("bestaudio[ext=m4a]/bestaudio"),
@@ -182,18 +276,16 @@ pub fn download_audio_with_progress(
             output_path,
             cookies_from_browser,
             *format,
-            &progress_bar,
+            progress_bar,
         );
 
         match result {
             Ok(path) => {
-                progress_bar.finish_with_message("  ✓ Audio downloaded");
-                println!();
                 return Ok(path);
             }
             Err(e) => {
                 log::debug!("Format selector #{} failed: {}", attempt + 1, e);
-                last_error = Some(e.to_string());
+                last_error = Some(e);
 
                 progress_bar.set_length(100);
                 progress_bar.set_position(0);
@@ -209,11 +301,14 @@ pub fn download_audio_with_progress(
         }
     }
 
-    progress_bar.abandon();
-    Err(YtcsError::DownloadError(format!(
-        "All format selectors failed. Last error: {}",
-        last_error.unwrap_or_default()
-    )))
+    // Return the last error with full stderr content
+    if let Some(err) = last_error {
+        Err(err)
+    } else {
+        Err(YtcsError::DownloadError(
+            "All format selectors failed".to_string(),
+        ))
+    }
 }
 
 /// Tente le téléchargement avec un sélecteur de format spécifique.
@@ -255,8 +350,12 @@ fn try_download_with_format(
         .take()
         .ok_or_else(|| YtcsError::DownloadError("No stderr stream".to_string()))?;
 
+    // Shared buffer to capture stderr for error reporting
+    let stderr_buffer = Arc::new(Mutex::new(String::new()));
+
     // Thread pour lire stderr en continu et mettre à jour la progress bar
     let pb = progress_bar.clone();
+    let stderr_clone = Arc::clone(&stderr_buffer);
     let handle = thread::spawn(move || {
         let mut stderr = stderr;
         let mut buffer = [0; 8192];
@@ -268,6 +367,11 @@ fn try_download_with_format(
                 Ok(0) => break, // EOF
                 Ok(n) => {
                     let chunk = String::from_utf8_lossy(&buffer[..n]);
+                    // Also store in buffer for error reporting
+                    if let Ok(mut buf) = stderr_clone.lock() {
+                        buf.push_str(&chunk);
+                    }
+
                     for c in chunk.chars() {
                         if c == '\n' || c == '\r' {
                             if !partial_line.is_empty() {
@@ -308,14 +412,55 @@ fn try_download_with_format(
     handle.join().ok();
 
     if !status.success() {
-        return Err(YtcsError::DownloadError(
-            "yt-dlp process failed".to_string(),
-        ));
+        // Get the stderr content for better error reporting
+        let stderr_content = stderr_buffer.lock().unwrap_or_else(|e| e.into_inner());
+
+        // Extract meaningful error message from stderr
+        let error_msg = extract_error_message(&stderr_content);
+
+        return Err(YtcsError::DownloadError(error_msg));
     }
 
     let mut final_path = output_path.to_path_buf();
     final_path.set_extension("mp3");
     Ok(final_path)
+}
+
+/// Extracts a meaningful error message from yt-dlp stderr.
+fn extract_error_message(stderr: &str) -> String {
+    // Look for specific error patterns
+    for line in stderr.lines() {
+        let line_lower = line.to_lowercase();
+
+        // HTTP errors
+        if line_lower.contains("http error") {
+            if let Some(rest) = line.strip_prefix("ERROR: ") {
+                return rest.to_string();
+            }
+            return line.trim().to_string();
+        }
+
+        // Generic ERROR: lines
+        if line.starts_with("ERROR: ") {
+            return line.trim().to_string();
+        }
+    }
+
+    // If no specific error found, check for version warning
+    if stderr.to_lowercase().contains("older than 90 days") {
+        return "yt-dlp is outdated (older than 90 days). YouTube may be blocking downloads.".to_string();
+    }
+
+    // Fallback to a generic message with a hint
+    if stderr.len() > 200 {
+        // Truncate very long stderr
+        format!(
+            "yt-dlp failed. Last error: {}...",
+            &stderr[stderr.len().saturating_sub(200)..].trim()
+        )
+    } else {
+        format!("yt-dlp failed: {}", stderr.trim())
+    }
 }
 
 #[cfg(test)]
@@ -352,5 +497,20 @@ mod tests {
     fn test_ignore_non_download_lines() {
         assert!(parse_download_line("[info] Downloading video").is_none());
         assert!(parse_download_line("[debug] Some debug info").is_none());
+    }
+
+    #[test]
+    fn test_extract_error_message() {
+        let stderr = "WARNING: Some warning\nERROR: unable to download video data: HTTP Error 403: Forbidden\n";
+        let msg = extract_error_message(stderr);
+        assert!(msg.contains("403"));
+        assert!(msg.contains("Forbidden"));
+    }
+
+    #[test]
+    fn test_extract_error_message_outdated() {
+        let stderr = "WARNING: Your yt-dlp version is older than 90 days\nERROR: download failed\n";
+        let msg = extract_error_message(stderr);
+        assert!(msg.contains("outdated"));
     }
 }
