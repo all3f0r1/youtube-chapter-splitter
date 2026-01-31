@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.6] - 2025-01-21
+## [0.14.6] - 2025-01-31
+
+### Added
+- **yt-dlp Auto-Update**: Automatic detection and update of outdated yt-dlp when download fails
+- When yt-dlp is outdated (>90 days) and download fails with HTTP 403 errors, the tool now offers to update yt-dlp automatically and retry the download
+- Captures stderr from yt-dlp for better error messages
+- Added version detection to check if yt-dlp is outdated
 
 ### Fixed
 - **Cookie Fallback**: Automatic retry without cookies when expired/invalid cookies cause HTTP 403/401 errors
@@ -13,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-friendly warning message displayed when cookie fallback is triggered
 
 ### Technical Details
+- Added `ytdlp_helper` module with version detection and auto-update functionality
+- Added `is_outdated_error()` to detect if download failure is due to outdated yt-dlp
+- Added `extract_error_message()` to parse meaningful error messages from yt-dlp stderr
+- Modified `try_download_with_format()` to capture stderr in shared buffer for error reporting
 - Added `is_cookie_related_error()` function to detect cookie-related errors (HTTP 403, 401, "forbidden", "unauthorized", "invalid cookies", "cookies have expired")
 - Refactored `get_video_info()` and `download_audio()` to use internal implementations with a `with_cookies` parameter
 - Automatic fallback: try with cookies first, then retry without cookies on cookie-related errors
