@@ -63,7 +63,7 @@ pub fn capitalize_words(s: &str) -> String {
 /// - Retire tout le contenu après `[FULL ALBUM]` ou `(FULL ALBUM)` (insensible à la casse)
 /// - Supprime les tags de genre musical (ex: "70s Psychedelic • Progressive Rock")
 /// - Supprime tous les crochets `[]` et parenthèses `()` avec leur contenu
-/// - Remplace les underscores `_`, pipes `|` et slashes `/` par des tirets `-`
+/// - Remplace les caractères interdits par Windows (`:*<>?"|/\`) par des tirets `-`
 /// - Normalise les espaces multiples en un seul espace
 /// - Capitalise chaque mot (première lettre en majuscule, reste en minuscule)
 /// - Supprime les espaces et tirets en début/fin de chaîne
@@ -94,8 +94,9 @@ pub fn clean_folder_name(name: &str) -> String {
     // Retirer les [] et () avec leur contenu restants
     let cleaned = RE_BRACKETS.replace_all(&without_genre, "");
 
-    // Remplacer les underscores, pipes et slashes par des tirets
-    let with_dashes = cleaned.replace(['_', '|', '/'], "-");
+    // Remplacer les caractères interdits par Windows (: * < > ? " / \ |) par des tirets
+    let with_dashes = cleaned
+        .replace([':', '*', '<', '>', '?', '"', '/', '\\', '|', '_'], "-");
 
     // Nettoyer les espaces multiples
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");
@@ -334,6 +335,20 @@ mod tests {
                 "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
             ),
             "Purple Dreams - Wandering Shadows"
+        );
+
+        // Test Windows forbidden characters: : * < > ? " | / \
+        // Note: Spaces are normalized after replacement, so "Artist-" becomes "Artist-"
+        assert_eq!(
+            clean_folder_name("Artist: Album* <Test> |/\\"),
+            "Artist- Album- -test-"
+        );
+
+        // Issue #4: Test with various problematic characters
+        // Note: Parentheses content is removed by RE_BRACKETS first
+        assert_eq!(
+            clean_folder_name("Artist Name? \"Album Title\" (Video: 1080p)"),
+            "Artist Name- -album Title"
         );
     }
 
