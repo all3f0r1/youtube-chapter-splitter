@@ -212,7 +212,9 @@ pub fn download_audio_with_progress(
                             let new_pb = ProgressBar::new(100);
                             new_pb.set_style(
                                 ProgressStyle::default_bar()
-                                    .template("{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}")
+                                    .template(
+                                        "{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}",
+                                    )
                                     .unwrap()
                                     .progress_chars("=> "),
                             );
@@ -233,7 +235,8 @@ pub fn download_audio_with_progress(
                             println!();
                             println!(
                                 "{}",
-                                format!("Update failed: {}. Original error: {}", update_err, e).red()
+                                format!("Update failed: {}. Original error: {}", update_err, e)
+                                    .red()
                             );
                             return Err(YtcsError::DownloadError(e.clone()));
                         }
@@ -448,7 +451,8 @@ fn extract_error_message(stderr: &str) -> String {
 
     // If no specific error found, check for version warning
     if stderr.to_lowercase().contains("older than 90 days") {
-        return "yt-dlp is outdated (older than 90 days). YouTube may be blocking downloads.".to_string();
+        return "yt-dlp is outdated (older than 90 days). YouTube may be blocking downloads."
+            .to_string();
     }
 
     // Fallback to a generic message with a hint
@@ -509,7 +513,8 @@ mod tests {
 
     #[test]
     fn test_extract_error_message_outdated() {
-        let stderr = "WARNING: Your yt-dlp version is older than 90 days\nERROR: download failed\n";
+        // No ERROR line, so version warning should be detected
+        let stderr = "WARNING: Your yt-dlp version is older than 90 days\nSome other output\n";
         let msg = extract_error_message(stderr);
         assert!(msg.contains("outdated"));
     }

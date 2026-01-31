@@ -105,14 +105,15 @@ mod tests {
 
     #[test]
     fn test_temp_file_auto_cleanup() {
-        let path = Path::new("/tmp/test_temp_file_auto_cleanup.txt");
+        let temp_dir = std::env::temp_dir();
+        let path = temp_dir.join("test_temp_file_auto_cleanup.txt");
 
         // Create the file
-        File::create(path).unwrap();
+        File::create(&path).unwrap();
         assert!(path.exists());
 
         {
-            let _temp = TempFile::new(path);
+            let _temp = TempFile::new(&path);
             assert!(path.exists());
         } // temp is dropped here
 
@@ -122,14 +123,15 @@ mod tests {
 
     #[test]
     fn test_temp_file_keep() {
-        let path = Path::new("/tmp/test_temp_file_keep.txt");
+        let temp_dir = std::env::temp_dir();
+        let path = temp_dir.join("test_temp_file_keep.txt");
 
         // Create the file
-        File::create(path).unwrap();
+        File::create(&path).unwrap();
         assert!(path.exists());
 
         {
-            let mut temp = TempFile::new(path);
+            let mut temp = TempFile::new(&path);
             temp.keep();
         } // temp is dropped here
 
@@ -142,15 +144,16 @@ mod tests {
 
     #[test]
     fn test_temp_file_non_existent() {
-        let path = Path::new("/tmp/test_temp_file_non_existent.txt");
+        let temp_dir = std::env::temp_dir();
+        let path = temp_dir.join("test_temp_file_non_existent.txt");
 
         // Make sure file doesn't exist
         if path.exists() {
-            fs::remove_file(path).unwrap();
+            fs::remove_file(&path).unwrap();
         }
 
         {
-            let _temp = TempFile::new(path);
+            let _temp = TempFile::new(&path);
             // File doesn't exist, drop should not panic
         }
     }

@@ -95,8 +95,7 @@ pub fn clean_folder_name(name: &str) -> String {
     let cleaned = RE_BRACKETS.replace_all(&without_genre, "");
 
     // Remplacer les caractères interdits par Windows (: * < > ? " / \ |) par des tirets
-    let with_dashes = cleaned
-        .replace([':', '*', '<', '>', '?', '"', '/', '\\', '|', '_'], "-");
+    let with_dashes = cleaned.replace([':', '*', '<', '>', '?', '"', '/', '\\', '|', '_'], "-");
 
     // Nettoyer les espaces multiples
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");

@@ -41,7 +41,8 @@ pub fn get_ytdlp_version() -> Option<YtdlpVersionInfo> {
     let day: u8 = caps.get(3)?.as_str().parse().ok()?;
 
     // Calculate days since release
-    let release_date = time::Date::from_calendar_date(year, time::Month::try_from(month).ok()?, day).ok()?;
+    let release_date =
+        time::Date::from_calendar_date(year, time::Month::try_from(month).ok()?, day).ok()?;
     let today = time::OffsetDateTime::now_utc().date();
     let duration = today - release_date;
     let days_since_release = duration.whole_days();

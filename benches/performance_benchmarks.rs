@@ -47,7 +47,7 @@ fn bench_parse_artist_album(c: &mut Criterion) {
 
     for input in test_cases {
         group.bench_with_input(BenchmarkId::from_parameter(input), &input, |b, &input| {
-            b.iter(|| parse_artist_album(black_box(input)));
+            b.iter(|| parse_artist_album(black_box(input), black_box("TestChannel")));
         });
     }
 

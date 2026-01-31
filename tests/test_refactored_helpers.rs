@@ -2,7 +2,7 @@
 ///
 /// Ces tests vérifient que les fonctions modulaires fonctionnent correctement
 /// individuellement et ensemble.
-use youtube_chapter_splitter::{config, Result};
+use youtube_chapter_splitter::config;
 
 #[test]
 fn test_handle_playlist_detection_video_only() {
@@ -11,7 +11,7 @@ fn test_handle_playlist_detection_video_only() {
     cfg.playlist_behavior = config::PlaylistBehavior::VideoOnly;
 
     // URL avec playlist
-    let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLtest123";
+    let _url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLtest123";
 
     // Note: Cette fonction est privée dans main.rs, donc on ne peut pas la tester directement
     // Ce test est un placeholder pour documenter ce qui devrait être testé
