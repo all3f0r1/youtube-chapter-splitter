@@ -9,6 +9,15 @@
 use colored::*;
 use std::io::{self, Write};
 
+/// Output mode for UI
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OutputMode {
+    /// Colored terminal output (default)
+    Colored,
+    /// Plain text output for --cli mode or piping
+    Plain,
+}
+
 /// Operation status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -31,13 +40,119 @@ pub struct TrackProgress {
     pub duration: String,
 }
 
-/// Status icon
+/// Get status icon (plain or colored)
 fn status_icon(status: Status) -> ColoredString {
     match status {
         Status::Pending => " ".dimmed(),
         Status::InProgress => "⏳".yellow(),
         Status::Success => "✓".green(),
         Status::Failed => "✗".red(),
+    }
+}
+
+/// Plain text presenter for --cli mode
+pub struct PlainTextPresenter {
+    output_mode: OutputMode,
+}
+
+impl PlainTextPresenter {
+    pub fn new() -> Self {
+        Self {
+            output_mode: OutputMode::Plain,
+        }
+    }
+
+    pub fn with_output_mode(mut self, mode: OutputMode) -> Self {
+        self.output_mode = mode;
+        self
+    }
+
+    /// Print a message with ERROR prefix
+    pub fn error(&self, message: &str) {
+        match self.output_mode {
+            OutputMode::Plain => eprintln!("ERROR: {}", message),
+            OutputMode::Colored => eprintln!("{} {}", "✗".red().bold(), message.red()),
+        }
+    }
+
+    /// Print a message with WARNING prefix
+    pub fn warning(&self, message: &str) {
+        match self.output_mode {
+            OutputMode::Plain => eprintln!("WARNING: {}", message),
+            OutputMode::Colored => eprintln!("{} {}", "⚠".yellow(), message.yellow()),
+        }
+    }
+
+    /// Print info message
+    pub fn info(&self, message: &str) {
+        match self.output_mode {
+            OutputMode::Plain => println!("INFO: {}", message),
+            OutputMode::Colored => println!("  {}", message.dimmed()),
+        }
+    }
+
+    /// Print success message
+    pub fn success(&self, message: &str) {
+        match self.output_mode {
+            OutputMode::Plain => println!("OK: {}", message),
+            OutputMode::Colored => println!("{} {}", "✓".green().bold(), message.green()),
+        }
+    }
+
+    /// Print header
+    pub fn header(&self) {
+        match self.output_mode {
+            OutputMode::Plain => println!("ytcs v0.14.7"),
+            OutputMode::Colored => println!("{}", "ytcs v0.14.5".dimmed()),
+        }
+    }
+
+    /// Print section header
+    pub fn section_header(&self, title: &str) {
+        match self.output_mode {
+            OutputMode::Plain => {
+                println!();
+                println!("=== {} ===", title);
+                println!();
+            }
+            OutputMode::Colored => {
+                println!("{}", title.bright_cyan().bold());
+                println!();
+            }
+        }
+    }
+
+    /// Print video info
+    pub fn video_info(&self, title: &str, duration: &str, tracks: usize) {
+        match self.output_mode {
+            OutputMode::Plain => {
+                println!("Title: {}", clean_title(title));
+                println!("Duration: {}", duration);
+                println!("Tracks: {}", tracks);
+                println!();
+            }
+            OutputMode::Colored => {
+                print_video_info(title, duration, tracks, false, false);
+            }
+        }
+    }
+
+    /// Print progress for multiple URLs
+    pub fn progress(&self, current: usize, total: usize, message: &str) {
+        match self.output_mode {
+            OutputMode::Plain => {
+                println!("[{}/{}] {}", current, total, message);
+            }
+            OutputMode::Colored => {
+                println!("  {}/{}: {}", current, total, message.dimmed());
+            }
+        }
+    }
+}
+
+impl Default for PlainTextPresenter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -2,7 +2,7 @@
 
 > **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art, all via a single command line.
 
-[![Version](https://img.shields.io/badge/version-0.14.5-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -17,7 +17,7 @@
 - **Classy**: Elegant without being flashy.
 
 ```
-ytcs v0.14.5
+ytcs v0.15.0
 
 → Paradox - Chemical Love Theory
   21m 47s • 5 tracks
@@ -52,6 +52,8 @@ Splitting into the album...
 
 ## Features
 
+- **Interactive TUI Mode**: Beautiful terminal UI with `ytcs --tui` for guided downloads
+- **Auto-Dependency Detection**: Automatically detects and offers to install missing dependencies (yt-dlp, ffmpeg)
 - **MP3 Download**: High-quality audio (192 kbps by default).
 - **Automatic Cover Art**: Album artwork embedded in MP3 metadata.
 - **Chapter-based Splitting**: Automatic detection of YouTube chapters.
@@ -189,6 +191,29 @@ ytcs --no-cover "https://youtube.com/..."
 # Disable chapter refinement (faster, less precise splits)
 ytcs --no-refine-chapters "https://youtube.com/..."
 ```
+
+### Interactive TUI Mode
+
+Launch the interactive terminal UI for a guided experience:
+
+```bash
+ytcs --tui
+```
+
+**TUI Features:**
+- Welcome screen with menu navigation
+- Download screen with URL input and video metadata preview
+- Playlist selection with multi-select support
+- Real-time progress display with minimal/detailed modes
+- Summary screen with "Open Folder" action
+- Full settings editor
+
+**Keyboard Shortcuts:**
+- `Enter` / `D`: Download from URL
+- `S`: Settings
+- `H`: Help
+- `Q`: Quit
+- `Esc`: Go back / 3x rapid presses return to welcome
 
 ### Debugging with Logs
 

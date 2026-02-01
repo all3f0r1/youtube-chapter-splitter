@@ -88,7 +88,7 @@ mod utils_edge_cases_tests {
     fn test_parse_artist_album_only_artist() {
         let (artist, _album) = parse_artist_album("Artist -", "TestChannel");
         assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
-                                           // Avec un seul élément après split, ça retourne le titre nettoyé
+        // Avec un seul élément après split, ça retourne le titre nettoyé
     }
 
     #[test]

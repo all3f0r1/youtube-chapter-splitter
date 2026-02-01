@@ -1,8 +1,8 @@
 [package]
 name = "youtube_chapter_splitter"
-version = "0.14.7"
-edition = "2021"
-rust-version = "1.70"
+version = "0.15.0"
+edition = "2024"
+rust-version = "1.93"
 authors = ["YouTube Chapter Splitter Contributors"]
 description = "Download YouTube videos, extract audio to MP3, and split by chapters with automatic metadata tagging"
 license = "MIT"
@@ -19,6 +19,10 @@ exclude = [
     "!README.md",
     "!CHANGELOG.md",
 ]
+
+[features]
+default = []
+tui = ["ratatui", "crossterm"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -39,6 +43,10 @@ log = "0.4"
 env_logger = "0.11"
 time = "0.3"
 
+# TUI dependencies (optional, enabled by default when building with TUI support)
+ratatui = { version = "0.29", optional = true }
+crossterm = { version = "0.28", optional = true }
+
 [[bin]]
 name = "ytcs"
 path = "src/main.rs"
@@ -49,6 +57,7 @@ path = "src/lib.rs"
 
 [dev-dependencies]
 criterion = "0.5"
+tempfile = "3.14"
 
 [[bench]]
 name = "performance_benchmarks"

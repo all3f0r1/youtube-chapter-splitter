@@ -1,7 +1,7 @@
 /// Benchmarks de performance pour YouTube Chapter Splitter
 ///
 /// Pour exécuter : cargo bench
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use youtube_chapter_splitter::chapters::Chapter;
 use youtube_chapter_splitter::utils::{
     clean_folder_name, format_duration, parse_artist_album, sanitize_title,

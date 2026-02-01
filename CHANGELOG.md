@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2025-02-01
+
+### Added
+- **Interactive TUI Mode**: Complete terminal user interface with `ytcs --tui`
+  - Welcome screen with menu navigation
+  - Download screen with URL input and metadata display
+  - Playlist selection screen with multi-select support
+  - Progress screen with minimal/detailed modes
+  - Summary screen with "Open Folder" and "Download Another" actions
+  - Settings screen with full configuration editing
+  - Help screen with keyboard shortcuts
+- **Dependency Auto-Detection**: Automatic detection and installation prompts for missing dependencies (yt-dlp, ffmpeg)
+  - Platform-specific install commands (Linux: apt, macOS: brew, Windows: chocolatey)
+  - Interactive installer with `--yes` flag for automation
+- **Accessibility Features**: NO_COLOR support, monochrome mode, Unicode/ASCII adaptive box-drawing
+- **Persistent Screen State**: All TUI screens maintain state during navigation
+- **Rapid Esc Tracking**: Three rapid Esc presses return to welcome screen
+
+### Changed
+- **Code Quality**: All clippy warnings fixed, code formatted with rustfmt
+- **Test Coverage**: Added 43 new tests for audio and downloader modules (now ~75% coverage)
+  - Audio: WebP detection, MIME type detection, silence detection regex, integration tests
+  - Downloader: Video ID extraction for all URL formats, cookie error detection
+- **Refactored**: Boolean expressions simplified, collapsible if-let chains applied
+- **Removed**: Unused `status_icon_plain` function
+
+### Technical Details
+- New TUI module structure: `src/tui/` with screens, components, app, layout
+- BoxChars component for Unicode/ASCII adaptive box-drawing
+- ColorMode and AccessibleStyle for accessibility features
+- ProgressMode toggle (Minimal/Detailed) in progress screen
+- WelcomeState loading states (Idle, FetchingVideoInfo, LoadingPlaylist, CheckingUpdates)
+- SummaryAction for post-download actions (OpenFolder, DownloadAnother, Quit)
+- TerminalCapabilities detection (size, Unicode, color, too_small)
+- PlainTextPresenter for --cli mode with ERROR/WARNING/INFO prefixes
+- New test dependencies: tempfile 3.14
+
 ## [0.14.7] - 2025-01-31
 
 ### Fixed

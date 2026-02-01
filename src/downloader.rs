@@ -3,7 +3,7 @@
 //! This module handles l'interaction avec `yt-dlp` pour télécharger les vidéos
 //! et extraire leurs métadonnées (titre, durée, chapitres).
 
-use crate::chapters::{parse_chapters_from_json, Chapter};
+use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
 use crate::ytdlp_error_parser;
@@ -174,10 +174,10 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 
     for pattern in &patterns {
         let re = regex::Regex::new(pattern)?;
-        if let Some(caps) = re.captures(url) {
-            if let Some(id) = caps.get(1) {
-                return Ok(id.as_str().to_string());
-            }
+        if let Some(caps) = re.captures(url)
+            && let Some(id) = caps.get(1)
+        {
+            return Ok(id.as_str().to_string());
         }
     }
 
@@ -550,4 +550,198 @@ pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std
     Err(YtcsError::DownloadError(
         "Could not download thumbnail from any source".to_string(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test extract_video_id with various URL formats
+    #[test]
+    fn test_extract_video_id_youtube_com() {
+        let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn test_extract_video_id_youtu_be() {
+        let url = "https://youtu.be/dQw4w9WgXcQ";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn test_extract_video_id_with_parameters() {
+        let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn test_extract_video_id_short() {
+        let url = "https://youtu.be/9bZkp7q19f0";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "9bZkp7q19f0");
+    }
+
+    #[test]
+    fn test_extract_video_id_underscores_and_hyphens() {
+        // YouTube IDs are exactly 11 characters
+        let url = "https://www.youtube.com/watch?v=aB-c_d01234";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "aB-c_d01234");
+    }
+
+    #[test]
+    fn test_extract_video_id_invalid_url() {
+        let url = "https://example.com/watch?v=invalid";
+        let result = extract_video_id(url);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_video_id_empty_string() {
+        let result = extract_video_id("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_video_id_too_short_id() {
+        let url = "https://youtu.be/short";
+        let result = extract_video_id(url);
+        assert!(result.is_err());
+    }
+
+    // Test is_cookie_related_error function
+    #[test]
+    fn test_is_cookie_error_403() {
+        let stderr = "HTTP Error 403: Forbidden";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_401() {
+        let stderr = "HTTP Error 401: Unauthorized";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_forbidden() {
+        let stderr = "Access forbidden for this video";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_unauthorized() {
+        let stderr = "This video is unauthorized";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_expired_cookies() {
+        let stderr = "cookies have expired, please update";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_invalid_cookies() {
+        let stderr = "invalid cookies detected";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_cookie_error_case_insensitive() {
+        let stderr = "HTTP ERROR 403: FORBIDDEN";
+        assert!(is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_not_cookie_error_404() {
+        let stderr = "HTTP Error 404: Not Found";
+        assert!(!is_cookie_related_error(stderr));
+    }
+
+    #[test]
+    fn test_is_not_cookie_error_network() {
+        let stderr = "Network connection failed";
+        assert!(!is_cookie_related_error(stderr));
+    }
+
+    // Test VideoInfo struct
+    #[test]
+    fn test_video_info_creation() {
+        let info = VideoInfo {
+            title: "Test Video".to_string(),
+            duration: 120.0,
+            chapters: vec![],
+            video_id: "abc123".to_string(),
+            thumbnail_url: "https://example.com/thumb.jpg".to_string(),
+            uploader: "Test Channel".to_string(),
+            description: "Test description".to_string(),
+        };
+        assert_eq!(info.title, "Test Video");
+        assert_eq!(info.duration, 120.0);
+        assert_eq!(info.video_id, "abc123");
+    }
+
+    // Test MissingDependency struct
+    #[test]
+    fn test_missing_dependency_creation() {
+        let dep = MissingDependency {
+            tool: "ffmpeg".to_string(),
+            install_command: "sudo apt install ffmpeg".to_string(),
+        };
+        assert_eq!(dep.tool, "ffmpeg");
+        assert!(dep.install_command.contains("install"));
+    }
+
+    // Integration test: check_dependencies with actual system
+    #[test]
+    fn test_check_dependencies_returns_result() {
+        // This test just verifies the function runs without panicking
+        // It may fail if dependencies are missing, which is expected
+        let result = check_dependencies();
+        // We don't assert success/failure since it depends on the test environment
+        let _ = result;
+    }
+
+    #[test]
+    fn test_extract_video_id_mixed_case() {
+        // YouTube IDs are case-sensitive and exactly 11 characters
+        let url = "https://youtu.be/AbCdEf12345";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "AbCdEf12345");
+    }
+
+    #[test]
+    fn test_extract_video_id_with_playlist_param() {
+        // Should still work even with list parameter
+        let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLxyz";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn test_extract_video_id_mobile_url() {
+        let url = "https://m.youtube.com/watch?v=dQw4w9WgXcQ";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
+
+    #[test]
+    fn test_extract_video_id_www_less() {
+        let url = "https://youtube.com/watch?v=dQw4w9WgXcQ";
+        let result = extract_video_id(url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "dQw4w9WgXcQ");
+    }
 }

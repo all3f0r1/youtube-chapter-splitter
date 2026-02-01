@@ -1,4 +1,4 @@
-use youtube_chapter_splitter::chapters::{format_timestamp, parse_timestamp, Chapter};
+use youtube_chapter_splitter::chapters::{Chapter, format_timestamp, parse_timestamp};
 
 #[test]
 fn test_chapter_creation() {

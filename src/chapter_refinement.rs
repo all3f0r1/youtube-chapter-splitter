@@ -99,12 +99,11 @@ fn detect_all_silences(
         if let Some(caps) = RE_SILENCE_START.captures(line) {
             current_start = caps.get(1).and_then(|m| m.as_str().parse().ok());
         } else if let Some(caps) = RE_SILENCE_END.captures(line) {
-            if let Some(start) = current_start {
-                if let Some(end_caps) = caps.get(1) {
-                    if let Ok(end) = end_caps.as_str().parse::<f64>() {
-                        silence_points.push(SilencePoint::new(start, end));
-                    }
-                }
+            if let Some(start) = current_start
+                && let Some(end_caps) = caps.get(1)
+                && let Ok(end) = end_caps.as_str().parse::<f64>()
+            {
+                silence_points.push(SilencePoint::new(start, end));
             }
             current_start = None;
         }

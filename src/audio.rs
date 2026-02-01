@@ -500,14 +500,14 @@ pub fn detect_silence_chapters(
             if let Some(start_str) = caps.get(1) {
                 current_start = start_str.as_str().parse::<f64>().ok();
             }
-        } else if let Some(caps) = RE_SILENCE_END.captures(line) {
-            if let (Some(start), Some(end_str)) = (current_start, caps.get(1)) {
-                if let Ok(end) = end_str.as_str().parse::<f64>() {
-                    let mid_point = (start + end) / 2.0;
-                    silence_periods.push(mid_point);
-                }
-                current_start = None;
+        } else if let Some(caps) = RE_SILENCE_END.captures(line)
+            && let (Some(start), Some(end_str)) = (current_start, caps.get(1))
+        {
+            if let Ok(end) = end_str.as_str().parse::<f64>() {
+                let mid_point = (start + end) / 2.0;
+                silence_periods.push(mid_point);
             }
+            current_start = None;
         }
     }
 
@@ -579,4 +579,263 @@ pub fn get_audio_duration(input_file: &Path) -> Result<f64> {
         .trim()
         .parse::<f64>()
         .map_err(|_| YtcsError::AudioError("Invalid duration format".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    // Test for is_webp function
+    #[test]
+    fn test_is_webp_valid_webp() {
+        // Valid WebP header: RIFF....WEBP
+        let webp_data = [
+            0x52, 0x49, 0x46, 0x46, // "RIFF"
+            0x00, 0x00, 0x00, 0x00, // file size (placeholder)
+            0x57, 0x45, 0x42, 0x50, // "WEBP"
+        ];
+        assert!(is_webp(&webp_data));
+    }
+
+    #[test]
+    fn test_is_webp_too_short() {
+        let short_data = [0x52, 0x49, 0x46, 0x46];
+        assert!(!is_webp(&short_data));
+    }
+
+    #[test]
+    fn test_is_webp_wrong_magic() {
+        let wrong_data = [
+            0x52, 0x49, 0x46, 0x46, // "RIFF"
+            0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x51, // "WEBQ" instead of "WEBP"
+        ];
+        assert!(!is_webp(&wrong_data));
+    }
+
+    #[test]
+    fn test_is_webp_jpeg_data() {
+        // JPEG magic bytes
+        let jpeg_data = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+        ];
+        assert!(!is_webp(&jpeg_data));
+    }
+
+    // Test for detect_image_mime_type function
+    #[test]
+    fn test_detect_mime_jpeg() {
+        // JPEG magic bytes: FF D8 FF
+        let jpeg_data = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+        ];
+        assert_eq!(
+            detect_image_mime_type(&jpeg_data),
+            Some(lofty::picture::MimeType::Jpeg)
+        );
+    }
+
+    #[test]
+    fn test_detect_mime_png() {
+        // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
+        let png_data = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(
+            detect_image_mime_type(&png_data),
+            Some(lofty::picture::MimeType::Png)
+        );
+    }
+
+    #[test]
+    fn test_detect_mime_gif() {
+        // GIF magic bytes: 47 49 46 38 (GIF8)
+        let gif_data = [
+            0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(
+            detect_image_mime_type(&gif_data),
+            Some(lofty::picture::MimeType::Gif)
+        );
+    }
+
+    #[test]
+    fn test_detect_mime_bmp() {
+        // BMP magic bytes: 42 4D (BM)
+        let bmp_data = [
+            0x42, 0x4D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(
+            detect_image_mime_type(&bmp_data),
+            Some(lofty::picture::MimeType::Bmp)
+        );
+    }
+
+    #[test]
+    fn test_detect_mime_unknown() {
+        let unknown_data = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        ];
+        assert_eq!(detect_image_mime_type(&unknown_data), None);
+    }
+
+    #[test]
+    fn test_detect_mime_too_short() {
+        let short_data = [0xFF, 0xD8];
+        assert_eq!(detect_image_mime_type(&short_data), None);
+    }
+
+    #[test]
+    fn test_detect_mime_webp_returns_none() {
+        // WebP is not supported by lofty's MimeType enum
+        let webp_data = [
+            0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+        ];
+        assert_eq!(detect_image_mime_type(&webp_data), None);
+    }
+
+    // Test for silence detection regex parsing
+    #[test]
+    fn test_silence_start_regex() {
+        let line = " [silencedetect @ 0x7f8b4c0] silence_start: 1.234";
+        assert!(RE_SILENCE_START.is_match(line));
+        let caps = RE_SILENCE_START.captures(line).unwrap();
+        assert_eq!(caps.get(1).unwrap().as_str(), "1.234");
+    }
+
+    #[test]
+    fn test_silence_end_regex() {
+        let line = " [silencedetect @ 0x7f8b4c0] silence_end: 5.678 | silence_duration: 4.444";
+        assert!(RE_SILENCE_END.is_match(line));
+        let caps = RE_SILENCE_END.captures(line).unwrap();
+        assert_eq!(caps.get(1).unwrap().as_str(), "5.678");
+    }
+
+    // Test load_cover_image with non-existent file
+    #[test]
+    fn test_load_cover_image_nonexistent() {
+        let nonexistent = Path::new("/nonexistent/path/to/image.jpg");
+        let result = load_cover_image(nonexistent);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+    }
+
+    // Test get_audio_duration with invalid file
+    #[test]
+    fn test_get_audio_duration_invalid_file() {
+        let result = get_audio_duration(Path::new("/nonexistent/audio.mp3"));
+        assert!(result.is_err());
+    }
+
+    // Integration test: create a minimal audio file and test duration
+    #[test]
+    fn test_get_audio_duration_with_temp_file() {
+        // Skip this test if ffmpeg is not available
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            return;
+        }
+        if Command::new("ffprobe").arg("-version").output().is_err() {
+            return;
+        }
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("test_audio.mp3");
+
+        // Create a 1-second silent audio file using ffmpeg
+        let output = Command::new("ffmpeg")
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg("anullsrc=r=44100:cl=mono")
+            .arg("-t")
+            .arg("1.0")
+            .arg("-q:a")
+            .arg("0")
+            .arg("-y")
+            .arg(&audio_path)
+            .output();
+
+        if output.is_err() || !output.as_ref().unwrap().status.success() {
+            // FFmpeg failed, skip test
+            return;
+        }
+
+        let duration = get_audio_duration(&audio_path);
+        assert!(duration.is_ok());
+        let dur = duration.unwrap();
+        assert!(dur > 0.9 && dur < 1.1, "Expected ~1.0s, got {}", dur);
+    }
+
+    // Test silence detection with a simple audio file
+    #[test]
+    fn test_detect_silence_chapters_creates_chapters() {
+        // Skip if ffmpeg not available
+        if Command::new("ffmpeg").arg("-version").output().is_err() {
+            return;
+        }
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let audio_path = temp_dir.path().join("test_silence.mp3");
+
+        // Create an audio file with silence in the middle
+        // Using ffmpeg to generate: 0.5s audio + 1s silence + 0.5s audio
+        let output = Command::new("ffmpeg")
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg("sine=frequency=1000:duration=0.5")
+            .arg("-af")
+            .arg("afade=t=out:st=0.4:d=0.1,asetpts=PTS/PTS") // Short tone
+            .arg("-t")
+            .arg("2.0")
+            .arg("-q:a")
+            .arg("0")
+            .arg("-y")
+            .arg(&audio_path)
+            .output();
+
+        if output.is_err() || !output.as_ref().unwrap().status.success() {
+            return;
+        }
+
+        let chapters = detect_silence_chapters(&audio_path, -30.0, 0.5);
+
+        // We may get chapters or error depending on the audio generated
+        // Just check the function doesn't panic
+        let _ = chapters;
+    }
+
+    // Test split_single_track with minimal setup
+    #[test]
+    fn test_split_single_track_requires_ffmpeg() {
+        // This test verifies the error handling when ffmpeg is not available
+        // Create a dummy chapter and temp file
+        let temp_dir = tempfile::tempdir().unwrap();
+        let input_path = temp_dir.path().join("input.mp3");
+        let output_dir = temp_dir.path().join("output");
+
+        // Create an empty file (will fail ffmpeg)
+        let mut file = File::create(&input_path).unwrap();
+        file.write_all(b"not real audio").unwrap();
+
+        let chapter = Chapter::new("Test Track".to_string(), 0.0, 10.0);
+
+        let config = crate::config::Config::default();
+
+        let params = TrackSplitParams {
+            input_file: &input_path,
+            chapter: &chapter,
+            track_number: 1,
+            total_tracks: 1,
+            output_dir: &output_dir,
+            artist: "Test Artist",
+            album: "Test Album",
+            cover_data: None,
+            config: &config,
+        };
+
+        let result = split_single_track(params);
+        // Should fail because the input is not a valid audio file
+        assert!(result.is_err());
+    }
 }

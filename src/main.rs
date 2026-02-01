@@ -3,8 +3,8 @@ use colored::Colorize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
-    audio, config, download_audio_with_progress, downloader, playlist, print_refinement_report,
-    refine_chapters_with_silence, utils, Result,
+    Result, audio, config, download_audio_with_progress, downloader, error::YtcsError, playlist,
+    print_refinement_report, refine_chapters_with_silence, utils, ytdlp_helper,
 };
 
 #[derive(Parser)]
@@ -12,7 +12,11 @@ use youtube_chapter_splitter::{
 #[command(about = "YouTube Chapter Splitter - Download and split YouTube videos into MP3 tracks", long_about = None)]
 #[command(version)]
 struct Cli {
-    /// YouTube video URL(s) - can be used without 'download' subcommand
+    /// YouTube video URL(s)
+    ///
+    /// If provided without --cli: non-interactive TUI-style download
+    /// If provided with --cli: plain-text download mode
+    /// If not provided: launch interactive TUI
     #[arg(value_name = "URL")]
     urls: Vec<String>,
 
@@ -28,50 +32,20 @@ struct Cli {
     #[arg(short = 'A', long)]
     album: Option<String>,
 
-    /// Skip downloading cover art
+    /// Force plain-text mode (no TUI rendering, for scripting/piping)
     #[arg(long)]
-    no_cover: bool,
+    cli: bool,
 
-    /// Refine chapter markers using silence detection (improves split accuracy)
-    #[arg(long, default_value = "true")]
-    refine_chapters: bool,
+    /// Force yt-dlp update before downloading
+    #[arg(long)]
+    force_update: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
-#[derive(Parser)]
-struct DownloadArgs {
-    /// YouTube video URL(s)
-    #[arg(value_name = "URL", required = true)]
-    urls: Vec<String>,
-
-    /// Output directory (overrides config)
-    #[arg(short, long)]
-    output: Option<String>,
-
-    /// Force artist name (overrides auto-detection)
-    #[arg(short, long)]
-    artist: Option<String>,
-
-    /// Force album name (overrides auto-detection)
-    #[arg(short = 'A', long)]
-    album: Option<String>,
-
-    /// Skip downloading cover art
-    #[arg(long)]
-    no_cover: bool,
-
-    /// Refine chapter markers using silence detection (improves split accuracy)
-    #[arg(long, default_value = "true")]
-    refine_chapters: bool,
-}
-
 #[derive(Subcommand)]
 enum Commands {
-    /// Download and split YouTube video(s) (default)
-    Download(DownloadArgs),
-
     /// Show current configuration
     Config,
 
@@ -85,6 +59,21 @@ enum Commands {
 
     /// Reset configuration to defaults
     Reset,
+
+    /// Update yt-dlp to the latest version
+    UpdateYtdlp,
+}
+
+/// Arguments for download processing
+#[derive(Debug, Clone)]
+struct DownloadArgs {
+    urls: Vec<String>,
+    output: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    #[allow(dead_code)]
+    cli_mode: bool,
+    force_update: bool,
 }
 
 fn clean_url(url: &str) -> String {
@@ -101,40 +90,44 @@ fn clean_url(url: &str) -> String {
     }
 }
 
-fn check_dependencies() -> Result<()> {
-    let mut missing = Vec::new();
+/// Check dependencies and offer to install if missing (US1: Dependency Auto-Detection)
+fn check_and_install_dependencies() -> Result<()> {
+    use youtube_chapter_splitter::dependency::{DependencyInstaller, DependencyState};
 
-    if std::process::Command::new("yt-dlp")
-        .arg("--version")
-        .output()
-        .is_err()
-    {
-        missing.push("yt-dlp");
-    }
+    let state = DependencyState::check_all();
 
-    if std::process::Command::new("ffmpeg")
-        .arg("-version")
-        .output()
-        .is_err()
-    {
-        missing.push("ffmpeg");
-    }
+    if !state.all_present() {
+        let missing = state.missing();
+        let installer = DependencyInstaller::new();
 
-    if !missing.is_empty() {
-        eprintln!(
-            "{}",
-            format!("⚠ Missing dependencies: {}", missing.join(", ")).yellow()
-        );
-        eprintln!();
-        eprintln!(
-            "{}",
-            "Would you like to install the missing dependencies? (y/n)".bold()
-        );
-        eprintln!("Or install manually:");
-        eprintln!("  Ubuntu/Debian: sudo apt install yt-dlp ffmpeg");
-        eprintln!("  macOS: brew install yt-dlp ffmpeg");
-        eprintln!("  Windows: winget install yt-dlp ffmpeg");
-        std::process::exit(1);
+        // Check config for auto-install preference
+        let config = config::Config::load()?;
+        let should_install = match config.dependency_auto_install {
+            config::AutoInstallBehavior::Always => true,
+            config::AutoInstallBehavior::Never => false,
+            config::AutoInstallBehavior::Prompt => DependencyInstaller::prompt_install(&missing)?,
+        };
+
+        if should_install {
+            for dep in &missing {
+                if let Err(e) = installer.install(dep) {
+                    eprintln!("{}", format!("✗ Failed to install {}: {}", dep, e).red());
+                    eprintln!();
+                    eprintln!("Manual installation:");
+                    eprintln!("{}", installer.get_manual_instructions());
+                    return Err(e);
+                }
+            }
+        } else {
+            eprintln!(
+                "{}",
+                "Dependencies required but auto-install is disabled.".yellow()
+            );
+            eprintln!();
+            eprintln!("Manual installation:");
+            eprintln!("{}", installer.get_manual_instructions());
+            return Err(YtcsError::MissingTool(missing.join(", ")));
+        }
     }
 
     Ok(())
@@ -160,44 +153,121 @@ fn main() -> Result<()> {
         Some(Commands::Config) => config::show_config(),
         Some(Commands::Set { key, value }) => config::set_config(&key, &value),
         Some(Commands::Reset) => config::reset_config(),
-        Some(Commands::Download(args)) => handle_download(args),
+        Some(Commands::UpdateYtdlp) => handle_ytdlp_update(),
         None => {
-            // Si aucune commande mais des URLs sont fournies, traiter comme download
-            if !cli.urls.is_empty() {
+            // No subcommand - determine mode based on URLs and --cli flag
+            if cli.urls.is_empty() {
+                // No URL provided - launch interactive TUI
+                #[cfg(feature = "tui")]
+                {
+                    return youtube_chapter_splitter::run_tui();
+                }
+                #[cfg(not(feature = "tui"))]
+                {
+                    eprintln!("{}", "Error: No URL provided".red().bold());
+                    eprintln!();
+                    eprintln!("Usage: ytcs <URL> [OPTIONS]");
+                    eprintln!("       ytcs --cli <URL> [OPTIONS]");
+                    eprintln!("       ytcs config");
+                    eprintln!("       ytcs set <KEY> <VALUE>");
+                    eprintln!("       ytcs reset");
+                    eprintln!("       ytcs update-ytdlp");
+                    eprintln!();
+                    eprintln!("For more information, run: ytcs --help");
+                    std::process::exit(1);
+                }
+            } else {
+                // URLs provided - process download
                 let args = DownloadArgs {
                     urls: cli.urls,
                     output: cli.output,
                     artist: cli.artist,
                     album: cli.album,
-                    no_cover: cli.no_cover,
-                    refine_chapters: cli.refine_chapters,
+                    cli_mode: cli.cli,
+                    force_update: cli.force_update,
                 };
                 handle_download(args)
-            } else {
-                // Aucune URL fournie, afficher l'aide
-                eprintln!("{}", "Error: No URL provided".red().bold());
-                eprintln!();
-                eprintln!("Usage: ytcs <URL> [OPTIONS]");
-                eprintln!("       ytcs download <URL> [OPTIONS]");
-                eprintln!("       ytcs config");
-                eprintln!("       ytcs set <KEY> <VALUE>");
-                eprintln!("       ytcs reset");
-                eprintln!();
-                eprintln!("For more information, run: ytcs --help");
-                std::process::exit(1);
             }
         }
     }
 }
 
-fn handle_download(cli: DownloadArgs) -> Result<()> {
-    check_dependencies()?;
+/// Handle the update-ytdlp command
+fn handle_ytdlp_update() -> Result<()> {
+    use youtube_chapter_splitter::ytdlp_helper;
 
-    // Afficher l'en-tête TUI moderne
-    youtube_chapter_splitter::ui::print_header();
+    println!("{}", "Updating yt-dlp to the latest version...".cyan());
+    println!();
+
+    // Check current version
+    if let Some(info) = ytdlp_helper::get_ytdlp_version() {
+        println!(
+            "{}",
+            format!(
+                "Current version: {} ({} days old)",
+                info.version,
+                info.days_since_release.unwrap_or(0)
+            )
+            .dimmed()
+        );
+        println!();
+    }
+
+    match ytdlp_helper::update_ytdlp() {
+        Ok(()) => {
+            println!();
+            println!("{}", "✓ yt-dlp is up to date!".green());
+            Ok(())
+        }
+        Err(e) => {
+            println!();
+            println!("{}", format!("✗ Update failed: {}", e).red());
+            println!();
+            println!("{}", "To update manually, run:".yellow());
+            println!("  pip install --upgrade yt-dlp");
+            println!("  or");
+            println!("  python -m pip install --upgrade yt-dlp");
+            Err(e)
+        }
+    }
+}
+
+fn handle_download(cli: DownloadArgs) -> Result<()> {
+    check_and_install_dependencies()?;
 
     // Load config
     let config = config::Config::load()?;
+
+    // Handle --force-update flag
+    if cli.force_update
+        || (ytdlp_helper::should_check_for_update(config.ytdlp_update_interval_days)
+            && config.ytdlp_auto_update)
+    {
+        // Check if update is needed
+        if let Some(info) = ytdlp_helper::get_ytdlp_version()
+            && (info.is_outdated || cli.force_update)
+        {
+            println!();
+            println!(
+                "{}",
+                format!(
+                    "yt-dlp version {} ({} days old) - updating...",
+                    info.version,
+                    info.days_since_release.unwrap_or(0)
+                )
+                .yellow()
+            );
+            if let Err(e) = ytdlp_helper::update_ytdlp() {
+                println!("{}", format!("Update warning: {}", e).dimmed());
+                println!();
+            } else {
+                println!();
+            }
+        }
+    }
+
+    // Afficher l'en-tête TUI moderne
+    youtube_chapter_splitter::ui::print_header();
 
     // Process each URL
     let total_urls = cli.urls.len();
@@ -572,8 +642,8 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         config,
     )?;
 
-    // 4. Télécharger la couverture et l'audio
-    let keep_cover = !cli.no_cover && config.download_cover;
+    // 4. Download cover and audio
+    let keep_cover = config.download_cover;
     let assets = download_cover_and_audio(
         &url,
         &video_ctx.info,
@@ -582,11 +652,10 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         cookies_from_browser,
     )?;
 
-    // 5. Récupérer les chapitres avec fallback
-    let chapters =
-        get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, cli.refine_chapters)?;
+    // 5. Get chapters with fallback (refinement always enabled)
+    let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, true)?;
 
-    // 6. Découper en pistes
+    // 6. Split into tracks
     split_into_tracks(
         &chapters,
         &assets.audio_file,
@@ -597,7 +666,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
         config,
     )?;
 
-    // Message de succès
+    // Success message
     ui::print_success(&output_dir.display().to_string());
 
     Ok(())
@@ -739,9 +808,8 @@ fn download_single_video(
     let output_dir = base_output_dir.join(&dir_name);
     std::fs::create_dir_all(&output_dir)?;
 
-    // Download cover art (unless --no-cover)
-    let download_cover = !cli.no_cover && cfg.download_cover;
-    if download_cover {
+    // Download cover art if enabled in config
+    if cfg.download_cover {
         match downloader::download_thumbnail(&video_info.thumbnail_url, &output_dir) {
             Ok(thumb_path) => println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display()),
             Err(e) => println!("{} {}", "⚠ Could not download artwork:".yellow(), e),
@@ -764,7 +832,7 @@ fn download_single_video(
     };
 
     // Split audio with metadata
-    let cover_path = if download_cover {
+    let cover_path = if cfg.download_cover {
         Some(output_dir.join("cover.jpg"))
     } else {
         None

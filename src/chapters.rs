@@ -160,7 +160,7 @@ pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
         _ => {
             return Err(YtcsError::ChapterError(
                 "Invalid timestamp format".to_string(),
-            ))
+            ));
         }
     };
 

@@ -3,7 +3,7 @@
 //! Ce module détecte et parse les timestamps dans la description des vidéos
 //! pour créer des chapitres lorsque les métadonnées YouTube n'en contiennent pas.
 
-use crate::chapters::{parse_timestamp, Chapter};
+use crate::chapters::{Chapter, parse_timestamp};
 use crate::error::{Result, YtcsError};
 use crate::utils;
 use regex::Regex;

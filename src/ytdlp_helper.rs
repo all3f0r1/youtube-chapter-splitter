@@ -4,12 +4,15 @@
 //! - Check the current yt-dlp version
 //! - Detect if yt-dlp is outdated (older than 90 days)
 //! - Auto-update yt-dlp when download fails due to version issues
+//! - Cache update attempts to avoid excessive update checks
 
 use crate::error::{Result, YtcsError};
 use colored::Colorize;
 use regex::Regex;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 /// Information about yt-dlp version.
 #[derive(Debug, Clone)]
@@ -20,6 +23,53 @@ pub struct YtdlpVersionInfo {
     pub is_outdated: bool,
     /// Days since release
     pub days_since_release: Option<i64>,
+}
+
+/// Get the path to the last update timestamp file
+fn last_update_file() -> Option<PathBuf> {
+    dirs::config_dir().map(|dir| dir.join("ytcs").join("last_ytdlp_update.txt"))
+}
+
+/// Get the timestamp of the last yt-dlp update attempt
+pub fn get_last_update_time() -> Option<SystemTime> {
+    let path = last_update_file()?;
+    let content = std::fs::read_to_string(path).ok()?;
+    let timestamp = content.trim().parse::<u64>().ok()?;
+    Some(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp))
+}
+
+/// Save the timestamp of this update attempt
+pub fn save_update_time() -> Result<()> {
+    let path = last_update_file()
+        .ok_or_else(|| YtcsError::ConfigError("Cannot determine config directory".to_string()))?;
+
+    // Ensure directory exists
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| YtcsError::ConfigError(format!("Invalid system time: {}", e)))?
+        .as_secs();
+
+    std::fs::write(path, now.to_string())?;
+    Ok(())
+}
+
+/// Check if an update should be attempted based on time elapsed
+pub fn should_check_for_update(interval_days: u64) -> bool {
+    if interval_days == 0 {
+        return true; // 0 means always check
+    }
+
+    if let Some(last_time) = get_last_update_time()
+        && let Ok(elapsed) = last_time.elapsed()
+    {
+        let interval = Duration::from_secs(interval_days * 24 * 60 * 60);
+        return elapsed >= interval;
+    }
+    true // No previous update time, should check
 }
 
 /// Checks if yt-dlp is installed and returns version information.
@@ -155,6 +205,9 @@ pub fn update_ytdlp() -> Result<()> {
 
         match result {
             Ok(output) if output.status.success() => {
+                // Save update timestamp
+                let _ = save_update_time();
+
                 let new_version = get_ytdlp_version();
                 if let Some(info) = new_version {
                     println!(
@@ -184,14 +237,14 @@ pub fn update_ytdlp() -> Result<()> {
 
 /// Checks if yt-dlp needs an update and returns a warning message if so.
 pub fn check_ytdlp_update_needed() -> Option<String> {
-    if let Some(info) = get_ytdlp_version() {
-        if info.is_outdated {
-            return Some(format!(
-                "Your yt-dlp version ({} / {} days old) is outdated. Consider updating: pip install --upgrade yt-dlp",
-                info.version,
-                info.days_since_release.unwrap_or(0)
-            ));
-        }
+    if let Some(info) = get_ytdlp_version()
+        && info.is_outdated
+    {
+        return Some(format!(
+            "Your yt-dlp version ({} / {} days old) is outdated. Consider updating: pip install --upgrade yt-dlp",
+            info.version,
+            info.days_since_release.unwrap_or(0)
+        ));
     }
     None
 }

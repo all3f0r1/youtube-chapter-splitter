@@ -378,21 +378,21 @@ fn try_download_with_format(
                     for c in chunk.chars() {
                         if c == '\n' || c == '\r' {
                             if !partial_line.is_empty() {
-                                if let Some(progress) = parse_download_line(&partial_line) {
-                                    if progress.percentage - last_percentage >= 0.5 {
-                                        pb.set_length(100);
-                                        pb.set_position(progress.percentage as u64);
-                                        let msg = if !progress.speed.is_empty() {
-                                            format!(
-                                                "{} | {} | ETA: {}",
-                                                progress.downloaded, progress.speed, progress.eta
-                                            )
-                                        } else {
-                                            progress.downloaded.clone()
-                                        };
-                                        pb.set_message(msg);
-                                        last_percentage = progress.percentage;
-                                    }
+                                if let Some(progress) = parse_download_line(&partial_line)
+                                    && progress.percentage - last_percentage >= 0.5
+                                {
+                                    pb.set_length(100);
+                                    pb.set_position(progress.percentage as u64);
+                                    let msg = if !progress.speed.is_empty() {
+                                        format!(
+                                            "{} | {} | ETA: {}",
+                                            progress.downloaded, progress.speed, progress.eta
+                                        )
+                                    } else {
+                                        progress.downloaded.clone()
+                                    };
+                                    pb.set_message(msg);
+                                    last_percentage = progress.percentage;
                                 }
                                 log::trace!("{}", partial_line);
                                 partial_line.clear();

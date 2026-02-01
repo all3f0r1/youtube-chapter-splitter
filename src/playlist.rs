@@ -226,10 +226,12 @@ mod tests {
             "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
         )
         .is_some());
-        assert!(is_playlist_url(
-            "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
-        )
-        .is_some());
+        assert!(
+            is_playlist_url(
+                "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
+            )
+            .is_some()
+        );
         assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
     }
 
