@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2025-02-02
+
+### Changed
+- **TUI by Default**: Running `ytcs` without arguments now launches the interactive TUI
+- **URL + TUI**: Providing a URL without `--cli` launches TUI with URL pre-filled
+- **TUI Consistency**: TUI now has full feature parity with CLI mode
+  - Added dependency checking before download
+  - Added chapter refinement with silence detection
+  - Fixed yt-dlp update to check if outdated first
+  - Errors now displayed in TUI (not just stderr)
+
+### Fixed
+- **FFmpeg Detection**: Fixed false positive that tried to install even when ffmpeg was present
+- **Temp File Cleanup**: Added proper RAII for temp files in download_single_video
+- **Version Display**: Fixed hardcoded version strings to use `env!("CARGO_PKG_VERSION")`
+
+### Improved
+- **Code Quality**: Reduced verbose output throughout codebase
+  - Removed unnecessary status messages
+  - Simplified multi-URL and playlist messages
+  - Compacted chapter refinement report to single line
+  - Only show yt-dlp update message if 7+ days old
+- Fixed all clippy warnings (needless borrows, collapsible if)
+
+### Technical Details
+- TUI entry point now accepts `initial_url: Option<String>` for pre-filling
+- Added `DependencyStatus` to TUI `ScreenData`
+- Added `DependencyScreen` for installation prompts
+- Fixed `data_has_output_path()` to check actual download result
+
 ## [0.15.0] - 2025-02-01
 
 ### Added

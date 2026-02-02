@@ -279,14 +279,7 @@ impl DownloadManager {
             .ok()
             .and_then(|chapters| {
                 // Refine chapters from description too
-                crate::refine_chapters_with_silence(
-                    &chapters,
-                    &audio_file,
-                    5.0,
-                    -35.0,
-                    1.0,
-                )
-                .ok()
+                crate::refine_chapters_with_silence(&chapters, &audio_file, 5.0, -35.0, 1.0).ok()
             })
             .unwrap_or_else(|| {
                 // Fallback to silence detection

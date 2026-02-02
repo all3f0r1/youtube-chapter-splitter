@@ -103,7 +103,10 @@ impl PlainTextPresenter {
     pub fn header(&self) {
         match self.output_mode {
             OutputMode::Plain => println!("ytcs v{}", env!("CARGO_PKG_VERSION")),
-            OutputMode::Colored => println!("{}", format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()),
+            OutputMode::Colored => println!(
+                "{}",
+                format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()
+            ),
         }
     }
 

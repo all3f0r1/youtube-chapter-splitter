@@ -475,12 +475,13 @@ impl App {
                 if !tasks.is_empty() {
                     let last_task = &tasks[tasks.len() - 1];
                     if let Some(ref result) = last_task.result {
-                        self.screen_data.last_download_result = Some(crate::tui::app::DownloadResult {
-                            success: result.success,
-                            tracks_count: result.tracks_count,
-                            output_path: result.output_path.clone(),
-                            error: result.error.clone(),
-                        });
+                        self.screen_data.last_download_result =
+                            Some(crate::tui::app::DownloadResult {
+                                success: result.success,
+                                tracks_count: result.tracks_count,
+                                output_path: result.output_path.clone(),
+                                error: result.error.clone(),
+                            });
                     }
                 }
                 // All downloads done - navigate to summary

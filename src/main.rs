@@ -3,8 +3,8 @@ use colored::Colorize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
-    temp_file::TempFile, Result, audio, config, download_audio_with_progress, downloader,
-    error::YtcsError, playlist, print_refinement_report, refine_chapters_with_silence, utils,
+    Result, audio, config, download_audio_with_progress, downloader, error::YtcsError, playlist,
+    print_refinement_report, refine_chapters_with_silence, temp_file::TempFile, utils,
     ytdlp_helper,
 };
 
@@ -271,10 +271,7 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
         {
             let days_old = info.days_since_release.unwrap_or(0);
             if days_old >= 7 || cli.force_update {
-                println!(
-                    "Updating yt-dlp ({} days old)...",
-                    days_old
-                );
+                println!("Updating yt-dlp ({} days old)...", days_old);
                 if let Err(e) = ytdlp_helper::update_ytdlp() {
                     println!("  Warning: {}", e);
                 }
@@ -289,12 +286,7 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
     let total_urls = cli.urls.len();
     for (index, url) in cli.urls.iter().enumerate() {
         if total_urls > 1 {
-            println!(
-                "[{}/{}] {}",
-                index + 1,
-                total_urls,
-                url
-            );
+            println!("[{}/{}] {}", index + 1, total_urls, url);
         }
 
         process_single_url(url, &cli, &config)?;
@@ -806,12 +798,8 @@ fn download_single_video(
     let temp_audio_path = output_dir.join("temp_audio.mp3");
     let _temp_file = TempFile::new(&temp_audio_path);
 
-    let audio_file = downloader::download_audio(
-        &url,
-        &temp_audio_path,
-        cookies_from_browser,
-        None,
-    )?;
+    let audio_file =
+        downloader::download_audio(&url, &temp_audio_path, cookies_from_browser, None)?;
 
     // Get chapters
     let chapters_to_use = if !video_info.chapters.is_empty() {

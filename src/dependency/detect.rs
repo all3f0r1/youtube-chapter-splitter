@@ -176,7 +176,9 @@ impl DependencyStatus {
             .or_else(|_| Command::new(name).arg("-version").output())
             .or_else(|_| Command::new(name).arg("version").output());
 
-        if let Ok(output) = version_result && output.status.success() {
+        if let Ok(output) = version_result
+            && output.status.success()
+        {
             return true;
         }
 
