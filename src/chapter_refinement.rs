@@ -33,7 +33,6 @@
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
-use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
@@ -253,53 +252,28 @@ pub fn print_refinement_report(original: &[Chapter], refined: &[Chapter]) {
         return;
     }
 
-    let mut total_start_delta = 0.0_f64;
-    let mut max_start_delta = 0.0_f64;
+    let mut total_delta = 0.0_f64;
+    let mut max_delta = 0.0_f64;
+    let mut adjusted_count = 0;
 
-    println!();
-    println!("{}", "Chapter refinement report:".dimmed());
-    println!(
-        "{:<5} {:<30} {:>12} → {:>12} ({:>8})",
-        "", "Title", "Original", "Refined", "Delta"
-    );
-    println!("{}", "-".repeat(70).dimmed());
-
-    for (i, (orig, refn)) in original.iter().zip(refined.iter()).enumerate() {
-        let start_delta = refn.start_time - orig.start_time;
-        let _duration_delta = (refn.end_time - refn.start_time) - (orig.end_time - orig.start_time);
-
-        total_start_delta += start_delta.abs();
-        max_start_delta = max_start_delta.max(start_delta.abs());
-
-        let delta_str = if start_delta.abs() < 0.1 {
-            "—".dimmed().to_string()
-        } else if start_delta > 0.0 {
-            format!("{:+.1}s", start_delta).green().to_string()
-        } else {
-            format!("{:+.1}s", start_delta).red().to_string()
-        };
-
-        println!(
-            "{:<5} {:<30} {:>6.1}s → {:>6.1}s ({:>8})",
-            format!("{}.", i + 1),
-            if orig.title.len() > 28 {
-                format!("{}...", &orig.title[..25])
-            } else {
-                orig.title.clone()
-            },
-            orig.start_time,
-            refn.start_time,
-            delta_str
-        );
+    for (orig, refn) in original.iter().zip(refined.iter()) {
+        let delta = refn.start_time - orig.start_time;
+        if delta.abs() >= 0.1 {
+            adjusted_count += 1;
+            total_delta += delta.abs();
+            max_delta = max_delta.max(delta.abs());
+        }
     }
 
-    println!();
-    println!(
-        "  Average adjustment: {:.2}s | Max adjustment: {:.2}s",
-        total_start_delta / original.len() as f64,
-        max_start_delta
-    );
-    println!();
+    if adjusted_count > 0 {
+        println!(
+            "  Adjusted {}/{} chapters (avg: {:.1}s, max: {:.1}s)",
+            adjusted_count,
+            original.len(),
+            total_delta / adjusted_count as f64,
+            max_delta
+        );
+    }
 }
 
 #[cfg(test)]

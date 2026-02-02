@@ -24,9 +24,6 @@ use std::process::{Command, Stdio};
 /// use youtube_chapter_splitter::downloader::get_video_info;
 ///
 /// let video_info = get_video_info("https://youtube.com/watch?v=...", None)?;
-/// println!("Title: {}", video_info.title);
-/// println!("Duration: {} seconds", video_info.duration);
-/// println!("Chapters: {}", video_info.chapters.len());
 /// # Ok::<(), youtube_chapter_splitter::error::YtcsError>(())
 /// ```
 #[derive(Debug, Clone)]
@@ -454,7 +451,6 @@ fn download_audio_impl(
 ///     None,
 ///     None,
 /// )?;
-/// println!("Downloaded to: {:?}", audio_file);
 /// # Ok::<(), youtube_chapter_splitter::error::YtcsError>(())
 /// ```
 pub fn download_audio(

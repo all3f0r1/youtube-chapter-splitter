@@ -102,8 +102,8 @@ impl PlainTextPresenter {
     /// Print header
     pub fn header(&self) {
         match self.output_mode {
-            OutputMode::Plain => println!("ytcs v0.14.7"),
-            OutputMode::Colored => println!("{}", "ytcs v0.14.5".dimmed()),
+            OutputMode::Plain => println!("ytcs v{}", env!("CARGO_PKG_VERSION")),
+            OutputMode::Colored => println!("{}", format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()),
         }
     }
 
@@ -161,7 +161,7 @@ pub fn print_header() {
     println!(
         "{}
 ",
-        "ytcs v0.14.5".dimmed()
+        format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()
     );
 }
 

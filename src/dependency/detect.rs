@@ -92,7 +92,7 @@ impl Platform {
         {
             if Command::new("sh")
                 .arg("-c")
-                .arg(&format!("command -v {}", cmd))
+                .arg(format!("command -v {}", cmd))
                 .output()
                 .map(|output| output.status.success())
                 .unwrap_or(false)
@@ -176,10 +176,8 @@ impl DependencyStatus {
             .or_else(|_| Command::new(name).arg("-version").output())
             .or_else(|_| Command::new(name).arg("version").output());
 
-        if let Ok(output) = version_result {
-            if output.status.success() {
-                return true;
-            }
+        if let Ok(output) = version_result && output.status.success() {
+            return true;
         }
 
         // Fallback: check if the command exists in PATH using 'command -v'
@@ -188,7 +186,7 @@ impl DependencyStatus {
         {
             if Command::new("sh")
                 .arg("-c")
-                .arg(&format!("command -v {}", name))
+                .arg(format!("command -v {}", name))
                 .output()
                 .map(|output| output.status.success())
                 .unwrap_or(false)

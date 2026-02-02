@@ -3,8 +3,9 @@ use colored::Colorize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
-    Result, audio, config, download_audio_with_progress, downloader, error::YtcsError, playlist,
-    print_refinement_report, refine_chapters_with_silence, utils, ytdlp_helper,
+    temp_file::TempFile, Result, audio, config, download_audio_with_progress, downloader,
+    error::YtcsError, playlist, print_refinement_report, refine_chapters_with_silence, utils,
+    ytdlp_helper,
 };
 
 #[derive(Parser)]
@@ -268,21 +269,15 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
         if let Some(info) = ytdlp_helper::get_ytdlp_version()
             && (info.is_outdated || cli.force_update)
         {
-            println!();
-            println!(
-                "{}",
-                format!(
-                    "yt-dlp version {} ({} days old) - updating...",
-                    info.version,
-                    info.days_since_release.unwrap_or(0)
-                )
-                .yellow()
-            );
-            if let Err(e) = ytdlp_helper::update_ytdlp() {
-                println!("{}", format!("Update warning: {}", e).dimmed());
-                println!();
-            } else {
-                println!();
+            let days_old = info.days_since_release.unwrap_or(0);
+            if days_old >= 7 || cli.force_update {
+                println!(
+                    "Updating yt-dlp ({} days old)...",
+                    days_old
+                );
+                if let Err(e) = ytdlp_helper::update_ytdlp() {
+                    println!("  Warning: {}", e);
+                }
             }
         }
     }
@@ -294,27 +289,21 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
     let total_urls = cli.urls.len();
     for (index, url) in cli.urls.iter().enumerate() {
         if total_urls > 1 {
-            println!();
             println!(
-                "{}",
-                format!("=== Processing URL {}/{} ===", index + 1, total_urls)
-                    .cyan()
-                    .bold()
+                "[{}/{}] {}",
+                index + 1,
+                total_urls,
+                url
             );
-            println!("{}", url.bright_blue());
-            println!();
         }
 
         process_single_url(url, &cli, &config)?;
     }
 
     if total_urls > 1 {
-        println!();
         println!(
             "{}",
-            format!("✓ All {} URL(s) processed successfully!", total_urls)
-                .green()
-                .bold()
+            format!("✓ All {} URL(s) processed", total_urls).green()
         );
     }
 
@@ -349,11 +338,9 @@ fn handle_playlist_detection(url: &str, config: &config::Config) -> Result<bool>
     if let Some(_playlist_id) = playlist::is_playlist_url(url) {
         let should_download_playlist = match config.playlist_behavior {
             PlaylistBehavior::Ask => {
-                println!("{}", "Playlist detected!".yellow().bold());
-                println!();
                 print!(
                     "{}",
-                    "Do you want to download (v)ideo only or (p)laylist? [v/p]: ".bold()
+                    "Playlist detected. Download [v]ideo or [p]laylist? ".bold()
                 );
                 io::stdout().flush()?;
 
@@ -365,13 +352,7 @@ fn handle_playlist_detection(url: &str, config: &config::Config) -> Result<bool>
             }
             PlaylistBehavior::VideoOnly => false,
             PlaylistBehavior::PlaylistOnly => {
-                println!("{}", "Playlist detected!".yellow().bold());
-                println!();
-                println!(
-                    "{}",
-                    "Downloading entire playlist (configured behavior)...".green()
-                );
-                println!();
+                println!("{}", "Downloading entire playlist...".green());
                 true
             }
         };
@@ -393,7 +374,6 @@ fn fetch_and_display_video_info(
 ) -> Result<VideoContext> {
     use youtube_chapter_splitter::ui;
 
-    println!("{}", "Fetching video information...".yellow());
     let video_info = downloader::get_video_info(url, cookies_from_browser)?;
 
     // Parse artist and album pour l'affichage
@@ -547,7 +527,6 @@ fn get_chapters_with_fallback(
 
     // Affiner les chapitres avec la détection de silence si demandé
     if refine && !original_chapters.is_empty() {
-        ui::print_info("Refining chapter markers with silence detection...");
         match refine_chapters_with_silence(
             &original_chapters,
             audio_file,
@@ -694,8 +673,6 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
 }
 
 fn download_playlist(url: &str, cli: &DownloadArgs, cfg: &config::Config) -> Result<()> {
-    println!("{}", "Fetching playlist information...".yellow());
-
     let cookies_from_browser = cfg.cookies_from_browser.as_deref();
     let playlist_info = playlist::get_playlist_info(url, cookies_from_browser)?;
 
@@ -757,46 +734,34 @@ fn download_playlist(url: &str, cli: &DownloadArgs, cfg: &config::Config) -> Res
 
     // Download each video
     for (i, video) in playlist_info.videos.iter().enumerate() {
-        println!(
-            "{}",
-            format!("=== Video {}/{} ===", i + 1, playlist_info.videos.len())
-                .bold()
-                .cyan()
-        );
-        println!("{} {}", "Title:".bold(), video.title);
-        println!();
+        println!("[{}/{}] {}", i + 1, playlist_info.videos.len(), video.title);
 
         match download_single_video(&video.url, cli, cfg, &playlist_dir) {
             Ok(_) => {
                 successful += 1;
-                println!("{}", "✓ Video completed successfully!".green().bold());
             }
             Err(e) => {
                 failed += 1;
-                println!("{} {}", "✗ Video failed:".red().bold(), e);
+                println!("  ✗ {}", e);
             }
         }
-
-        println!();
     }
 
     // Summary
-    println!("{}", "=== Playlist Download Complete ===".bold().cyan());
     println!(
-        "{} {}/{}",
-        "Successful:".green(),
+        "{} {}/{} successful",
+        "✓".green(),
         successful,
         playlist_info.videos.len()
     );
     if failed > 0 {
         println!(
-            "{} {}/{}",
-            "Failed:".red(),
+            "{} {}/{} failed",
+            "✗".red(),
             failed,
             playlist_info.videos.len()
         );
     }
-    println!("{} {}", "Directory:".bold(), playlist_dir.display());
 
     // Create M3U playlist if configured
     if cfg.create_playlist {
@@ -838,9 +803,12 @@ fn download_single_video(
     }
 
     // Download audio
+    let temp_audio_path = output_dir.join("temp_audio.mp3");
+    let _temp_file = TempFile::new(&temp_audio_path);
+
     let audio_file = downloader::download_audio(
         &url,
-        &output_dir.join("temp_audio.mp3"),
+        &temp_audio_path,
         cookies_from_browser,
         None,
     )?;
@@ -869,9 +837,7 @@ fn download_single_video(
         cfg,
     )?;
 
-    // Clean up temporary audio file
-    std::fs::remove_file(&audio_file).ok();
-
+    // Temp file is automatically cleaned up by _temp_file when it goes out of scope
     Ok(())
 }
 

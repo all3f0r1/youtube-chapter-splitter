@@ -326,7 +326,6 @@ pub fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
 
     // Détecter si c'est un WebP et le convertir en JPEG si nécessaire
     if is_webp(&data) {
-        eprintln!("Warning: Cover image is WebP format. Converting to JPEG...");
         data = convert_webp_to_jpeg(cover_path)?;
     }
 
@@ -474,8 +473,6 @@ pub fn detect_silence_chapters(
     silence_threshold: f64,
     min_silence_duration: f64,
 ) -> Result<Vec<Chapter>> {
-    println!("Detecting silence to identify tracks...");
-
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(input_file)
@@ -539,7 +536,6 @@ pub fn detect_silence_chapters(
         duration,
     ));
 
-    println!("✓ {} tracks detected", chapters.len());
     Ok(chapters)
 }
 
