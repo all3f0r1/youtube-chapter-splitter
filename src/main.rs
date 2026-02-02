@@ -14,9 +14,9 @@ use youtube_chapter_splitter::{
 struct Cli {
     /// YouTube video URL(s)
     ///
-    /// If provided without --cli: non-interactive TUI-style download
-    /// If provided with --cli: plain-text download mode
     /// If not provided: launch interactive TUI
+    /// If provided without --cli: launch TUI with URL pre-filled
+    /// If provided with --cli: plain-text download mode
     #[arg(value_name = "URL")]
     urls: Vec<String>,
 
@@ -71,8 +71,6 @@ struct DownloadArgs {
     output: Option<String>,
     artist: Option<String>,
     album: Option<String>,
-    #[allow(dead_code)]
-    cli_mode: bool,
     force_update: bool,
 }
 
@@ -156,37 +154,60 @@ fn main() -> Result<()> {
         Some(Commands::UpdateYtdlp) => handle_ytdlp_update(),
         None => {
             // No subcommand - determine mode based on URLs and --cli flag
-            if cli.urls.is_empty() {
-                // No URL provided - launch interactive TUI
-                #[cfg(feature = "tui")]
-                {
-                    return youtube_chapter_splitter::run_tui();
-                }
-                #[cfg(not(feature = "tui"))]
-                {
-                    eprintln!("{}", "Error: No URL provided".red().bold());
+            if cli.cli {
+                // --cli flag: use plain-text CLI mode
+                if cli.urls.is_empty() {
+                    eprintln!("{}", "Error: --cli requires a URL".red().bold());
                     eprintln!();
-                    eprintln!("Usage: ytcs <URL> [OPTIONS]");
-                    eprintln!("       ytcs --cli <URL> [OPTIONS]");
-                    eprintln!("       ytcs config");
-                    eprintln!("       ytcs set <KEY> <VALUE>");
-                    eprintln!("       ytcs reset");
-                    eprintln!("       ytcs update-ytdlp");
-                    eprintln!();
-                    eprintln!("For more information, run: ytcs --help");
+                    eprintln!("Usage: ytcs --cli <URL> [OPTIONS]");
                     std::process::exit(1);
                 }
-            } else {
-                // URLs provided - process download
                 let args = DownloadArgs {
                     urls: cli.urls,
                     output: cli.output,
                     artist: cli.artist,
                     album: cli.album,
-                    cli_mode: cli.cli,
                     force_update: cli.force_update,
                 };
                 handle_download(args)
+            } else {
+                // Default mode: TUI
+                #[cfg(feature = "tui")]
+                {
+                    // If URL provided, start TUI with URL pre-filled
+                    // Otherwise, start TUI on welcome screen
+                    let initial_url = if cli.urls.is_empty() {
+                        None
+                    } else {
+                        Some(cli.urls.join("\n"))
+                    };
+                    return youtube_chapter_splitter::run_tui(initial_url);
+                }
+                #[cfg(not(feature = "tui"))]
+                {
+                    if cli.urls.is_empty() {
+                        eprintln!("{}", "Error: No URL provided".red().bold());
+                        eprintln!();
+                        eprintln!("Usage: ytcs <URL> [OPTIONS]");
+                        eprintln!("       ytcs --cli <URL> [OPTIONS]");
+                        eprintln!("       ytcs config");
+                        eprintln!("       ytcs set <KEY> <VALUE>");
+                        eprintln!("       ytcs reset");
+                        eprintln!("       ytcs update-ytdlp");
+                        eprintln!();
+                        eprintln!("For more information, run: ytcs --help");
+                        std::process::exit(1);
+                    } else {
+                        let args = DownloadArgs {
+                            urls: cli.urls,
+                            output: cli.output,
+                            artist: cli.artist,
+                            album: cli.album,
+                            force_update: cli.force_update,
+                        };
+                        handle_download(args)
+                    }
+                }
             }
         }
     }

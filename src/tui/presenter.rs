@@ -13,8 +13,6 @@ impl TuiStylePresenter {
     }
 
     pub fn print_header(&self, title: &str, duration: &str, track_count: usize) {
-        use colored::Colorize;
-
         let top = "┌".to_string() + &"─".repeat(60) + "┐";
         let bottom = "└".to_string() + &"─".repeat(60) + "┘";
 

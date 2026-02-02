@@ -87,7 +87,27 @@ impl Platform {
 
     /// Check if a command exists on the system
     fn command_exists(cmd: &str) -> bool {
-        Command::new("which")
+        // Try 'command -v' first (more portable, built into shell)
+        #[cfg(unix)]
+        {
+            if Command::new("sh")
+                .arg("-c")
+                .arg(&format!("command -v {}", cmd))
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        // Fallback to 'which' for Unix or 'where' for Windows
+        #[cfg(unix)]
+        let checker = "which";
+        #[cfg(windows)]
+        let checker = "where";
+
+        Command::new(checker)
             .arg(cmd)
             .output()
             .map(|output| output.status.success())
@@ -149,13 +169,47 @@ impl DependencyStatus {
 
     /// Check if a command is available
     fn is_installed(name: &str) -> bool {
-        Command::new(name)
+        // First, try running the command with various version flags
+        let version_result = Command::new(name)
             .arg("--version")
             .output()
             .or_else(|_| Command::new(name).arg("-version").output())
-            .or_else(|_| Command::new(name).arg("version").output())
-            .map(|output| output.status.success())
-            .unwrap_or(false)
+            .or_else(|_| Command::new(name).arg("version").output());
+
+        if let Ok(output) = version_result {
+            if output.status.success() {
+                return true;
+            }
+        }
+
+        // Fallback: check if the command exists in PATH using 'command -v'
+        // This handles cases where the command exists but returns non-zero for --version
+        #[cfg(unix)]
+        {
+            if Command::new("sh")
+                .arg("-c")
+                .arg(&format!("command -v {}", name))
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            if Command::new("where")
+                .arg(name)
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false)
+            {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Get version of a dependency

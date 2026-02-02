@@ -4,9 +4,8 @@
 
 use crate::config::Config;
 use crate::downloader;
-use crate::error::{Result, YtcsError};
-use crate::playlist::PlaylistInfo;
-use std::path::PathBuf;
+use crate::error::Result;
+use crate::{audio, utils, ytdlp_helper};
 
 /// Download operation status
 #[derive(Debug, Clone, PartialEq)]
@@ -207,14 +206,17 @@ impl DownloadManager {
 
     /// Process a single download task
     fn process_single_task(&self, task: &DownloadTask) -> Result<DownloadResult> {
-        use crate::{audio, utils, ytdlp_helper};
-
         let cookies = self.config.cookies_from_browser.as_deref();
 
-        // Update yt-dlp if needed
-        if ytdlp_helper::should_check_for_update(self.config.ytdlp_update_interval_days) {
-            if self.config.ytdlp_auto_update {
-                let _ = ytdlp_helper::update_ytdlp();
+        // Update yt-dlp if needed (matching CLI behavior)
+        if ytdlp_helper::should_check_for_update(self.config.ytdlp_update_interval_days)
+            && self.config.ytdlp_auto_update
+        {
+            if let Some(info) = ytdlp_helper::get_ytdlp_version() {
+                if info.is_outdated {
+                    // Attempt update but don't fail if it doesn't work
+                    let _ = ytdlp_helper::update_ytdlp();
+                }
             }
         }
 
@@ -256,15 +258,37 @@ impl DownloadManager {
             None
         };
 
-        // Get chapters with fallback
+        // Get chapters with fallback AND refinement (matching CLI behavior)
         let chapters = if !video_info.chapters.is_empty() {
-            video_info.chapters.clone()
+            let original = video_info.chapters.clone();
+            // Always refine chapters like CLI does
+            crate::refine_chapters_with_silence(
+                &original,
+                &audio_file,
+                5.0,   // window of ±5 seconds
+                -35.0, // silence threshold in dB
+                1.0,   // minimum silence duration in seconds
+            )
+            .unwrap_or(original)
         } else {
+            // Try description parsing first
             crate::chapters_from_description::parse_chapters_from_description(
                 &video_info.description,
                 video_info.duration,
             )
-            .unwrap_or_else(|_| {
+            .ok()
+            .and_then(|chapters| {
+                // Refine chapters from description too
+                crate::refine_chapters_with_silence(
+                    &chapters,
+                    &audio_file,
+                    5.0,
+                    -35.0,
+                    1.0,
+                )
+                .ok()
+            })
+            .unwrap_or_else(|| {
                 // Fallback to silence detection
                 audio::detect_silence_chapters(&audio_file, -30.0, 2.0).unwrap_or_default()
             })

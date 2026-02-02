@@ -61,7 +61,8 @@ enum SettingsState {
     Browsing,
     /// Editing a text value
     EditingText,
-    /// Showing save confirmation
+    /// Showing save confirmation (for future use)
+    #[allow(dead_code)]
     ConfirmSave,
     /// Showing error message
     Error(String),

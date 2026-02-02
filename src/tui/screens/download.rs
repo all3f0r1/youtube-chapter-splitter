@@ -38,7 +38,6 @@ enum FocusedField {
 enum DownloadState {
     Idle,
     Downloading,
-    Complete,
     Error(String),
 }
 
@@ -110,7 +109,7 @@ impl DownloadScreen {
         self.draw_download_button(f, content_chunks[6]);
     }
 
-    fn draw_status(&self, f: &mut Frame, area: Rect, data: &ScreenData) {
+    fn draw_status(&self, f: &mut Frame, area: Rect, _data: &ScreenData) {
         let status_text = match &self.download_state {
             DownloadState::Idle => {
                 vec![
@@ -132,12 +131,6 @@ impl DownloadScreen {
                     Line::from(""),
                     Line::from("Downloading...").style(Style::default().fg(Color::Yellow)),
                     Line::from("(Download progress coming soon)"),
-                ]
-            }
-            DownloadState::Complete => {
-                vec![
-                    Line::from(""),
-                    Line::from("Download completed!").style(Style::default().fg(Color::Green)),
                 ]
             }
             DownloadState::Error(err) => {
@@ -190,7 +183,7 @@ impl DownloadScreen {
         &mut self,
         key: KeyEvent,
         data: &mut ScreenData,
-        playlist_screen: &mut PlaylistScreen,
+        _playlist_screen: &mut PlaylistScreen,
     ) -> ScreenResult {
         // Check if an input field should handle this key
         let input_handled = match self.focused_field {
@@ -201,6 +194,10 @@ impl DownloadScreen {
         };
 
         if input_handled {
+            // Clear any error state when user modifies input
+            if matches!(self.download_state, DownloadState::Error(_)) {
+                self.download_state = DownloadState::Idle;
+            }
             // Sync URL to screen data
             data.input_url = self.url_input.value.clone();
             data.input_artist = self.artist_input.value.clone();
@@ -232,6 +229,14 @@ impl DownloadScreen {
             KeyCode::Enter => {
                 if self.focused_field == FocusedField::Url && !self.url_input.is_empty() {
                     let url = self.url_input.value.trim();
+
+                    // Validate URL is a YouTube URL
+                    if !url.contains("youtube.com") && !url.contains("youtu.be") {
+                        self.download_state = DownloadState::Error(
+                            "Invalid YouTube URL. Use youtube.com or youtu.be links.".to_string(),
+                        );
+                        return ScreenResult::Continue;
+                    }
 
                     // Check if this is a playlist URL
                     if playlist::is_playlist_url(url).is_some() {

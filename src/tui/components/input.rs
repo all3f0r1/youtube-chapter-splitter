@@ -146,7 +146,7 @@ impl TextInput {
         // Ensure cursor is within bounds
         if cursor_x < area.x + area.width.saturating_sub(1) {
             // Set cursor position (hidden in ratatui, but terminal will show it)
-            f.set_cursor(cursor_x, cursor_y);
+            f.set_cursor_position(ratatui::layout::Position::new(cursor_x, cursor_y));
         }
     }
 

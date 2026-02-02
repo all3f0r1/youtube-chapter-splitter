@@ -7,7 +7,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState},
 };
 
 /// State for a selectable list

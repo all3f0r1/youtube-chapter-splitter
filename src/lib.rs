@@ -80,8 +80,16 @@ pub use error::{Result, YtcsError};
 pub use yt_dlp_progress::download_audio_with_progress;
 
 /// Entry point for the interactive TUI
+///
+/// If `initial_url` is provided, the TUI will start in download mode
+/// with the URL pre-filled.
 #[cfg(feature = "tui")]
-pub fn run_tui() -> Result<()> {
+pub fn run_tui(initial_url: Option<String>) -> Result<()> {
     let mut app = tui::App::new()?;
+    if let Some(url) = initial_url {
+        // Pre-fill the URL and start in download mode
+        app.screen_data.input_url = url;
+        app.current_screen = tui::app::Screen::Download;
+    }
     app.run()
 }

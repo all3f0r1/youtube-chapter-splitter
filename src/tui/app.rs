@@ -3,6 +3,7 @@
 //! This module contains the main TUI application logic using ratatui.
 
 use crate::config::Config;
+use crate::dependency::DependencyState;
 use crate::error::Result;
 use crate::tui::download_manager::DownloadManager;
 use crate::tui::layout::TerminalCapabilities;
@@ -19,9 +20,9 @@ use crossterm::{
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::io;
@@ -75,6 +76,17 @@ pub struct ScreenData {
     pub download_status: String,
     pub error_message: Option<String>,
     pub last_download_result: Option<DownloadResult>,
+    /// Dependency check result (None = not checked yet)
+    pub dependency_status: Option<DependencyStatus>,
+}
+
+/// Status of dependency check
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DependencyStatus {
+    /// All dependencies present
+    Ok,
+    /// Missing dependencies - downloads blocked
+    MissingDependencies { ytdlp: bool, ffmpeg: bool },
 }
 
 #[derive(Default, Clone)]
@@ -90,11 +102,25 @@ impl App {
         let config = Config::load().unwrap_or_default();
         let capabilities = TerminalCapabilities::detect();
 
+        // Check dependencies on startup
+        let dep_state = DependencyState::check_all();
+        let dependency_status = if dep_state.all_present() {
+            Some(DependencyStatus::Ok)
+        } else {
+            Some(DependencyStatus::MissingDependencies {
+                ytdlp: !dep_state.ytdlp.installed,
+                ffmpeg: !dep_state.ffmpeg.installed,
+            })
+        };
+
+        let mut screen_data = ScreenData::default();
+        screen_data.dependency_status = dependency_status;
+
         Ok(Self {
             current_screen: Screen::Welcome,
             should_quit: false,
             config: config.clone(),
-            screen_data: ScreenData::default(),
+            screen_data,
             capabilities,
             welcome_screen: crate::tui::screens::welcome::WelcomeScreen::new(),
             playlist_screen: PlaylistScreen::new(),
@@ -173,7 +199,7 @@ impl App {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     ) -> Result<()> {
-        let mut tick_rate = Duration::from_millis(250);
+        let tick_rate = Duration::from_millis(250);
 
         loop {
             // Draw the current screen
@@ -366,7 +392,6 @@ impl App {
             ScreenResult::Quit => {
                 self.should_quit = true;
             }
-            _ => {}
         }
 
         // Special handling for specific screen transitions
@@ -377,6 +402,18 @@ impl App {
                         .load_from_url(&self.screen_data.input_url, &self.config);
                 }
                 (Screen::Download, Screen::Progress) => {
+                    // Check dependencies before allowing download
+                    if let Some(DependencyStatus::MissingDependencies { .. }) =
+                        self.screen_data.dependency_status
+                    {
+                        // Show error and don't proceed
+                        self.screen_data.error_message = Some(
+                            "Missing dependencies. Please install yt-dlp and ffmpeg.".to_string(),
+                        );
+                        self.current_screen = Screen::Download;
+                        return;
+                    }
+
                     let url = self.screen_data.input_url.trim().to_string();
                     if !url.is_empty() {
                         let artist = if self.screen_data.input_artist.is_empty() {
@@ -394,6 +431,18 @@ impl App {
                     }
                 }
                 (Screen::Playlist, Screen::Progress) => {
+                    // Check dependencies before allowing download
+                    if let Some(DependencyStatus::MissingDependencies { .. }) =
+                        self.screen_data.dependency_status
+                    {
+                        // Show error and don't proceed
+                        self.screen_data.error_message = Some(
+                            "Missing dependencies. Please install yt-dlp and ffmpeg.".to_string(),
+                        );
+                        self.current_screen = Screen::Playlist;
+                        return;
+                    }
+
                     let urls: Vec<String> = self
                         .screen_data
                         .input_url
@@ -415,12 +464,25 @@ impl App {
         // Process downloads if the manager is active
         if self.download_manager.is_active() {
             if let Err(e) = self.download_manager.process_next() {
-                // Download failed - the manager handles this internally
-                eprintln!("Download error: {}", e);
+                // Store error in screen data for TUI display
+                self.screen_data.error_message = Some(format!("Download error: {}", e));
             }
 
             // Check if all downloads are complete
             if self.download_manager.pending_count() == 0 && !self.download_manager.is_active() {
+                // Store final download result in screen data
+                let tasks = self.download_manager.tasks();
+                if !tasks.is_empty() {
+                    let last_task = &tasks[tasks.len() - 1];
+                    if let Some(ref result) = last_task.result {
+                        self.screen_data.last_download_result = Some(crate::tui::app::DownloadResult {
+                            success: result.success,
+                            tracks_count: result.tracks_count,
+                            output_path: result.output_path.clone(),
+                            error: result.error.clone(),
+                        });
+                    }
+                }
                 // All downloads done - navigate to summary
                 self.current_screen = Screen::Summary;
             }

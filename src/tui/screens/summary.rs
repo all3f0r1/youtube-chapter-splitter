@@ -4,7 +4,7 @@
 //! or download another video.
 
 use crate::config::Config;
-use crate::tui::app::{DownloadResult, Screen, ScreenData};
+use crate::tui::app::{Screen, ScreenData};
 use crate::tui::screens::ScreenResult;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -125,7 +125,7 @@ impl SummaryScreen {
         f.render_widget(paragraph, chunks[1]);
 
         // Actions row
-        self.draw_actions(f, chunks[2]);
+        self.draw_actions(f, chunks[2], data);
 
         // Footer hints
         let footer_text = "↑↓: Select | Enter: Confirm | Esc: Welcome | Q: Quit";
@@ -136,7 +136,7 @@ impl SummaryScreen {
         f.render_widget(footer, chunks[3]);
     }
 
-    fn build_content(&self, data: &ScreenData) -> Vec<Line> {
+    fn build_content(&self, data: &ScreenData) -> Vec<Line<'_>> {
         if let Some(ref result) = data.last_download_result {
             if result.success {
                 vec![
@@ -183,7 +183,7 @@ impl SummaryScreen {
         }
     }
 
-    fn draw_actions(&self, f: &mut Frame, area: Rect) {
+    fn draw_actions(&self, f: &mut Frame, area: Rect, data: &ScreenData) {
         // Split actions into 3 columns
         let action_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -195,7 +195,7 @@ impl SummaryScreen {
             .split(area);
 
         // Check if we have a successful download with output path
-        let has_output_path = data_has_output_path(); // We'll check this properly
+        let has_output_path = data_has_output_path(data);
 
         let (open_enabled, another_enabled, quit_enabled) = match self.selected_action {
             SummaryAction::OpenFolder => (true, false, false),
@@ -298,10 +298,11 @@ impl Default for SummaryScreen {
 }
 
 /// Helper to check if data has a valid output path
-fn data_has_output_path() -> bool {
-    // This is a simplified check - in real implementation,
-    // we'd check the actual ScreenData
-    true
+fn data_has_output_path(data: &ScreenData) -> bool {
+    data.last_download_result
+        .as_ref()
+        .map(|r| r.success && !r.output_path.is_empty())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

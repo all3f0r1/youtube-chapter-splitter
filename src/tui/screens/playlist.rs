@@ -306,7 +306,7 @@ impl PlaylistScreen {
         f.render_stateful_widget(list, area, &mut state);
     }
 
-    fn draw_footer(&self, f: &mut Frame, area: Rect, playlist: &PlaylistInfo) {
+    fn draw_footer(&self, f: &mut Frame, area: Rect, _playlist: &PlaylistInfo) {
         let selected = self.selected_count();
 
         let actions = vec![

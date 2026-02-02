@@ -3,7 +3,6 @@
 //! Each screen represents a distinct view in the TUI application.
 
 use crate::tui::app::Screen;
-use crossterm::event::KeyEvent;
 
 pub mod download;
 pub mod help;

@@ -4,7 +4,7 @@
 
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Style},
     text::Line,
     widgets::{Block, Borders, Paragraph, Wrap},

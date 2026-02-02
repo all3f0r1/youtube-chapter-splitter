@@ -28,8 +28,24 @@ impl DependencyInstaller {
 
     /// Install a dependency by name
     pub fn install(&self, name: &str) -> Result<()> {
-        let method = self.platform.install_method();
+        use super::detect::DependencyStatus;
 
+        // Check if already installed before attempting installation
+        let status = DependencyStatus::check(name);
+        if status.installed {
+            let version_msg = if let Some(v) = &status.version {
+                format!(" (version {})", v)
+            } else {
+                String::new()
+            };
+            eprintln!(
+                "{}",
+                format!("✓ {} is already installed{}", name, version_msg).green()
+            );
+            return Ok(());
+        }
+
+        let method = self.platform.install_method();
         let command = self.get_install_command(name, method)?;
 
         eprintln!("{}", format!("Installing {}...", name).yellow());
@@ -40,8 +56,29 @@ impl DependencyInstaller {
             .spawn()?
             .wait()?;
 
-        if status.success() {
-            eprintln!("{}", format!("✓ {} installed successfully", name).green());
+        // Verify installation was successful
+        let post_install_status = DependencyStatus::check(name);
+        if post_install_status.installed {
+            let version_msg = if let Some(v) = &post_install_status.version {
+                format!(" (version {})", v)
+            } else {
+                String::new()
+            };
+            eprintln!(
+                "{}",
+                format!("✓ {} installed successfully{}", name, version_msg).green()
+            );
+            Ok(())
+        } else if status.success() {
+            // Package manager reported success but command not found
+            // This can happen with PATH issues - notify the user
+            eprintln!(
+                "{}",
+                format!(
+                    "⚠ {} was installed but may not be in your PATH. You may need to restart your terminal or log out and back in.",
+                    name
+                ).yellow()
+            );
             Ok(())
         } else {
             Err(YtcsError::InstallError(format!(
