@@ -216,10 +216,10 @@ impl TextInput {
                 true
             }
             KeyCode::Right => {
-                if self.cursor < self.value.len() {
-                    if let Some(ch) = self.value[self.cursor..].chars().next() {
-                        self.cursor += ch.len_utf8();
-                    }
+                if self.cursor < self.value.len()
+                    && let Some(ch) = self.value[self.cursor..].chars().next()
+                {
+                    self.cursor += ch.len_utf8();
                 }
                 true
             }
@@ -342,8 +342,7 @@ impl TextArea {
                 if self.cursor_col > 0 {
                     let prev_char_len = self.lines[self.cursor_line]
                         .chars()
-                        .rev()
-                        .next()
+                        .next_back()
                         .map(|c| c.len_utf8())
                         .unwrap_or(1);
                     self.cursor_col -= prev_char_len;

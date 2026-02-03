@@ -211,13 +211,11 @@ impl DownloadManager {
         // Update yt-dlp if needed (matching CLI behavior)
         if ytdlp_helper::should_check_for_update(self.config.ytdlp_update_interval_days)
             && self.config.ytdlp_auto_update
+            && let Some(info) = ytdlp_helper::get_ytdlp_version()
+            && info.is_outdated
         {
-            if let Some(info) = ytdlp_helper::get_ytdlp_version() {
-                if info.is_outdated {
-                    // Attempt update but don't fail if it doesn't work
-                    let _ = ytdlp_helper::update_ytdlp();
-                }
-            }
+            // Attempt update but don't fail if it doesn't work
+            let _ = ytdlp_helper::update_ytdlp();
         }
 
         // Fetch video info

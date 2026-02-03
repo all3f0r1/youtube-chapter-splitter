@@ -82,11 +82,10 @@ impl PlaylistScreen {
 
     /// Toggle selection for focused video
     fn toggle_selection(&mut self) {
-        if let Some(playlist) = self.get_playlist() {
-            if self.focused_index < playlist.videos.len() {
-                self.selected_videos[self.focused_index] =
-                    !self.selected_videos[self.focused_index];
-            }
+        if let Some(playlist) = self.get_playlist()
+            && self.focused_index < playlist.videos.len()
+        {
+            self.selected_videos[self.focused_index] = !self.selected_videos[self.focused_index];
         }
     }
 
@@ -294,11 +293,7 @@ impl PlaylistScreen {
 
         let mut state = ListState::default();
         // Calculate the relative position within the visible window
-        let visible_index = if self.focused_index >= self.offset {
-            self.focused_index - self.offset
-        } else {
-            0
-        };
+        let visible_index = self.focused_index.saturating_sub(self.offset);
         if visible_index < list_items.len() {
             state.select(Some(visible_index));
         }
@@ -309,7 +304,7 @@ impl PlaylistScreen {
     fn draw_footer(&self, f: &mut Frame, area: Rect, _playlist: &PlaylistInfo) {
         let selected = self.selected_count();
 
-        let actions = vec![
+        let actions = [
             "↑↓: Navigate".to_string(),
             "Space: Toggle".to_string(),
             "A: Select All".to_string(),

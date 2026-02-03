@@ -213,30 +213,30 @@ impl SettingsScreen {
 
     /// Toggle a boolean setting
     fn toggle_boolean(&mut self) {
-        if let Some(item) = self.selected_item_mut() {
-            if item.setting_type == SettingType::Boolean {
-                let new_val = !item.value_string.parse::<bool>().unwrap_or(false);
-                item.value_string = new_val.to_string();
-                self.pending_changes = true;
-            }
+        if let Some(item) = self.selected_item_mut()
+            && item.setting_type == SettingType::Boolean
+        {
+            let new_val = !item.value_string.parse::<bool>().unwrap_or(false);
+            item.value_string = new_val.to_string();
+            self.pending_changes = true;
         }
     }
 
     /// Cycle to next enum value
     fn cycle_enum(&mut self, forward: bool) {
-        if let Some(item) = self.selected_item_mut() {
-            if let SettingType::Enum(options) = item.setting_type {
-                let current = &item.value_string;
-                let idx = options.iter().position(|&s| s == current).unwrap_or(0);
-                let len = options.len();
-                let new_idx = if forward {
-                    (idx + 1) % len
-                } else {
-                    (idx + len - 1) % len // Wrap correctly when going backward from 0
-                };
-                item.value_string = options[new_idx].to_string();
-                self.pending_changes = true;
-            }
+        if let Some(item) = self.selected_item_mut()
+            && let SettingType::Enum(options) = item.setting_type
+        {
+            let current = &item.value_string;
+            let idx = options.iter().position(|&s| s == current).unwrap_or(0);
+            let len = options.len();
+            let new_idx = if forward {
+                (idx + 1) % len
+            } else {
+                (idx + len - 1) % len // Wrap correctly when going backward from 0
+            };
+            item.value_string = options[new_idx].to_string();
+            self.pending_changes = true;
         }
     }
 
@@ -251,13 +251,11 @@ impl SettingsScreen {
                         .with_focused(true);
                     self.state = SettingsState::EditingText;
                 }
-                SettingType::Boolean | SettingType::Enum(_) => {
-                    // Toggle boolean or cycle enum
-                    if matches!(item.setting_type, SettingType::Boolean) {
-                        self.toggle_boolean();
-                    } else {
-                        self.cycle_enum(true);
-                    }
+                SettingType::Boolean => {
+                    self.toggle_boolean();
+                }
+                SettingType::Enum(_) => {
+                    self.cycle_enum(true);
                 }
             }
         }

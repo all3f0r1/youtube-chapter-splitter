@@ -278,14 +278,14 @@ impl SummaryScreen {
     }
 
     fn try_open_folder(&mut self, data: &ScreenData) {
-        if let Some(ref result) = data.last_download_result {
-            if result.success {
-                let path = &result.output_path;
-                if Self::open_folder(path) {
-                    // Success - folder opened
-                } else {
-                    // Failed - could show error in UI
-                }
+        if let Some(ref result) = data.last_download_result
+            && result.success
+        {
+            let path = &result.output_path;
+            if Self::open_folder(path) {
+                // Success - folder opened
+            } else {
+                // Failed - could show error in UI
             }
         }
     }

@@ -107,12 +107,12 @@ impl BoxChars {
 
     /// Get a horizontal line of specified width
     pub fn h_line(&self, width: usize) -> String {
-        std::iter::repeat(self.horizontal()).take(width).collect()
+        std::iter::repeat_n(self.horizontal(), width).collect()
     }
 
     /// Get a vertical line of specified height
     pub fn v_line(&self, height: usize) -> String {
-        std::iter::repeat(self.vertical()).take(height).collect()
+        std::iter::repeat_n(self.vertical(), height).collect()
     }
 
     /// Create a box frame with title

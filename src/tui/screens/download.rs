@@ -4,6 +4,7 @@
 //! Supports auto-detection of artist/album from video metadata.
 
 use crate::config::Config;
+use crate::downloader;
 use crate::playlist;
 use crate::tui::app::{Screen, ScreenData};
 use crate::tui::components::input::TextInput;
@@ -17,6 +18,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
+use std::time::Instant;
 
 /// Download screen
 pub struct DownloadScreen {
@@ -29,6 +31,16 @@ pub struct DownloadScreen {
     artist_modified: bool,
     /// Track if user has manually modified album (to clear auto-detected flag)
     album_modified: bool,
+    /// Metadata fetching state
+    metadata_state: MetadataState,
+    /// Last URL change timestamp for debounce
+    last_url_change: Option<Instant>,
+    /// Debounce delay in milliseconds before fetching metadata
+    metadata_debounce_ms: u64,
+    /// Last URL for which metadata was fetched (to avoid re-fetching)
+    last_fetched_url: Option<String>,
+    /// Any error from metadata fetching
+    metadata_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +55,19 @@ enum FocusedField {
 enum DownloadState {
     Idle,
     Downloading,
+    Error(String),
+}
+
+/// State of metadata auto-detection from URL
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MetadataState {
+    /// No URL entered yet
+    Idle,
+    /// Fetching video metadata
+    Loading,
+    /// Metadata successfully detected
+    Detected,
+    /// Detection failed
     Error(String),
 }
 
@@ -63,24 +88,52 @@ impl DownloadScreen {
             download_state: DownloadState::Idle,
             artist_modified: false,
             album_modified: false,
+            metadata_state: MetadataState::Idle,
+            last_url_change: None,
+            metadata_debounce_ms: 700, // 700ms debounce
+            last_fetched_url: None,
+            metadata_error: None,
         }
     }
 
-    pub fn draw(&mut self, f: &mut Frame, data: &ScreenData, _config: &Config) {
+    pub fn draw(&mut self, f: &mut Frame, data: &ScreenData, config: &Config) {
         // Sync URL from screen data
         if self.url_input.value != data.input_url {
             self.url_input.value = data.input_url.clone();
         }
 
+        // Check if we should fetch metadata (debounce)
+        if matches!(
+            self.metadata_state,
+            MetadataState::Idle | MetadataState::Error(_)
+        ) && let Some(last_change) = self.last_url_change
+        {
+            let elapsed = last_change.elapsed().as_millis();
+            if elapsed >= self.metadata_debounce_ms as u128 {
+                let current_url = self.url_input.value.trim().to_string();
+                // Check if URL looks valid and hasn't been fetched yet
+                if self.is_valid_youtube_url(&current_url)
+                    && self.last_fetched_url.as_ref() != Some(&current_url)
+                {
+                    // Extract cookies before mutable borrow to avoid borrow checker issue
+                    let cookies_from_browser = config.cookies_from_browser.as_deref();
+                    self.fetch_metadata(&current_url, cookies_from_browser);
+                }
+            }
+        }
+
         // Sync artist/album from screen data if auto-detected and not modified by user
-        if data.metadata_autodetected {
-            // Only sync if the user hasn't manually modified the field
-            if !self.artist_modified && self.artist_input.value != data.input_artist {
-                self.artist_input.value = data.input_artist.clone();
-            }
-            if !self.album_modified && self.album_input.value != data.input_album {
-                self.album_input.value = data.input_album.clone();
-            }
+        if data.metadata_autodetected
+            && !self.artist_modified
+            && self.artist_input.value != data.input_artist
+        {
+            self.artist_input.value = data.input_artist.clone();
+        }
+        if data.metadata_autodetected
+            && !self.album_modified
+            && self.album_input.value != data.input_album
+        {
+            self.album_input.value = data.input_album.clone();
         }
 
         let size = f.area();
@@ -121,44 +174,30 @@ impl DownloadScreen {
         self.album_input.focused = self.focused_field == FocusedField::Album;
 
         // Update artist/album input titles and colors based on auto-detection
-        let (artist_title, artist_color) = if data.metadata_autodetected
-            && !self.artist_input.value.is_empty()
-            && !self.artist_modified
-        {
-            ("Artist (auto-detected) ✓", Color::Rgb(100, 200, 100))
-        } else if self.artist_modified {
-            ("Artist (edited)", Color::Rgb(200, 200, 150))
-        } else {
-            ("Artist (optional)", Color::Gray)
+        let (artist_title, artist_color) = match &self.metadata_state {
+            MetadataState::Loading => ("Artist (loading...)", Color::Rgb(200, 200, 100)),
+            MetadataState::Detected if !self.artist_input.value.is_empty() => {
+                ("Artist (auto-detected) ✓", Color::Rgb(100, 200, 100))
+            }
+            _ if self.artist_modified => ("Artist (edited)", Color::Rgb(200, 200, 150)),
+            _ => ("Artist (optional)", Color::Gray),
         };
 
-        let (album_title, album_color) = if data.metadata_autodetected
-            && !self.album_input.value.is_empty()
-            && !self.album_modified
-        {
-            ("Album (auto-detected) ✓", Color::Rgb(100, 200, 100))
-        } else if self.album_modified {
-            ("Album (edited)", Color::Rgb(200, 200, 150))
-        } else {
-            ("Album (optional)", Color::Gray)
+        let (album_title, album_color) = match &self.metadata_state {
+            MetadataState::Loading => ("Album (loading...)", Color::Rgb(200, 200, 100)),
+            MetadataState::Detected if !self.album_input.value.is_empty() => {
+                ("Album (auto-detected) ✓", Color::Rgb(100, 200, 100))
+            }
+            _ if self.album_modified => ("Album (edited)", Color::Rgb(200, 200, 150)),
+            _ => ("Album (optional)", Color::Gray),
         };
 
         self.artist_input.title = artist_title.to_string();
         self.album_input.title = album_title.to_string();
 
         // Draw inputs with custom title colors for auto-detected fields
-        self.draw_input_with_title_color(
-            f,
-            content_chunks[2],
-            &self.artist_input,
-            artist_color,
-        );
-        self.draw_input_with_title_color(
-            f,
-            content_chunks[4],
-            &self.album_input,
-            album_color,
-        );
+        self.draw_input_with_title_color(f, content_chunks[2], &self.artist_input, artist_color);
+        self.draw_input_with_title_color(f, content_chunks[4], &self.album_input, album_color);
 
         // URL input (default color)
         self.url_input.draw(f, content_chunks[0]);
@@ -171,6 +210,25 @@ impl DownloadScreen {
     }
 
     fn draw_status(&self, f: &mut Frame, area: Rect, _data: &ScreenData) {
+        // Show metadata error if present
+        if let Some(ref error) = self.metadata_error {
+            let status_text = vec![
+                Line::from(""),
+                Line::from(""),
+                Line::from("Looking for metadata...").style(Style::default().fg(Color::Yellow)),
+                Line::from(""),
+                Line::from("Metadata error:").style(Style::default().fg(Color::Red)),
+                Line::from(format!("  {}", error)).style(Style::default().fg(Color::Red)),
+            ];
+
+            let paragraph = Paragraph::new(status_text)
+                .alignment(Alignment::Left)
+                .style(Style::default().fg(Color::White))
+                .wrap(Wrap { trim: true });
+            f.render_widget(paragraph, area);
+            return;
+        }
+
         let status_text = match &self.download_state {
             DownloadState::Idle => {
                 vec![
@@ -252,11 +310,7 @@ impl DownloadScreen {
         let title = Span::styled(&input.title, title_style);
 
         let block = Block::default()
-            .borders(if input.focused {
-                Borders::ALL
-            } else {
-                Borders::ALL
-            })
+            .borders(Borders::ALL)
             .border_style(if input.focused {
                 Style::default().fg(Color::Cyan)
             } else {
@@ -272,7 +326,10 @@ impl DownloadScreen {
         } else {
             // Truncate if too long for display
             let display_value = if input.value.len() > (inner.width as usize).saturating_sub(2) {
-                let start = input.value.len().saturating_sub((inner.width as usize).saturating_sub(4));
+                let start = input
+                    .value
+                    .len()
+                    .saturating_sub((inner.width as usize).saturating_sub(4));
                 format!("...{}", &input.value[start..])
             } else {
                 input.value.clone()
@@ -280,8 +337,7 @@ impl DownloadScreen {
             Span::from(display_value)
         };
 
-        let paragraph = Paragraph::new(input_text)
-            .alignment(ratatui::layout::Alignment::Left);
+        let paragraph = Paragraph::new(input_text).alignment(ratatui::layout::Alignment::Left);
         f.render_widget(paragraph, inner);
     }
 
@@ -300,17 +356,36 @@ impl DownloadScreen {
         };
 
         if input_handled {
-            // Track when user modifies artist/album fields
-            if self.focused_field == FocusedField::Artist {
-                // Mark as modified if user typed something (not just navigation)
-                if matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete) {
-                    self.artist_modified = true;
+            // Track URL changes for metadata fetching debounce
+            if self.focused_field == FocusedField::Url {
+                // Check if URL actually changed (not just cursor movement)
+                let url_changed = matches!(key.code, KeyCode::Char(_))
+                    || matches!(key.code, KeyCode::Backspace)
+                    || matches!(key.code, KeyCode::Delete);
+                if url_changed {
+                    // Reset metadata state and error when URL changes
+                    self.metadata_state = MetadataState::Idle;
+                    self.metadata_error = None;
+                    self.last_url_change = Some(Instant::now());
                 }
             }
-            if self.focused_field == FocusedField::Album {
-                if matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete) {
-                    self.album_modified = true;
-                }
+
+            // Track when user modifies artist/album fields
+            if self.focused_field == FocusedField::Artist
+                && matches!(
+                    key.code,
+                    KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
+                )
+            {
+                self.artist_modified = true;
+            }
+            if self.focused_field == FocusedField::Album
+                && matches!(
+                    key.code,
+                    KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
+                )
+            {
+                self.album_modified = true;
             }
 
             // Clear any error state when user modifies input
@@ -407,6 +482,43 @@ impl DownloadScreen {
         self.download_state = DownloadState::Idle;
         self.artist_modified = false;
         self.album_modified = false;
+        self.metadata_state = MetadataState::Idle;
+        self.last_url_change = None;
+        self.last_fetched_url = None;
+        self.metadata_error = None;
+    }
+
+    /// Check if the URL looks like a valid YouTube URL
+    fn is_valid_youtube_url(&self, url: &str) -> bool {
+        let trimmed = url.trim();
+        trimmed.contains("youtube.com") || trimmed.contains("youtu.be")
+    }
+
+    /// Fetch metadata from YouTube URL
+    fn fetch_metadata(&mut self, url: &str, cookies_from_browser: Option<&str>) {
+        self.metadata_state = MetadataState::Loading;
+        self.metadata_error = None;
+
+        match downloader::get_video_info(url, cookies_from_browser) {
+            Ok(video_info) => {
+                let (artist, album) =
+                    crate::utils::parse_artist_album(&video_info.title, &video_info.uploader);
+
+                // Apply the detected metadata to the input fields
+                self.artist_input.value = artist.clone();
+                self.artist_input.cursor = artist.len();
+
+                self.album_input.value = album.clone();
+                self.album_input.cursor = album.len();
+
+                self.metadata_state = MetadataState::Detected;
+                self.last_fetched_url = Some(url.to_string());
+            }
+            Err(e) => {
+                self.metadata_state = MetadataState::Error(e.to_string());
+                self.metadata_error = Some(e.to_string());
+            }
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "youtube_chapter_splitter"
-version = "0.15.2"
+version = "0.15.3"
 edition = "2024"
 rust-version = "1.93"
 authors = ["YouTube Chapter Splitter Contributors"]

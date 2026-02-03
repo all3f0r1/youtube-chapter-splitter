@@ -84,8 +84,7 @@ pub use yt_dlp_progress::download_audio_with_progress;
 /// If `initial_url` is provided, the TUI will:
 /// 1. Fetch video metadata (title, uploader)
 /// 2. Parse artist/album from metadata
-/// 3. Pre-fill URL field and auto-detect artist/album
-/// 4. Start in download mode
+/// 3. Auto-start the download immediately (like the old CLI behavior)
 ///
 /// If no URL provided, starts on welcome screen.
 #[cfg(feature = "tui")]
@@ -95,28 +94,42 @@ pub fn run_tui(initial_url: Option<String>) -> Result<()> {
     let mut app = tui::App::new()?;
 
     if let Some(url) = initial_url {
-        // Pre-fill the URL
-        app.screen_data.input_url = url.clone();
-        app.current_screen = tui::app::Screen::Download;
+        // Check if this is a playlist URL
+        if crate::playlist::is_playlist_url(&url).is_some() {
+            // For playlists, go to playlist screen
+            app.screen_data.input_url = url.clone();
+            app.current_screen = tui::app::Screen::Playlist;
+            app.playlist_screen.load_from_url(&url, &app.config);
+        } else {
+            // For single videos, fetch metadata and auto-start download
+            let cookies_from_browser = app.config.cookies_from_browser.as_deref();
+            match downloader::get_video_info(&url, cookies_from_browser) {
+                Ok(video_info) => {
+                    // Parse artist and album from title/uploader
+                    let (artist, album) =
+                        utils::parse_artist_album(&video_info.title, &video_info.uploader);
 
-        // Fetch metadata to pre-fill artist/album
-        let cookies_from_browser = app.config.cookies_from_browser.as_deref();
-        match downloader::get_video_info(&url, cookies_from_browser) {
-            Ok(video_info) => {
-                // Parse artist and album from title/uploader
-                let (artist, album) = utils::parse_artist_album(
-                    &video_info.title,
-                    &video_info.uploader,
-                );
-                app.screen_data.input_artist = artist;
-                app.screen_data.input_album = album;
-                // Mark metadata as auto-detected (for visual indication)
-                app.screen_data.metadata_autodetected = true;
-            }
-            Err(e) => {
-                // If metadata fetch fails, just continue with URL pre-filled
-                log::warn!("Could not fetch metadata: {}", e);
-                app.screen_data.metadata_autodetected = false;
+                    // Add to download manager and start immediately
+                    app.download_manager.add_url(
+                        url.clone(),
+                        if artist.is_empty() {
+                            None
+                        } else {
+                            Some(artist)
+                        },
+                        if album.is_empty() { None } else { Some(album) },
+                    );
+                    app.download_manager.start();
+
+                    // Navigate directly to progress screen (auto-start like CLI mode)
+                    app.current_screen = tui::app::Screen::Progress;
+                }
+                Err(e) => {
+                    // If metadata fetch fails, go to download screen with URL pre-filled
+                    log::warn!("Could not fetch metadata: {}", e);
+                    app.screen_data.input_url = url;
+                    app.current_screen = tui::app::Screen::Download;
+                }
             }
         }
     }

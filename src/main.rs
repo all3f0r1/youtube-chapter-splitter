@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
     Result, audio, config, download_audio_with_progress, downloader, error::YtcsError, playlist,
-    print_refinement_report, refine_chapters_with_silence, temp_file::TempFile, ui,
-    utils, ytdlp_helper,
+    print_refinement_report, refine_chapters_with_silence, temp_file::TempFile, ui, utils,
+    ytdlp_helper,
 };
 
 #[derive(Parser)]
@@ -182,7 +182,7 @@ fn main() -> Result<()> {
                     } else {
                         Some(cli.urls.join("\n"))
                     };
-                    return youtube_chapter_splitter::run_tui(initial_url);
+                    youtube_chapter_splitter::run_tui(initial_url)
                 }
                 #[cfg(not(feature = "tui"))]
                 {

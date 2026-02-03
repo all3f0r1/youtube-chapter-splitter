@@ -7,6 +7,12 @@ use crate::error::Result;
 /// TUI-style presenter for non-interactive downloads
 pub struct TuiStylePresenter;
 
+impl Default for TuiStylePresenter {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl TuiStylePresenter {
     pub fn new() -> Self {
         Self

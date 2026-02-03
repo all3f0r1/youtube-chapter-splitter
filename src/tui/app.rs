@@ -117,8 +117,10 @@ impl App {
             })
         };
 
-        let mut screen_data = ScreenData::default();
-        screen_data.dependency_status = dependency_status;
+        let screen_data = ScreenData {
+            dependency_status,
+            ..Default::default()
+        };
 
         Ok(Self {
             current_screen: Screen::Welcome,
@@ -252,7 +254,8 @@ impl App {
                 self.welcome_screen.draw(f, &self.screen_data, &self.config);
             }
             Screen::Download => {
-                self.download_screen.draw(f, &self.screen_data, &self.config);
+                self.download_screen
+                    .draw(f, &self.screen_data, &self.config);
             }
             Screen::Playlist => {
                 self.playlist_screen
@@ -369,10 +372,11 @@ impl App {
         // Route key event to current screen
         let result = match self.current_screen {
             Screen::Welcome => self.welcome_screen.handle_key(key, &mut self.screen_data),
-            Screen::Download => {
-                self.download_screen
-                    .handle_key(key, &mut self.screen_data, &mut self.playlist_screen)
-            }
+            Screen::Download => self.download_screen.handle_key(
+                key,
+                &mut self.screen_data,
+                &mut self.playlist_screen,
+            ),
             Screen::Playlist => self.playlist_screen.handle_key(key, &mut self.screen_data),
             Screen::Progress => self.progress_screen.handle_key(key, &mut self.screen_data),
             Screen::Settings => {

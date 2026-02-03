@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2025-02-03
+
+### Added
+- **Real-time Metadata Detection**: Artist and album fields are now auto-populated when pasting a YouTube URL in the TUI download screen
+- **Debounce Timer**: 700ms delay after URL input before fetching metadata to avoid unnecessary API calls
+- **Loading Indicators**: Field titles show "(loading...)" in yellow while metadata is being fetched
+- **Error Display**: Metadata fetch errors are shown in the status area with "Looking for metadata..." message
+
+### Changed
+- **Auto-start Download**: When providing a URL as argument, download starts immediately (like old CLI mode) without requiring Enter confirmation
+- Metadata detection now works both at startup (URL passed as argument) and during TUI navigation (URL pasted in download screen)
+- Improved user feedback with color-coded field states: gray (optional), yellow (loading), green (auto-detected), tan (edited)
+
+### Technical Details
+- Added `MetadataState` enum to track detection state (Idle/Loading/Detected/Error)
+- Added debounce fields: `last_url_change`, `metadata_debounce_ms`, `last_fetched_url`, `metadata_error`
+- Refactored `fetch_metadata()` to avoid borrow checker issues by extracting cookies before mutable borrow
+- Metadata fetch is now triggered in `draw()` when debounce timer expires
+- `run_tui()` now directly calls `download_manager.add_url()` and `start()` for immediate download on URL argument
+
 ## [0.15.2] - 2025-02-03
 
 ### Added
