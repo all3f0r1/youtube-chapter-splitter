@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use youtube_chapter_splitter::{
     Result, audio, config, download_audio_with_progress, downloader, error::YtcsError, playlist,
-    print_refinement_report, refine_chapters_with_silence, temp_file::TempFile, utils,
-    ytdlp_helper,
+    print_refinement_report, refine_chapters_with_silence, temp_file::TempFile, ui,
+    utils, ytdlp_helper,
 };
 
 #[derive(Parser)]
@@ -280,7 +280,8 @@ fn handle_download(cli: DownloadArgs) -> Result<()> {
     }
 
     // Afficher l'en-tête TUI moderne
-    youtube_chapter_splitter::ui::print_header();
+    ui::print_header();
+    ui::print_blank_line();
 
     // Process each URL
     let total_urls = cli.urls.len();
@@ -385,6 +386,7 @@ fn fetch_and_display_video_info(
         !has_chapters,
         false,
     );
+    ui::print_blank_line();
 
     Ok(VideoContext {
         info: video_info,
@@ -648,6 +650,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     let chapters = get_chapters_with_fallback(&video_ctx.info, &assets.audio_file, true)?;
 
     // 6. Split into tracks
+    ui::print_blank_line();
     split_into_tracks(
         &chapters,
         &assets.audio_file,
@@ -659,6 +662,7 @@ fn process_single_url(url: &str, cli: &DownloadArgs, config: &config::Config) ->
     )?;
 
     // Success message
+    ui::print_blank_line();
     ui::print_success(&output_dir.display().to_string());
 
     Ok(())

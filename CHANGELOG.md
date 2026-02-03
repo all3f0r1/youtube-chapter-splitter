@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] - 2025-02-03
+
+### Added
+- **TUI Metadata Pre-fill**: When providing a URL at startup, artist and album fields are now pre-filled with auto-detected metadata
+- **Visual Indicators**: Auto-detected fields show "✓" badge and green color for clear user feedback
+- **Edit Tracking**: Modified fields display "(edited)" label to distinguish from auto-detected values
+- **CLI Mode Flag**: Plain-text CLI mode is now accessed via `--cli` flag (for scripting/piping)
+
+### Changed
+- **TUI is Default**: The TUI is now the default mode when running `ytcs` without arguments
+  - Previous versions required `--tui` flag; now TUI is always enabled
+  - Use `--cli` flag for the previous default behavior (plain-text output)
+- **CLI Output Spacing**: Improved spacing for half-screen terminals with consistent blank lines between major sections
+- **DownloadScreen Persistence**: Fixed state management bug where user modifications were lost on render
+
+### Technical Details
+- Made `DownloadScreen` persistent in `App` struct (previously recreated on each draw/key event)
+- Added `metadata_autodetected` flag to `ScreenData` for tracking auto-detection state
+- Added `artist_modified` and `album_modified` fields to `DownloadScreen` for tracking user edits
+- Added `print_blank_line()` helper for explicit section spacing in CLI output
+- Updated feature flags: `default = ["tui"]` in Cargo.toml
+
 ## [0.15.1] - 2025-02-02
 
 ### Changed

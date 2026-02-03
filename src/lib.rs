@@ -81,15 +81,45 @@ pub use yt_dlp_progress::download_audio_with_progress;
 
 /// Entry point for the interactive TUI
 ///
-/// If `initial_url` is provided, the TUI will start in download mode
-/// with the URL pre-filled.
+/// If `initial_url` is provided, the TUI will:
+/// 1. Fetch video metadata (title, uploader)
+/// 2. Parse artist/album from metadata
+/// 3. Pre-fill URL field and auto-detect artist/album
+/// 4. Start in download mode
+///
+/// If no URL provided, starts on welcome screen.
 #[cfg(feature = "tui")]
 pub fn run_tui(initial_url: Option<String>) -> Result<()> {
+    use crate::{downloader, utils};
+
     let mut app = tui::App::new()?;
+
     if let Some(url) = initial_url {
-        // Pre-fill the URL and start in download mode
-        app.screen_data.input_url = url;
+        // Pre-fill the URL
+        app.screen_data.input_url = url.clone();
         app.current_screen = tui::app::Screen::Download;
+
+        // Fetch metadata to pre-fill artist/album
+        let cookies_from_browser = app.config.cookies_from_browser.as_deref();
+        match downloader::get_video_info(&url, cookies_from_browser) {
+            Ok(video_info) => {
+                // Parse artist and album from title/uploader
+                let (artist, album) = utils::parse_artist_album(
+                    &video_info.title,
+                    &video_info.uploader,
+                );
+                app.screen_data.input_artist = artist;
+                app.screen_data.input_album = album;
+                // Mark metadata as auto-detected (for visual indication)
+                app.screen_data.metadata_autodetected = true;
+            }
+            Err(e) => {
+                // If metadata fetch fails, just continue with URL pre-filled
+                log::warn!("Could not fetch metadata: {}", e);
+                app.screen_data.metadata_autodetected = false;
+            }
+        }
     }
+
     app.run()
 }

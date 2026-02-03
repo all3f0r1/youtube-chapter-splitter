@@ -9,6 +9,11 @@
 use colored::*;
 use std::io::{self, Write};
 
+/// Print a blank line for explicit section separation
+pub fn print_blank_line() {
+    println!();
+}
+
 /// Output mode for UI
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OutputMode {
@@ -114,13 +119,10 @@ impl PlainTextPresenter {
     pub fn section_header(&self, title: &str) {
         match self.output_mode {
             OutputMode::Plain => {
-                println!();
                 println!("=== {} ===", title);
-                println!();
             }
             OutputMode::Colored => {
                 println!("{}", title.bright_cyan().bold());
-                println!();
             }
         }
     }
@@ -132,7 +134,6 @@ impl PlainTextPresenter {
                 println!("Title: {}", clean_title(title));
                 println!("Duration: {}", duration);
                 println!("Tracks: {}", tracks);
-                println!();
             }
             OutputMode::Colored => {
                 print_video_info(title, duration, tracks, false, false);
@@ -171,7 +172,6 @@ pub fn print_header() {
 /// Display section header
 pub fn print_section_header(title: &str) {
     println!("{}", title.bright_cyan().bold());
-    println!();
 }
 
 /// Display video information

@@ -1,6 +1,7 @@
 //! Download screen for the TUI
 //!
 //! Allows users to input URLs and download options.
+//! Supports auto-detection of artist/album from video metadata.
 
 use crate::config::Config;
 use crate::playlist;
@@ -13,7 +14,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
@@ -24,6 +25,10 @@ pub struct DownloadScreen {
     album_input: TextInput,
     focused_field: FocusedField,
     download_state: DownloadState,
+    /// Track if user has manually modified artist (to clear auto-detected flag)
+    artist_modified: bool,
+    /// Track if user has manually modified album (to clear auto-detected flag)
+    album_modified: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,10 +61,28 @@ impl DownloadScreen {
                 .with_title("Album (optional)"),
             focused_field: FocusedField::Url,
             download_state: DownloadState::Idle,
+            artist_modified: false,
+            album_modified: false,
         }
     }
 
     pub fn draw(&mut self, f: &mut Frame, data: &ScreenData, _config: &Config) {
+        // Sync URL from screen data
+        if self.url_input.value != data.input_url {
+            self.url_input.value = data.input_url.clone();
+        }
+
+        // Sync artist/album from screen data if auto-detected and not modified by user
+        if data.metadata_autodetected {
+            // Only sync if the user hasn't manually modified the field
+            if !self.artist_modified && self.artist_input.value != data.input_artist {
+                self.artist_input.value = data.input_artist.clone();
+            }
+            if !self.album_modified && self.album_input.value != data.input_album {
+                self.album_input.value = data.input_album.clone();
+            }
+        }
+
         let size = f.area();
 
         let chunks = Layout::default()
@@ -97,10 +120,48 @@ impl DownloadScreen {
         self.artist_input.focused = self.focused_field == FocusedField::Artist;
         self.album_input.focused = self.focused_field == FocusedField::Album;
 
-        // Draw inputs
+        // Update artist/album input titles and colors based on auto-detection
+        let (artist_title, artist_color) = if data.metadata_autodetected
+            && !self.artist_input.value.is_empty()
+            && !self.artist_modified
+        {
+            ("Artist (auto-detected) ✓", Color::Rgb(100, 200, 100))
+        } else if self.artist_modified {
+            ("Artist (edited)", Color::Rgb(200, 200, 150))
+        } else {
+            ("Artist (optional)", Color::Gray)
+        };
+
+        let (album_title, album_color) = if data.metadata_autodetected
+            && !self.album_input.value.is_empty()
+            && !self.album_modified
+        {
+            ("Album (auto-detected) ✓", Color::Rgb(100, 200, 100))
+        } else if self.album_modified {
+            ("Album (edited)", Color::Rgb(200, 200, 150))
+        } else {
+            ("Album (optional)", Color::Gray)
+        };
+
+        self.artist_input.title = artist_title.to_string();
+        self.album_input.title = album_title.to_string();
+
+        // Draw inputs with custom title colors for auto-detected fields
+        self.draw_input_with_title_color(
+            f,
+            content_chunks[2],
+            &self.artist_input,
+            artist_color,
+        );
+        self.draw_input_with_title_color(
+            f,
+            content_chunks[4],
+            &self.album_input,
+            album_color,
+        );
+
+        // URL input (default color)
         self.url_input.draw(f, content_chunks[0]);
-        self.artist_input.draw(f, content_chunks[2]);
-        self.album_input.draw(f, content_chunks[4]);
 
         // Draw status/download info
         self.draw_status(f, content_chunks[6], data);
@@ -179,6 +240,51 @@ impl DownloadScreen {
         }
     }
 
+    /// Draw a TextInput with a custom title color
+    fn draw_input_with_title_color(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        input: &TextInput,
+        title_color: Color,
+    ) {
+        let title_style = Style::default().fg(title_color);
+        let title = Span::styled(&input.title, title_style);
+
+        let block = Block::default()
+            .borders(if input.focused {
+                Borders::ALL
+            } else {
+                Borders::ALL
+            })
+            .border_style(if input.focused {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            })
+            .title(title);
+
+        let inner = block.inner(area);
+        f.render_widget(block, area);
+
+        let input_text = if input.value.is_empty() {
+            Span::styled(&input.placeholder, Style::default().fg(Color::DarkGray))
+        } else {
+            // Truncate if too long for display
+            let display_value = if input.value.len() > (inner.width as usize).saturating_sub(2) {
+                let start = input.value.len().saturating_sub((inner.width as usize).saturating_sub(4));
+                format!("...{}", &input.value[start..])
+            } else {
+                input.value.clone()
+            };
+            Span::from(display_value)
+        };
+
+        let paragraph = Paragraph::new(input_text)
+            .alignment(ratatui::layout::Alignment::Left);
+        f.render_widget(paragraph, inner);
+    }
+
     pub fn handle_key(
         &mut self,
         key: KeyEvent,
@@ -194,6 +300,19 @@ impl DownloadScreen {
         };
 
         if input_handled {
+            // Track when user modifies artist/album fields
+            if self.focused_field == FocusedField::Artist {
+                // Mark as modified if user typed something (not just navigation)
+                if matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete) {
+                    self.artist_modified = true;
+                }
+            }
+            if self.focused_field == FocusedField::Album {
+                if matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete) {
+                    self.album_modified = true;
+                }
+            }
+
             // Clear any error state when user modifies input
             if matches!(self.download_state, DownloadState::Error(_)) {
                 self.download_state = DownloadState::Idle;
@@ -280,12 +399,14 @@ impl DownloadScreen {
         self.download_state = DownloadState::Downloading;
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.url_input.clear();
         self.artist_input.clear();
         self.album_input.clear();
         self.focused_field = FocusedField::Url;
         self.download_state = DownloadState::Idle;
+        self.artist_modified = false;
+        self.album_modified = false;
     }
 }
 

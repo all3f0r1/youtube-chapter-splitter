@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::tui::download_manager::DownloadManager;
 use crate::tui::layout::TerminalCapabilities;
 use crate::tui::screens::{
-    DownloadScreen, HelpScreen, PlaylistScreen, ProgressScreen, ScreenResult, SettingsScreen,
+    HelpScreen, PlaylistScreen, ProgressScreen, ScreenResult, SettingsScreen,
 };
 use crossterm::{
     event::{
@@ -58,6 +58,8 @@ pub struct App {
     pub settings_screen: SettingsScreen,
     /// Persistent summary screen (preserves action selection)
     pub summary_screen: crate::tui::screens::summary::SummaryScreen,
+    /// Persistent download screen (preserves metadata state)
+    pub download_screen: crate::tui::screens::download::DownloadScreen,
     /// Download manager for async download operations
     pub download_manager: DownloadManager,
     /// Track rapid Esc presses for "Esc Esc Esc = welcome" behavior
@@ -78,6 +80,8 @@ pub struct ScreenData {
     pub last_download_result: Option<DownloadResult>,
     /// Dependency check result (None = not checked yet)
     pub dependency_status: Option<DependencyStatus>,
+    /// True if artist/album were auto-detected from video metadata
+    pub metadata_autodetected: bool,
 }
 
 /// Status of dependency check
@@ -127,6 +131,7 @@ impl App {
             progress_screen: ProgressScreen::new(),
             settings_screen: SettingsScreen::new(),
             summary_screen: crate::tui::screens::summary::SummaryScreen::new(),
+            download_screen: crate::tui::screens::download::DownloadScreen::new(),
             download_manager: DownloadManager::new(config),
             esc_press_count: 0,
             last_esc_time: None,
@@ -247,8 +252,7 @@ impl App {
                 self.welcome_screen.draw(f, &self.screen_data, &self.config);
             }
             Screen::Download => {
-                let mut screen = DownloadScreen::new();
-                screen.draw(f, &self.screen_data, &self.config);
+                self.download_screen.draw(f, &self.screen_data, &self.config);
             }
             Screen::Playlist => {
                 self.playlist_screen
@@ -366,8 +370,8 @@ impl App {
         let result = match self.current_screen {
             Screen::Welcome => self.welcome_screen.handle_key(key, &mut self.screen_data),
             Screen::Download => {
-                let mut screen = DownloadScreen::new();
-                screen.handle_key(key, &mut self.screen_data, &mut self.playlist_screen)
+                self.download_screen
+                    .handle_key(key, &mut self.screen_data, &mut self.playlist_screen)
             }
             Screen::Playlist => self.playlist_screen.handle_key(key, &mut self.screen_data),
             Screen::Progress => self.progress_screen.handle_key(key, &mut self.screen_data),
@@ -397,6 +401,11 @@ impl App {
         // Special handling for specific screen transitions
         if previous_screen != self.current_screen {
             match (&previous_screen, &self.current_screen) {
+                (Screen::Download, Screen::Welcome) => {
+                    // Reset metadata auto-detection state when returning to welcome
+                    self.screen_data.metadata_autodetected = false;
+                    self.download_screen.reset();
+                }
                 (Screen::Download, Screen::Playlist) => {
                     self.playlist_screen
                         .load_from_url(&self.screen_data.input_url, &self.config);
