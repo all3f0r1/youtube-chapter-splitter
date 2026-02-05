@@ -77,16 +77,22 @@ impl ProgressScreen {
         completed: usize,
         total: usize,
         failed: usize,
+        progress_message: Option<&str>,
     ) {
         self.progress = percent;
         self.completed = completed;
         self.total = total;
         self.failed = failed;
 
+        // Update status message with progress details if available
         if total > 0 {
             let current = completed + failed + 1;
             if current <= total {
-                self.status_message = format!("Downloading {}/{}", current, total);
+                if let Some(msg) = progress_message {
+                    self.status_message = msg.to_string();
+                } else {
+                    self.status_message = format!("Downloading {}/{}", current, total);
+                }
             } else if completed + failed >= total {
                 self.status_message = if failed > 0 {
                     format!("Completed with {} errors", failed)
@@ -94,6 +100,8 @@ impl ProgressScreen {
                     "All downloads complete!".to_string()
                 };
             }
+        } else if let Some(msg) = progress_message {
+            self.status_message = msg.to_string();
         }
     }
 
@@ -168,7 +176,13 @@ impl ProgressScreen {
         let bar = ProgressBar::new()
             .with_progress(self.progress as u16)
             .with_total(100)
-            .with_message(self.status_message.clone())
+            .with_message(if !self.status_message.is_empty() {
+                self.status_message.clone()
+            } else if self.total > 0 {
+                format!("{}%", self.progress)
+            } else {
+                "Starting...".to_string()
+            })
             .with_detailed(detailed);
 
         bar.draw(f, area);

@@ -1,40 +1,29 @@
 /// Tests pour les fonctions du module audio
+
 #[cfg(test)]
 mod audio_function_tests {
+    use youtube_chapter_splitter::audio::get_audio_duration;
+    use youtube_chapter_splitter::chapters::Chapter;
     use std::fs;
     use std::path::PathBuf;
     use std::process::Command;
-    use youtube_chapter_splitter::audio::get_audio_duration;
-    use youtube_chapter_splitter::chapters::Chapter;
 
     /// Crée un fichier audio de test
-    fn create_test_audio(
-        path: &std::path::Path,
-        duration_secs: u32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_test_audio(path: &PathBuf, duration_secs: u32) -> Result<(), Box<dyn std::error::Error>> {
         let output = Command::new("ffmpeg")
-            .args([
-                "-f",
-                "lavfi",
-                "-i",
-                "anullsrc=r=44100:cl=mono",
-                "-t",
-                &duration_secs.to_string(),
-                "-c:a",
-                "libmp3lame",
-                "-q:a",
-                "2",
+            .args(&[
+                "-f", "lavfi",
+                "-i", "anullsrc=r=44100:cl=mono",
+                "-t", &duration_secs.to_string(),
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
                 "-y",
-                path.to_str().unwrap(),
+                path.to_str().unwrap()
             ])
             .output()?;
 
         if !output.status.success() {
-            return Err(format!(
-                "Failed to create test audio: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )
-            .into());
+            return Err(format!("Failed to create test audio: {}", String::from_utf8_lossy(&output.stderr)).into());
         }
 
         Ok(())
@@ -50,9 +39,9 @@ mod audio_function_tests {
         create_test_audio(&test_file, 5).unwrap();
 
         let duration = get_audio_duration(&test_file).unwrap();
-
+        
         // La durée devrait être proche de 5 secondes (avec une marge d'erreur)
-        assert!((4.9..=5.1).contains(&duration), "Duration was {}", duration);
+        assert!(duration >= 4.9 && duration <= 5.1, "Duration was {}", duration);
 
         fs::remove_dir_all(&test_dir).ok();
     }
@@ -81,7 +70,7 @@ mod audio_function_tests {
     fn test_chapter_sanitize_title_replaces_invalid_chars() {
         let chapter = Chapter::new("Song/Name:Test".to_string(), 0.0, 100.0);
         let sanitized = chapter.sanitize_title();
-        assert_eq!(sanitized, "Song_name_test");
+        assert_eq!(sanitized, "Song_Name_Test");
     }
 
     #[test]
@@ -93,7 +82,7 @@ mod audio_function_tests {
 
     #[test]
     fn test_multiple_chapters_no_overlap() {
-        let chapters = [
+        let chapters = vec![
             Chapter::new("Track 1".to_string(), 0.0, 100.0),
             Chapter::new("Track 2".to_string(), 100.0, 200.0),
             Chapter::new("Track 3".to_string(), 200.0, 300.0),

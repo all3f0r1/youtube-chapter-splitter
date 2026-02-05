@@ -31,6 +31,72 @@ pub struct DownloadProgress {
     pub eta: String,
 }
 
+/// Callback pour rapporter la progression du téléchargement
+pub trait ProgressCallback: Send + Sync {
+    /// Appelé périodiquement pendant le téléchargement avec la progression actuelle
+    fn on_progress(&self, progress: &DownloadProgress);
+
+    /// Appelé quand le téléchargement commence
+    fn on_start(&self) {
+        // Default implementation does nothing
+    }
+
+    /// Appelé quand le téléchargement est terminé
+    fn on_complete(&self) {
+        // Default implementation does nothing
+    }
+}
+
+/// Implémentation vide pour quand aucun callback n'est nécessaire
+pub struct NoProgressCallback;
+
+impl ProgressCallback for NoProgressCallback {
+    fn on_progress(&self, _progress: &DownloadProgress) {
+        // No-op
+    }
+}
+
+/// Implémentation de callback qui stocke la progression dans un Arc<Mutex>
+/// Utilisé pour partager la progression entre le thread de téléchargement et la TUI
+pub struct SharedProgressCallback {
+    /// La progression actuelle (partagée)
+    pub progress: Arc<Mutex<Option<DownloadProgress>>>,
+}
+
+impl SharedProgressCallback {
+    pub fn new() -> Self {
+        Self {
+            progress: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Obtenir la progression actuelle
+    pub fn get_progress(&self) -> Option<DownloadProgress> {
+        self.progress.lock().ok().and_then(|p| p.clone())
+    }
+
+    /// Réinitialiser la progression
+    pub fn reset(&self) {
+        if let Ok(mut p) = self.progress.lock() {
+            *p = None;
+        }
+    }
+}
+
+impl Default for SharedProgressCallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ProgressCallback for SharedProgressCallback {
+    fn on_progress(&self, progress: &DownloadProgress) {
+        if let Ok(mut p) = self.progress.lock() {
+            *p = Some(progress.clone());
+        }
+    }
+}
+
 /// Regex compilée pour extraire le pourcentage
 static RE_PERCENTAGE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+\.\d+)%").unwrap());
 
@@ -147,11 +213,13 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
 /// * `output_path` - Chemin de sortie (sans extension)
 /// * `cookies_from_browser` - Navigateur pour les cookies
 /// * `pb` - ProgressBar optionnelle (créée automatiquement si None)
+/// * `progress_shared` - Progress partagée pour TUI (Arc<Mutex<Option<DownloadProgress>>>)
 pub fn download_audio_with_progress(
     url: &str,
     output_path: &std::path::Path,
     cookies_from_browser: Option<&str>,
     pb: Option<ProgressBar>,
+    progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
     use indicatif::ProgressStyle;
 
@@ -168,6 +236,13 @@ pub fn download_audio_with_progress(
         pb
     });
 
+    // Reset progress at start
+    if let Some(shared) = progress_shared {
+        if let Ok(mut p) = shared.lock() {
+            *p = None;
+        }
+    }
+
     // Try downloading, with auto-update retry on failure
     let mut attempts = 0;
     const MAX_ATTEMPTS: usize = 2; // Initial try + one retry after update
@@ -180,6 +255,7 @@ pub fn download_audio_with_progress(
             output_path,
             cookies_from_browser,
             &progress_bar,
+            progress_shared,
         );
 
         match result {
@@ -260,6 +336,7 @@ fn download_audio_with_progress_impl(
     output_path: &std::path::Path,
     cookies_from_browser: Option<&str>,
     progress_bar: &ProgressBar,
+    progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
     // Fallback strategy pour les formats
     const FORMAT_SELECTORS: &[Option<&str>] = &[
@@ -280,6 +357,7 @@ fn download_audio_with_progress_impl(
             cookies_from_browser,
             *format,
             progress_bar,
+            progress_shared,
         );
 
         match result {
@@ -321,6 +399,7 @@ fn try_download_with_format(
     cookies_from_browser: Option<&str>,
     format_selector: Option<&str>,
     progress_bar: &ProgressBar,
+    progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
     let mut cmd = Command::new("yt-dlp");
 
@@ -359,6 +438,9 @@ fn try_download_with_format(
     // Thread pour lire stderr en continu et mettre à jour la progress bar
     let pb = progress_bar.clone();
     let stderr_clone = Arc::clone(&stderr_buffer);
+    // Clone the shared progress Arc for the thread
+    let progress_shared_clone = progress_shared.map(Arc::clone);
+
     let handle = thread::spawn(move || {
         let mut stderr = stderr;
         let mut buffer = [0; 8192];
@@ -393,6 +475,13 @@ fn try_download_with_format(
                                     };
                                     pb.set_message(msg);
                                     last_percentage = progress.percentage;
+
+                                    // Update shared progress for TUI
+                                    if let Some(ref shared) = progress_shared_clone {
+                                        if let Ok(mut p) = shared.lock() {
+                                            *p = Some(progress.clone());
+                                        }
+                                    }
                                 }
                                 log::trace!("{}", partial_line);
                                 partial_line.clear();

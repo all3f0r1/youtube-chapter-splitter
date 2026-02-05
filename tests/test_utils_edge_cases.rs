@@ -1,9 +1,10 @@
 /// Tests de cas limites pour le module utils
+
 #[cfg(test)]
 mod utils_edge_cases_tests {
     use youtube_chapter_splitter::utils::{
-        clean_folder_name, format_duration, format_duration_short, parse_artist_album,
-        sanitize_title,
+        clean_folder_name, parse_artist_album, sanitize_title,
+        format_duration, format_duration_short
     };
 
     // Tests pour clean_folder_name
@@ -72,28 +73,28 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_no_separator() {
-        let (artist, album) = parse_artist_album("Just A Title", "TestChannel");
-        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
+        let (artist, album) = parse_artist_album("Just A Title");
+        assert_eq!(artist, "Unknown Artist");
         assert_eq!(album, "Just A Title");
     }
 
     #[test]
     fn test_parse_artist_album_empty() {
-        let (artist, album) = parse_artist_album("", "TestChannel");
-        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
+        let (artist, album) = parse_artist_album("");
+        assert_eq!(artist, "Unknown Artist");
         assert_eq!(album, "");
     }
 
     #[test]
     fn test_parse_artist_album_only_artist() {
-        let (artist, _album) = parse_artist_album("Artist -", "TestChannel");
-        assert_eq!(artist, "Testchannel"); // clean_folder_name capitalise le nom
+        let (artist, _album) = parse_artist_album("Artist -");
+        assert_eq!(artist, "Unknown Artist");
         // Avec un seul élément après split, ça retourne le titre nettoyé
     }
 
     #[test]
     fn test_parse_artist_album_multiple_separators() {
-        let (artist, album) = parse_artist_album("Artist - Album - Extra", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist - Album - Extra");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
         // Le troisième élément est ignoré
@@ -101,14 +102,14 @@ mod utils_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_pipe_separator() {
-        let (artist, album) = parse_artist_album("Artist | Album", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist | Album");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
     }
 
     #[test]
     fn test_parse_artist_album_with_full_album_tag() {
-        let (artist, album) = parse_artist_album("Artist - Album [FULL ALBUM]", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist - Album [FULL ALBUM]");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album");
     }
@@ -184,75 +185,5 @@ mod utils_edge_cases_tests {
     fn test_format_duration_short_over_hour() {
         // 3661 secondes = 1h 1m 1s, mais format_short n'affiche que minutes
         assert_eq!(format_duration_short(3661.0), "61m 01s");
-    }
-
-    #[test]
-    fn test_parse_artist_album_with_em_dash() {
-        let (artist, album) =
-            parse_artist_album("Arcane Voyage – Third (FULL ALBUM)", "TestChannel");
-        assert_eq!(artist, "Arcane Voyage");
-        assert_eq!(album, "Third");
-    }
-
-    #[test]
-    fn test_clean_folder_name_genre_tags() {
-        let result = clean_folder_name(
-            "Ethereal Compass - Nebula's Embrace 70s Psychedelic • Progressive Rock",
-        );
-        assert_eq!(result, "Ethereal Compass - Nebula's Embrace");
-    }
-
-    #[test]
-    fn test_clean_folder_name_genre_tags_with_decades() {
-        let result = clean_folder_name("Artist - Album 80s Rock • Metal");
-        assert_eq!(result, "Artist - Album");
-    }
-
-    #[test]
-    fn test_clean_folder_name_genre_tags_with_dot_separator() {
-        let result = clean_folder_name("Band - Title 90s Alternative · Indie Rock");
-        assert_eq!(result, "Band - Title");
-    }
-
-    #[test]
-    fn test_parse_artist_album_with_stuck_dash() {
-        // Test avec tiret collé comme "Mammoth- Solar Crown Of Fire"
-        let (artist, album) = parse_artist_album("Mammoth- Solar Crown Of Fire", "Dark Chord");
-        assert_eq!(artist, "Mammoth");
-        assert_eq!(album, "Solar Crown Of Fire");
-    }
-
-    #[test]
-    fn test_parse_artist_album_with_stuck_dash_both_sides() {
-        // Test avec tiret collé des deux côtés
-        let (artist, album) = parse_artist_album("Mammoth-Solar Crown Of Fire", "Dark Chord");
-        assert_eq!(artist, "Mammoth");
-        assert_eq!(album, "Solar Crown Of Fire");
-    }
-
-    #[test]
-    fn test_parse_artist_album_with_stuck_dash_left() {
-        // Test avec tiret collé à gauche
-        let (artist, album) = parse_artist_album("Mammoth -Solar Crown Of Fire", "Dark Chord");
-        assert_eq!(artist, "Mammoth");
-        assert_eq!(album, "Solar Crown Of Fire");
-    }
-
-    #[test]
-    fn test_clean_folder_name_truncated_parenthesis() {
-        // Test avec parenthèse tronquée
-        let result = clean_folder_name("Thornshade - Heat At The Edge Of The Mirror (psychedel");
-        println!("Result: '{}'", result);
-        // La parenthèse non fermée est supprimée par RE_BRACKETS
-        assert_eq!(result, "Thornshade - Heat At The Edge Of The Mirror");
-    }
-
-    #[test]
-    fn test_clean_folder_name_complete_parenthesis() {
-        // Test avec parenthèse complète
-        let result =
-            clean_folder_name("Thornshade - Heat At The Edge Of The Mirror (psychedelic rock)");
-        println!("Result: '{}'", result);
-        assert_eq!(result, "Thornshade - Heat At The Edge Of The Mirror");
     }
 }

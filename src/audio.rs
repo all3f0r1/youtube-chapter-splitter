@@ -1,11 +1,11 @@
 //! Traitement audio et découpage par chapitres.
 //!
-//! This module handles audio file splitting into individual tracks
-//! and adding metadata ID3 with album artwork.
+//! Ce module gère le découpage des fichiers audio en pistes individuelles
+//! et l'ajout de métadonnées ID3 avec pochettes d'album.
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
-
+use indicatif::{ProgressBar, ProgressStyle};
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
 use lofty::prelude::*;
@@ -18,32 +18,35 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 // Regex compilées une seule fois au démarrage
-static RE_SILENCE_START: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"silence_start: ([\d.]+)").unwrap());
+static RE_SILENCE_START: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"silence_start: ([\d.]+)").unwrap()
+});
 
-static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d.]+)").unwrap());
+static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"silence_end: ([\d.]+)").unwrap()
+});
 
-/// Splits an audio file into individual tracks based on chapters.
+/// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
 ///
-/// This function uses `ffmpeg` to split the audio et `lofty` pour ajouter
-/// les métadonnées ID3 and the album artwork.
+/// Cette fonction utilise `ffmpeg` pour découper l'audio et `lofty` pour ajouter
+/// les métadonnées ID3 et la pochette d'album.
 ///
 /// # Arguments
 ///
-/// * `input_file` - The source audio file
-/// * `chapters` - The chapters defining the split points
-/// * `output_dir` - The output directory for tracks
-/// * `artist` - The artist name
-/// * `album` - The album name
-/// * `cover_path` - Optional path to the cover image
+/// * `input_file` - Le fichier audio source
+/// * `chapters` - Les chapitres définissant les points de découpe
+/// * `output_dir` - Le répertoire de sortie pour les pistes
+/// * `artist` - Le nom de l'artiste
+/// * `album` - Le nom de l'album
+/// * `cover_path` - Chemin optionnel vers l'image de pochette
 ///
 /// # Returns
 ///
-/// A vector containing the paths of created files
+/// Un vecteur contenant les chemins des fichiers créés
 ///
 /// # Errors
 ///
-/// Returns an error if splitting or metadata addition fails
+/// Retourne une erreur si le découpage ou l'ajout de métadonnées échoue
 pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
@@ -51,44 +54,39 @@ pub fn split_audio_by_chapters(
     artist: &str,
     album: &str,
     cover_path: Option<&Path>,
-    config: &crate::config::Config,
 ) -> Result<Vec<PathBuf>> {
-    log::info!("Starting audio splitting: {} chapters", chapters.len());
-    log::debug!("Input file: {:?}", input_file);
-    log::debug!("Output directory: {:?}", output_dir);
-    log::debug!("Artist: {}, Album: {}", artist, album);
+    println!("Splitting audio into {} tracks...", chapters.len());
+    
     std::fs::create_dir_all(output_dir)?;
-
+    
+    // Créer une barre de progression
+    let pb = ProgressBar::new(chapters.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("#>-")
+    );
+    
     // Charger l'image de couverture une seule fois si elle existe
     let cover_data = if let Some(cover) = cover_path {
         load_cover_image(cover)?
     } else {
         None
     };
-
+    
     let mut output_files = Vec::new();
 
     for (index, chapter) in chapters.iter().enumerate() {
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
-        let filename_base = config.format_filename(track_number, &sanitized_title, artist, album);
-        // Title Case: première lettre de chaque mot en majuscule
-        let title_cased = filename_base
-            .split_whitespace()
-            .map(|word| {
-                let mut chars = word.chars();
-                match chars.next() {
-                    None => String::new(),
-                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                }
-            })
-            .collect::<Vec<String>>()
-            .join(" ");
-        let output_filename = format!("{}.mp3", title_cased);
+        let output_filename = format!("{:02} - {}.mp3", track_number, sanitized_title);
         let output_path = output_dir.join(&output_filename);
 
-        let duration = chapter.duration();
+        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
+        let duration = chapter.duration();
+        
         // Découper l'audio avec ffmpeg (sans cover art)
         let mut cmd = Command::new("ffmpeg");
         cmd.arg("-i")
@@ -111,9 +109,8 @@ pub fn split_audio_by_chapters(
             .arg(format!("track={}/{}", track_number, chapters.len()))
             .arg("-y")
             .arg(&output_path);
-
-        let output = cmd
-            .output()
+        
+        let output = cmd.output()
             .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
         if !output.status.success() {
@@ -127,179 +124,11 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
+        pb.inc(1);
     }
 
+    pb.finish_with_message("Splitting completed successfully!");
     Ok(output_files)
-}
-
-/// Paramètres pour le découpage d'une piste audio
-pub struct TrackSplitParams<'a> {
-    pub input_file: &'a Path,
-    pub chapter: &'a Chapter,
-    pub track_number: usize,
-    pub total_tracks: usize,
-    pub output_dir: &'a Path,
-    pub artist: &'a str,
-    pub album: &'a str,
-    pub cover_data: Option<&'a [u8]>,
-    pub config: &'a crate::config::Config,
-}
-
-/// Découpe une seule piste audio
-///
-/// # Arguments
-///
-/// * `params` - Paramètres de découpage encapsulés dans une structure
-///
-/// # Returns
-///
-/// Le chemin du fichier MP3 créé
-///
-/// # Errors
-///
-/// Returns an error if FFmpeg fails or if adding the cover fails
-pub fn split_single_track(params: TrackSplitParams) -> Result<PathBuf> {
-    log::debug!(
-        "Splitting track #{}: {}",
-        params.track_number,
-        params.chapter.title
-    );
-
-    let TrackSplitParams {
-        input_file,
-        chapter,
-        track_number,
-        total_tracks,
-        output_dir,
-        artist,
-        album,
-        cover_data,
-        config: cfg,
-    } = params;
-    let sanitized_title = chapter.sanitize_title();
-    let filename_base = cfg.format_filename(track_number, &sanitized_title, artist, album);
-    // Title Case: première lettre de chaque mot en majuscule
-    let title_cased = filename_base
-        .split_whitespace()
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect::<Vec<String>>()
-        .join(" ");
-    let output_filename = format!("{}.mp3", title_cased);
-    let output_path = output_dir.join(&output_filename);
-    log::debug!("Output path: {:?}", output_path);
-
-    let duration = chapter.duration();
-
-    // Découper l'audio avec ffmpeg (sans cover art)
-    let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-i")
-        .arg(input_file)
-        .arg("-ss")
-        .arg(chapter.start_time.to_string())
-        .arg("-t")
-        .arg(duration.to_string())
-        .arg("-c:a")
-        .arg("libmp3lame")
-        .arg("-q:a")
-        .arg("0")
-        .arg("-metadata")
-        .arg(format!("title={}", chapter.title))
-        .arg("-metadata")
-        .arg(format!("artist={}", artist))
-        .arg("-metadata")
-        .arg(format!("album={}", album))
-        .arg("-metadata")
-        .arg(format!("track={}/{}", track_number, total_tracks))
-        .arg("-y")
-        .arg(&output_path);
-
-    let output = cmd
-        .output()
-        .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
-
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::AudioError(format!("ffmpeg failed: {}", error)));
-    }
-
-    // Ajouter la pochette d'album avec lofty si elle existe
-    if let Some(cover) = cover_data {
-        add_cover_to_file(&output_path, cover)?;
-    }
-
-    Ok(output_path)
-}
-
-/// Vérifie si les données sont au format WebP.
-///
-/// # Arguments
-///
-/// * `data` - Les données à vérifier
-///
-/// # Returns
-///
-/// `true` si c'est un WebP, `false` sinon
-fn is_webp(data: &[u8]) -> bool {
-    data.len() >= 12
-        && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46  // "RIFF"
-        && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50
-    // "WEBP"
-}
-
-/// Convertit une image WebP en JPEG en utilisant ffmpeg.
-///
-/// # Arguments
-///
-/// * `webp_path` - Chemin vers le fichier WebP
-///
-/// # Returns
-///
-/// Les données de l'image JPEG
-fn convert_webp_to_jpeg(webp_path: &Path) -> Result<Vec<u8>> {
-    // Créer un fichier temporaire pour le JPEG
-    let temp_dir = std::env::temp_dir();
-    let temp_jpeg = temp_dir.join(format!("cover_{}.jpg", std::process::id()));
-
-    // Convertir avec ffmpeg
-    let output = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(webp_path)
-        .arg("-y") // Overwrite output file
-        .arg("-q:v")
-        .arg("2") // Haute qualité JPEG (1-31, 2 = très haute qualité)
-        .arg(&temp_jpeg)
-        .output()
-        .map_err(|e| {
-            YtcsError::AudioError(format!("Failed to run ffmpeg for WebP conversion: {}", e))
-        })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::AudioError(format!(
-            "ffmpeg failed to convert WebP to JPEG: {}",
-            stderr
-        )));
-    }
-
-    // Lire le fichier JPEG converti
-    let mut jpeg_file = File::open(&temp_jpeg)
-        .map_err(|e| YtcsError::AudioError(format!("Failed to open converted JPEG: {}", e)))?;
-
-    let mut jpeg_data = Vec::new();
-    jpeg_file
-        .read_to_end(&mut jpeg_data)
-        .map_err(|e| YtcsError::AudioError(format!("Failed to read converted JPEG: {}", e)))?;
-
-    // Nettoyer le fichier temporaire
-    let _ = std::fs::remove_file(&temp_jpeg);
-
-    Ok(jpeg_data)
 }
 
 /// Charge une image de couverture depuis un fichier.
@@ -311,71 +140,15 @@ fn convert_webp_to_jpeg(webp_path: &Path) -> Result<Vec<u8>> {
 /// # Returns
 ///
 /// Les données de l'image sous forme de vecteur d'octets
-pub fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
-    // Vérifier si le fichier existe
-    if !cover_path.exists() {
-        return Ok(None);
-    }
-
+fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
     let mut file = File::open(cover_path)
         .map_err(|e| YtcsError::AudioError(format!("Failed to open cover image: {}", e)))?;
-
+    
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| YtcsError::AudioError(format!("Failed to read cover image: {}", e)))?;
-
-    // Détecter si c'est un WebP et le convertir en JPEG si nécessaire
-    if is_webp(&data) {
-        data = convert_webp_to_jpeg(cover_path)?;
-    }
-
+    
     Ok(Some(data))
-}
-
-/// Détecte le type MIME d'une image basé sur ses magic bytes.
-///
-/// # Arguments
-///
-/// * `data` - Les données de l'image
-///
-/// # Returns
-///
-/// Le type MIME détecté, ou None si non reconnu
-fn detect_image_mime_type(data: &[u8]) -> Option<lofty::picture::MimeType> {
-    use lofty::picture::MimeType;
-
-    if data.len() < 12 {
-        return None;
-    }
-
-    // JPEG: FF D8 FF
-    if data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF {
-        return Some(MimeType::Jpeg);
-    }
-
-    // PNG: 89 50 4E 47 0D 0A 1A 0A
-    if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
-        return Some(MimeType::Png);
-    }
-
-    // GIF: 47 49 46 38 (GIF8)
-    if data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 {
-        return Some(MimeType::Gif);
-    }
-
-    // BMP: 42 4D (BM)
-    if data[0] == 0x42 && data[1] == 0x4D {
-        return Some(MimeType::Bmp);
-    }
-
-    // WEBP: 52 49 46 46 ... 57 45 42 50 (RIFF...WEBP)
-    // Note: WEBP n'est pas dans l'enum MimeType de lofty, donc on ne le supporte pas pour l'instant
-    // if data.len() >= 12 && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46
-    //     && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
-    //     return Some(MimeType::from("image/webp"));
-    // }
-
-    None
 }
 
 /// Ajoute une pochette d'album à un fichier audio avec lofty.
@@ -392,42 +165,16 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
         .map_err(|e| YtcsError::AudioError(format!("Failed to guess file type: {}", e)))?
         .read()
         .map_err(|e| YtcsError::AudioError(format!("Failed to read audio file: {}", e)))?;
-
+    
     // Créer l'objet Picture depuis les données
-    let mut cover_reader = cover_data;
-    let mut picture = match Picture::from_reader(&mut cover_reader) {
-        Ok(pic) => pic,
-        Err(e) => {
-            // Si la lecture automatique échoue, essayer de créer manuellement avec le MIME type
-            eprintln!(
-                "Warning: Failed to auto-detect image format: {}. Trying manual creation...",
-                e
-            );
-
-            // Détecter le MIME type basé sur les magic bytes
-            let mime_type = detect_image_mime_type(cover_data)
-                .ok_or_else(|| YtcsError::AudioError(
-                    "Failed to detect image format. The cover image may be corrupted or in an unsupported format.".to_string()
-                ))?;
-
-            // Créer la picture manuellement
-            Picture::new_unchecked(
-                PictureType::CoverFront,
-                Some(mime_type),
-                None,
-                cover_data.to_vec(),
-            )
-        }
-    };
-
-    // Définir le type et la description (seulement si pas déjà défini)
-    if picture.pic_type() != PictureType::CoverFront {
-        picture.set_pic_type(PictureType::CoverFront);
-    }
-    if picture.description().is_none() {
-        picture.set_description(Some("Album Cover".to_string()));
-    }
-
+    let mut cover_reader = &cover_data[..];
+    let mut picture = Picture::from_reader(&mut cover_reader)
+        .map_err(|e| YtcsError::AudioError(format!("Failed to create picture: {}", e)))?;
+    
+    // Définir le type et la description
+    picture.set_pic_type(PictureType::CoverFront);
+    picture.set_description(Some("Album Cover".to_string()));
+    
     // Obtenir ou créer le tag principal
     let tag = match tagged_file.primary_tag_mut() {
         Some(primary_tag) => primary_tag,
@@ -437,22 +184,21 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
             tagged_file.primary_tag_mut().unwrap()
         }
     };
-
+    
     // Ajouter l'image au tag
     tag.push_picture(picture);
-
+    
     // Sauvegarder les modifications avec tagged_file.save_to() pour préserver tous les tags
     // Note: save_to() préserve toutes les métadonnées existantes, contrairement à save_to_path()
-    tagged_file
-        .save_to_path(audio_path, WriteOptions::default())
+    tagged_file.save_to_path(audio_path, WriteOptions::default())
         .map_err(|e| YtcsError::AudioError(format!("Failed to save tags: {}", e)))?;
-
+    
     Ok(())
 }
 
 /// Détecte les chapitres automatiquement en analysant les périodes de silence.
 ///
-/// Uses `ffmpeg` with the filter `silencedetect` to identify the points
+/// Utilise `ffmpeg` avec le filtre `silencedetect` pour identifier les points
 /// de découpe potentiels dans l'audio.
 ///
 /// # Arguments
@@ -467,12 +213,14 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Returns an error if no silence is detected or if ffmpeg fails
+/// Retourne une erreur si aucun silence n'est détecté ou si ffmpeg échoue
 pub fn detect_silence_chapters(
     input_file: &Path,
     silence_threshold: f64,
     min_silence_duration: f64,
 ) -> Result<Vec<Chapter>> {
+    println!("Detecting silence to identify tracks...");
+    
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(input_file)
@@ -488,7 +236,7 @@ pub fn detect_silence_chapters(
         .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-
+    
     let mut silence_periods = Vec::new();
     let mut current_start: Option<f64> = None;
 
@@ -497,20 +245,20 @@ pub fn detect_silence_chapters(
             if let Some(start_str) = caps.get(1) {
                 current_start = start_str.as_str().parse::<f64>().ok();
             }
-        } else if let Some(caps) = RE_SILENCE_END.captures(line)
-            && let (Some(start), Some(end_str)) = (current_start, caps.get(1))
-        {
-            if let Ok(end) = end_str.as_str().parse::<f64>() {
-                let mid_point = (start + end) / 2.0;
-                silence_periods.push(mid_point);
+        } else if let Some(caps) = RE_SILENCE_END.captures(line) {
+            if let (Some(start), Some(end_str)) = (current_start, caps.get(1)) {
+                if let Ok(end) = end_str.as_str().parse::<f64>() {
+                    let mid_point = (start + end) / 2.0;
+                    silence_periods.push(mid_point);
+                }
+                current_start = None;
             }
-            current_start = None;
         }
     }
 
     if silence_periods.is_empty() {
         return Err(YtcsError::ChapterError(
-            "No silence detected. Try adjusting the parameters.".to_string(),
+            "No silence detected. Try adjusting the parameters.".to_string()
         ));
     }
 
@@ -536,12 +284,13 @@ pub fn detect_silence_chapters(
         duration,
     ));
 
+    println!("✓ {} tracks detected", chapters.len());
     Ok(chapters)
 }
 
 /// Obtient la durée totale d'un fichier audio.
 ///
-/// Uses `ffprobe` to extract the file duration.
+/// Utilise `ffprobe` pour extraire la durée du fichier.
 ///
 /// # Arguments
 ///
@@ -553,7 +302,7 @@ pub fn detect_silence_chapters(
 ///
 /// # Errors
 ///
-/// Returns an error if ffprobe échoue ou si la durée est invalide
+/// Retourne une erreur si ffprobe échoue ou si la durée est invalide
 pub fn get_audio_duration(input_file: &Path) -> Result<f64> {
     let output = Command::new("ffprobe")
         .arg("-v")
@@ -575,263 +324,4 @@ pub fn get_audio_duration(input_file: &Path) -> Result<f64> {
         .trim()
         .parse::<f64>()
         .map_err(|_| YtcsError::AudioError("Invalid duration format".to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-
-    // Test for is_webp function
-    #[test]
-    fn test_is_webp_valid_webp() {
-        // Valid WebP header: RIFF....WEBP
-        let webp_data = [
-            0x52, 0x49, 0x46, 0x46, // "RIFF"
-            0x00, 0x00, 0x00, 0x00, // file size (placeholder)
-            0x57, 0x45, 0x42, 0x50, // "WEBP"
-        ];
-        assert!(is_webp(&webp_data));
-    }
-
-    #[test]
-    fn test_is_webp_too_short() {
-        let short_data = [0x52, 0x49, 0x46, 0x46];
-        assert!(!is_webp(&short_data));
-    }
-
-    #[test]
-    fn test_is_webp_wrong_magic() {
-        let wrong_data = [
-            0x52, 0x49, 0x46, 0x46, // "RIFF"
-            0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x51, // "WEBQ" instead of "WEBP"
-        ];
-        assert!(!is_webp(&wrong_data));
-    }
-
-    #[test]
-    fn test_is_webp_jpeg_data() {
-        // JPEG magic bytes
-        let jpeg_data = [
-            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-        ];
-        assert!(!is_webp(&jpeg_data));
-    }
-
-    // Test for detect_image_mime_type function
-    #[test]
-    fn test_detect_mime_jpeg() {
-        // JPEG magic bytes: FF D8 FF
-        let jpeg_data = [
-            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-        ];
-        assert_eq!(
-            detect_image_mime_type(&jpeg_data),
-            Some(lofty::picture::MimeType::Jpeg)
-        );
-    }
-
-    #[test]
-    fn test_detect_mime_png() {
-        // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
-        let png_data = [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(
-            detect_image_mime_type(&png_data),
-            Some(lofty::picture::MimeType::Png)
-        );
-    }
-
-    #[test]
-    fn test_detect_mime_gif() {
-        // GIF magic bytes: 47 49 46 38 (GIF8)
-        let gif_data = [
-            0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(
-            detect_image_mime_type(&gif_data),
-            Some(lofty::picture::MimeType::Gif)
-        );
-    }
-
-    #[test]
-    fn test_detect_mime_bmp() {
-        // BMP magic bytes: 42 4D (BM)
-        let bmp_data = [
-            0x42, 0x4D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(
-            detect_image_mime_type(&bmp_data),
-            Some(lofty::picture::MimeType::Bmp)
-        );
-    }
-
-    #[test]
-    fn test_detect_mime_unknown() {
-        let unknown_data = [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
-        ];
-        assert_eq!(detect_image_mime_type(&unknown_data), None);
-    }
-
-    #[test]
-    fn test_detect_mime_too_short() {
-        let short_data = [0xFF, 0xD8];
-        assert_eq!(detect_image_mime_type(&short_data), None);
-    }
-
-    #[test]
-    fn test_detect_mime_webp_returns_none() {
-        // WebP is not supported by lofty's MimeType enum
-        let webp_data = [
-            0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
-        ];
-        assert_eq!(detect_image_mime_type(&webp_data), None);
-    }
-
-    // Test for silence detection regex parsing
-    #[test]
-    fn test_silence_start_regex() {
-        let line = " [silencedetect @ 0x7f8b4c0] silence_start: 1.234";
-        assert!(RE_SILENCE_START.is_match(line));
-        let caps = RE_SILENCE_START.captures(line).unwrap();
-        assert_eq!(caps.get(1).unwrap().as_str(), "1.234");
-    }
-
-    #[test]
-    fn test_silence_end_regex() {
-        let line = " [silencedetect @ 0x7f8b4c0] silence_end: 5.678 | silence_duration: 4.444";
-        assert!(RE_SILENCE_END.is_match(line));
-        let caps = RE_SILENCE_END.captures(line).unwrap();
-        assert_eq!(caps.get(1).unwrap().as_str(), "5.678");
-    }
-
-    // Test load_cover_image with non-existent file
-    #[test]
-    fn test_load_cover_image_nonexistent() {
-        let nonexistent = Path::new("/nonexistent/path/to/image.jpg");
-        let result = load_cover_image(nonexistent);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
-    }
-
-    // Test get_audio_duration with invalid file
-    #[test]
-    fn test_get_audio_duration_invalid_file() {
-        let result = get_audio_duration(Path::new("/nonexistent/audio.mp3"));
-        assert!(result.is_err());
-    }
-
-    // Integration test: create a minimal audio file and test duration
-    #[test]
-    fn test_get_audio_duration_with_temp_file() {
-        // Skip this test if ffmpeg is not available
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
-            return;
-        }
-        if Command::new("ffprobe").arg("-version").output().is_err() {
-            return;
-        }
-
-        let temp_dir = tempfile::tempdir().unwrap();
-        let audio_path = temp_dir.path().join("test_audio.mp3");
-
-        // Create a 1-second silent audio file using ffmpeg
-        let output = Command::new("ffmpeg")
-            .arg("-f")
-            .arg("lavfi")
-            .arg("-i")
-            .arg("anullsrc=r=44100:cl=mono")
-            .arg("-t")
-            .arg("1.0")
-            .arg("-q:a")
-            .arg("0")
-            .arg("-y")
-            .arg(&audio_path)
-            .output();
-
-        if output.is_err() || !output.as_ref().unwrap().status.success() {
-            // FFmpeg failed, skip test
-            return;
-        }
-
-        let duration = get_audio_duration(&audio_path);
-        assert!(duration.is_ok());
-        let dur = duration.unwrap();
-        assert!(dur > 0.9 && dur < 1.1, "Expected ~1.0s, got {}", dur);
-    }
-
-    // Test silence detection with a simple audio file
-    #[test]
-    fn test_detect_silence_chapters_creates_chapters() {
-        // Skip if ffmpeg not available
-        if Command::new("ffmpeg").arg("-version").output().is_err() {
-            return;
-        }
-
-        let temp_dir = tempfile::tempdir().unwrap();
-        let audio_path = temp_dir.path().join("test_silence.mp3");
-
-        // Create an audio file with silence in the middle
-        // Using ffmpeg to generate: 0.5s audio + 1s silence + 0.5s audio
-        let output = Command::new("ffmpeg")
-            .arg("-f")
-            .arg("lavfi")
-            .arg("-i")
-            .arg("sine=frequency=1000:duration=0.5")
-            .arg("-af")
-            .arg("afade=t=out:st=0.4:d=0.1,asetpts=PTS/PTS") // Short tone
-            .arg("-t")
-            .arg("2.0")
-            .arg("-q:a")
-            .arg("0")
-            .arg("-y")
-            .arg(&audio_path)
-            .output();
-
-        if output.is_err() || !output.as_ref().unwrap().status.success() {
-            return;
-        }
-
-        let chapters = detect_silence_chapters(&audio_path, -30.0, 0.5);
-
-        // We may get chapters or error depending on the audio generated
-        // Just check the function doesn't panic
-        let _ = chapters;
-    }
-
-    // Test split_single_track with minimal setup
-    #[test]
-    fn test_split_single_track_requires_ffmpeg() {
-        // This test verifies the error handling when ffmpeg is not available
-        // Create a dummy chapter and temp file
-        let temp_dir = tempfile::tempdir().unwrap();
-        let input_path = temp_dir.path().join("input.mp3");
-        let output_dir = temp_dir.path().join("output");
-
-        // Create an empty file (will fail ffmpeg)
-        let mut file = File::create(&input_path).unwrap();
-        file.write_all(b"not real audio").unwrap();
-
-        let chapter = Chapter::new("Test Track".to_string(), 0.0, 10.0);
-
-        let config = crate::config::Config::default();
-
-        let params = TrackSplitParams {
-            input_file: &input_path,
-            chapter: &chapter,
-            track_number: 1,
-            total_tracks: 1,
-            output_dir: &output_dir,
-            artist: "Test Artist",
-            album: "Test Album",
-            cover_data: None,
-            config: &config,
-        };
-
-        let result = split_single_track(params);
-        // Should fail because the input is not a valid audio file
-        assert!(result.is_err());
-    }
 }

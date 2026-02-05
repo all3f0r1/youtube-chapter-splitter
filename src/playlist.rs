@@ -1,18 +1,15 @@
 //! Module de gestion des playlists YouTube.
 //!
 //! Ce module détecte si une URL est une playlist et extrait les vidéos.
+//!
+//! **Note**: Par défaut, toutes les URLs sont traitées comme des vidéos uniques (mode "video only").
 
 use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
 use crate::ytdlp_error_parser;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-
-/// Regex pour détecter une URL de playlist YouTube
-static PLAYLIST_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[?&]list=([a-zA-Z0-9_-]+)").unwrap());
 
 /// Information sur une vidéo dans une playlist
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,24 +42,21 @@ pub struct PlaylistInfo {
 
 /// Check if a URL contains a playlist
 ///
+/// **IMPORTANT**: Always returns None to treat all URLs as single videos.
+/// This is the default behavior - playlist downloads are not supported in TUI mode.
+/// To download a playlist, users should use individual video URLs.
+///
 /// # Arguments
 ///
-/// * `url` - L'URL à vérifier
+/// * `url` - L'URL à vérifier (non utilisé, toujours retourne None)
 ///
 /// # Returns
 ///
-/// `Some(playlist_id)` si l'URL contient une playlist, `None` sinon
-///
-/// # Exemples
-///
-/// ```
-/// use youtube_chapter_splitter::playlist::is_playlist_url;
-///
-/// assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf").is_some());
-/// assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
-/// ```
-pub fn is_playlist_url(url: &str) -> Option<String> {
-    PLAYLIST_REGEX.captures(url).map(|cap| cap[1].to_string())
+/// Toujours `None` - toutes les URLs sont traitées comme des vidéos uniques
+pub fn is_playlist_url(_url: &str) -> Option<String> {
+    // Always return None - treat all URLs as single videos
+    // This implements the "video only" default behavior
+    None
 }
 
 /// Extract video ID from a YouTube URL
@@ -222,17 +216,21 @@ mod tests {
 
     #[test]
     fn test_is_playlist_url() {
+        // All URLs are now treated as single videos (video only behavior)
         assert!(is_playlist_url(
             "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
         )
-        .is_some());
+        .is_none());
         assert!(
             is_playlist_url(
                 "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
             )
-            .is_some()
+            .is_none()
         );
         assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
+        // All playlist URLs are treated as single videos
+        assert!(is_playlist_url("https://www.youtube.com/watch?v=Kx0wf6xqzWg&list=RDKx0wf6xqzWg&start_radio=1").is_none());
+        assert!(is_playlist_url("https://www.youtube.com/watch?v=abc&list=RDMM12345").is_none());
     }
 
     #[test]

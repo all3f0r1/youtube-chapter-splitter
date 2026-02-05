@@ -1,177 +1,349 @@
-# youtube-chapter-splitter
+# YouTube Chapter Splitter (ytcs)
 
-> **ytcs**: Download complete YouTube albums, cleanly split into MP3 tracks with metadata and cover art.
+A simple and powerful Rust CLI tool to download YouTube videos, extract audio to MP3, and automatically split them into individual tracks based on chapters.
 
-[![Version](https://img.shields.io/badge/version-0.15.1-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
----
+## ✨ Features
 
-`youtube-chapter-splitter` (or `ytcs`) is a CLI tool designed for one thing: archiving music from YouTube perfectly. It downloads the video, extracts audio to MP3, fetches the cover art, cleans titles, and splits the audio into pristine tracks based on chapters.
+- 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps)
+- 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
+- 📑 **Automatic chapter detection** from YouTube video metadata
+- 🔇 **Silence detection fallback** for videos without chapters
+- ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
+- 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
+- 📁 **Smart default output** to ~/Music directory (cross-platform)
+- 🎯 **Force artist/album names** with CLI options
+- ⚡ **Dependency checking** with automatic installation prompts
+- 🧹 **URL cleaning** - automatically removes playlist and extra parameters
+- 🪶 **Lightweight binary** (6.3 MB) with minimal dependencies
 
-## Features
-
-- **Interactive TUI**: Beautiful terminal UI (default mode) for guided downloads
-- **Quick CLI**: Direct URL download with `ytcs --cli <URL>`
-- **MP3 Download**: High-quality audio (192 kbps by default)
-- **Automatic Cover Art**: Album artwork embedded in MP3 metadata
-- **Smart Chapter Detection**: YouTube chapters → description parsing → silence detection fallback
-- **Chapter Refinement**: Adjusts markers using silence detection for precise splits
-- **Playlist Support**: Download entire playlists with interactive selection
-- **Complete Metadata**: Title, artist, album, track number, cover art
-- **Persistent Configuration**: `config.toml` file for your preferences
-- **Auto-Dependency Check**: Detects missing yt-dlp/ffmpeg and prompts to install
-
-## Installation
+## 🚀 Quick Start
 
 ### Prerequisites
 
-`ytcs` requires:
+The application will check for dependencies at startup and offer to install them:
 
-- **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - YouTube downloader
-- **[ffmpeg](https://ffmpeg.org/)** - Audio processing
+- **yt-dlp**: `pip install yt-dlp`
+- **ffmpeg**: 
+  - Linux: `sudo apt install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
 
-```bash
-# Ubuntu/Debian
-sudo apt install yt-dlp ffmpeg
+### Installation
 
-# macOS
-brew install yt-dlp ffmpeg
-
-# Windows (chocolatey)
-choco install yt-dlp ffmpeg
-```
-
-### Pre-compiled Binaries (Recommended)
-
-Download from [Releases](https://github.com/all3f0r1/youtube-chapter-splitter/releases).
-
-```bash
-# Linux
-wget https://github.com/all3f0r1/youtube-chapter-splitter/releases/latest/download/ytcs-x86_64-unknown-linux-gnu.tar.gz
-tar xzf ytcs-x86_64-unknown-linux-gnu.tar.gz
-sudo mv ytcs /usr/local/bin/
-
-# macOS (Intel)
-brew install ytcs
-```
-
-### Via cargo
+#### Option 1: From crates.io (Recommended)
 
 ```bash
 cargo install youtube_chapter_splitter
 ```
 
-### Build from Source
+The `ytcs` binary will be installed in `~/.cargo/bin/` (make sure it's in your PATH).
+
+#### Option 2: From source
 
 ```bash
+# Clone the repository
 git clone https://github.com/all3f0r1/youtube-chapter-splitter.git
 cd youtube-chapter-splitter
-cargo build --release
-sudo cp target/release/ytcs /usr/local/bin/
+
+# Build and install
+cargo install --path .
 ```
 
-## Usage
+### Usage
 
-### Interactive Mode (Default)
-
-Launch the TUI:
+**Simple syntax:**
 
 ```bash
-ytcs
-```
-
-**Keyboard shortcuts:**
-- `Enter` / `D` - Download from URL
-- `S` - Settings
-- `H` - Help
-- `Q` - Quit
-- `Esc` - Go back
-
-### CLI Mode
-
-Download directly:
-
-```bash
-# Single video
-ytcs --cli "https://www.youtube.com/watch?v=..."
-
-# Custom output
-ytcs --cli -o ~/Downloads/Music "URL"
-
-# Override artist/album
-ytcs --cli -a "Artist" -A "Album" "URL"
+ytcs <YOUTUBE_URL> [OPTIONS]
 ```
 
 **Options:**
-| Option | Description |
-|--------|-------------|
-| `-o, --output <DIR>` | Output directory |
-| `-a, --artist <ARTIST>` | Force artist name |
-| `-A, --album <ALBUM>` | Force album name |
-| `--no-cover` | Skip cover art |
-| `--no-refine-chapters` | Disable silence refinement |
+- `-o, --output <DIR>` - Output directory (default: ~/Music)
+- `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
+- `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
 
-### With URL (TUI pre-filled)
+**Examples:**
 
 ```bash
-ytcs "https://youtube.com/..."
-# Launches TUI with URL ready to download
+# Download and split a YouTube video (saves to ~/Music)
+ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA"
+
+# Specify custom output directory
+ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
+
+# Force artist and album names
+ytcs "https://www.youtube.com/watch?v=..." -a "Pink Floyd" -A "Dark Side of the Moon"
+
+# URL cleaning works automatically (removes &list=, &start_radio=, etc.)
+ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA&list=RD28vf7QxgCzA&start_radio=1"
 ```
 
-## Configuration
+**Important:** Always put URLs in quotes to avoid shell interpretation of special characters:
+```bash
+ytcs "URL"  # ✅ Correct
+ytcs URL    # ❌ May cause issues with & characters
+```
 
-Config file: `~/.config/ytcs/config.toml`
+## 📊 Example Output
+
+```
+=== YouTube Chapter Splitter ===
+
+Fetching video information...
+Title: Marigold - Oblivion Gate
+Duration: 29m 29s
+Tracks found: 5
+
+Downloading album artwork...
+✓ Artwork saved: ~/Music/Marigold - Oblivion Gate/cover.jpg
+
+Downloading audio...
+✓ Audio downloaded: ~/Music/Marigold - Oblivion Gate/temp_audio.mp3
+
+Using YouTube tracks
+
+Tracks to create:
+  1. Oblivion Gate [5m 54s]
+  2. Obsidian Throne [5m 35s]
+  3. Crimson Citadel [5m 47s]
+  4. Silver Spire [6m 30s]
+  5. Eternal Pyre [5m 43s]
+
+Splitting audio into 5 tracks...
+  Track 1/5: Oblivion Gate
+  Track 2/5: Obsidian Throne
+  Track 3/5: Crimson Citadel
+  Track 4/5: Silver Spire
+  Track 5/5: Eternal Pyre
+✓ Splitting completed successfully!
+
+✓ Processing completed successfully!
+Files created: 5
+Directory: ~/Music/Marigold - Oblivion Gate
+```
+
+**Result:**
+```
+~/Music/Marigold - Oblivion Gate/
+├── cover.jpg
+├── 01. Oblivion Gate.mp3
+├── 02. Obsidian Throne.mp3
+├── 03. Crimson Citadel.mp3
+├── 04. Silver Spire.mp3
+└── 05. Eternal Pyre.mp3
+```
+
+## 🎯 How It Works
+
+1. **URL Cleaning**: Removes playlist parameters and extra query strings
+2. **Video Info**: Fetches video metadata including title, duration, and chapters
+3. **Artwork Download**: Downloads the highest quality thumbnail as `cover.jpg`
+4. **Audio Download**: Extracts audio in MP3 format using yt-dlp
+5. **Track Detection**: Uses YouTube chapters or falls back to silence detection
+6. **Audio Splitting**: Splits audio using ffmpeg with proper metadata and embedded cover art
+7. **Cleanup**: Removes temporary files and organizes output
+
+## 🛠️ Advanced Features
+
+### Default Output Directory
+
+The application automatically saves to your system's Music directory:
+
+- **Linux**: `~/Music` (e.g., `/home/username/Music`)
+- **macOS**: `~/Music` (e.g., `/Users/username/Music`)
+- **Windows**: `%USERPROFILE%\Music` (e.g., `C:\Users\username\Music`)
+
+You can override this with the `-o` flag.
+
+### Folder Name Cleaning
+
+The application automatically cleans folder names:
+- Removes `[...]` and `(...)` content and everything after `[FULL ALBUM]`
+- Replaces `_`, `|`, and `/` with `-`
+- Capitalizes words properly
+- Removes duplicate track numbers from chapter titles
+
+**Examples:**
+```
+Input:  "MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"
+Output: "Marigold - Oblivion Gate"
+
+Input:  "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
+Output: "Purple Dreams - Wandering Shadows"
+```
+
+### Complete ID3 Metadata Tagging
+
+Each MP3 file includes comprehensive ID3v2.3 tags:
+- **Title**: Track name (e.g., "Oblivion Gate")
+- **Artist**: Auto-detected or forced (e.g., "Marigold")
+- **Album**: Auto-detected or forced (e.g., "Oblivion Gate")
+- **Track**: Track number / Total tracks (e.g., "1/5")
+- **Cover Art**: ✅ Embedded album artwork (if downloaded)
+
+**Music players like iTunes, VLC, foobar2000, and mobile apps will display the album artwork automatically!**
+
+### Force Artist and Album Names
+
+Override automatic detection when video titles are non-standard:
 
 ```bash
-# View config
-ytcs config
+# Auto-detection from title
+ytcs "URL"
 
-# Set value
-ytcs set audio_quality 320
-ytcs set default_output_dir ~/Music
+# Force both artist and album
+ytcs "URL" --artist "Pink Floyd" --album "The Dark Side of the Moon"
 
-# Reset to defaults
-ytcs reset
+# Force only artist (album auto-detected)
+ytcs "URL" -a "Led Zeppelin"
+
+# Force only album (artist auto-detected)
+ytcs "URL" -A "Houses of the Holy"
 ```
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `default_output_dir` | `~/Music` | Output folder |
-| `download_cover` | `true` | Download cover art |
-| `filename_format` | `"%n - %t"` | File format |
-| `directory_format` | `"%a - %A"` | Folder format |
-| `audio_quality` | `192` | MP3 quality (kbps) |
-| `playlist_behavior` | `ask` | `ask` / `video_only` / `playlist_only` |
-| `cookies_from_browser` | - | Browser for cookies |
+### Silence Detection
 
-**Format placeholders:**
-- `%n` - Track number
-- `%t` - Track title
-- `%a` - Artist
-- `%A` - Album
+If no chapters are found, the tool automatically detects silence periods:
+- Threshold: -30 dB
+- Minimum duration: 2.0 seconds
+- Uses ffmpeg's `silencedetect` filter
 
-## Debugging
+## 📁 Project Structure
+
+```
+youtube-chapter-splitter/
+├── src/
+│   ├── main.rs          # CLI application
+│   ├── lib.rs           # Library exports
+│   ├── error.rs         # Error handling
+│   ├── chapters.rs      # Chapter parsing and manipulation
+│   ├── downloader.rs    # YouTube downloading and thumbnail
+│   ├── audio.rs         # Audio processing with ffmpeg
+│   └── utils.rs         # Utility functions (formatting, cleaning)
+├── examples/
+│   ├── basic_usage.rs           # Programmatic usage example
+│   └── chapters_example.json    # Sample chapters file
+├── Cargo.toml           # Dependencies and configuration
+├── README.md            # This file
+├── LICENSE              # MIT License
+└── .gitignore           # Git ignore rules
+```
+
+## 🧪 Testing
+
+Test with a real video:
 
 ```bash
-# Verbose logging
-RUST_LOG=debug ytcs "URL"
-
-# Save logs
-RUST_LOG=debug ytcs "URL" 2>&1 | tee debug.log
+cargo run --release -- "https://www.youtube.com/watch?v=28vf7QxgCzA"
 ```
 
-## Changelog
+## 🤝 Contributing
 
-See [CHANGELOG.md](CHANGELOG.md).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-**Recent:**
+### Development Setup
 
-- **0.15.1** - TUI by default, URL pre-fill, reduced verbosity
-- **0.15.0** - Interactive TUI mode, dependency auto-detection
-- **0.14.7** - Windows forbidden character filtering
+```bash
+# Clone the repository
+git clone https://github.com/all3f0r1/youtube-chapter-splitter.git
+cd youtube-chapter-splitter
 
-## License
+# Install dependencies
+cargo build
 
-MIT
+# Run tests
+cargo test
+
+# Run with debug output
+RUST_LOG=debug cargo run -- "URL"
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube video downloader
+- [ffmpeg](https://ffmpeg.org/) - Audio processing
+- [clap](https://github.com/clap-rs/clap) - Command line argument parser
+- [ureq](https://github.com/algesten/ureq) - Lightweight HTTP client for thumbnail download
+- [dirs](https://github.com/dirs-dev/dirs-rs) - Cross-platform directory detection
+
+## 🐛 Known Issues
+
+- Age-restricted videos may require authentication
+- Some videos with DRM protection cannot be downloaded
+- Download links are valid for 6 hours only
+
+## ❓ FAQ
+
+**Q: Where are my files saved?**  
+A: By default, files are saved to your Music directory (`~/Music` on Linux/macOS, `%USERPROFILE%\Music` on Windows). You can change this with the `-o` flag.
+
+**Q: Why not use a pure Rust solution instead of ffmpeg?**  
+A: We use ffmpeg for audio encoding and splitting (industry standard), but we use the Rust library `lofty` for adding metadata and album artwork. This hybrid approach gives us the best of both worlds: ffmpeg's robust audio processing and Rust's safe, efficient metadata handling.
+
+**Q: Can I use this for playlists?**  
+A: Currently, the tool processes one video at a time. Playlist support may be added in the future.
+
+**Q: What if a video has no chapters?**  
+A: The tool automatically falls back to silence detection to identify track boundaries.
+
+**Q: Can I customize silence detection parameters?**  
+A: Currently, the parameters are fixed (-30 dB threshold, 2.0s minimum duration). Custom parameters may be added in future versions.
+
+**Q: How do I avoid the [1], [2] background job messages?**  
+A: Always put the URL in quotes: `ytcs "URL"` instead of `ytcs URL`. The `&` character in URLs is interpreted by the shell as a background job operator.
+
+**Q: Does the cover art appear in my music player?**  
+A: Yes! The album artwork is automatically embedded in each MP3 file using the `lofty` Rust library. It works with iTunes, VLC, foobar2000, Windows Media Player, and most mobile music apps.
+
+## 📈 Changelog
+
+### v0.4.0 (Latest)
+- **Performance**: Optimized regex compilation with `once_cell` for faster processing
+- **UX**: Added progress bars for downloads and track splitting with `indicatif`
+- **Cover Art**: Switched to `lofty` library for reliable album artwork embedding
+- **Documentation**: Complete rustdoc coverage for all public APIs
+- **Robustness**: Network timeout and retry mechanism for thumbnail downloads
+- **Testing**: Unit tests for core modules (chapters, downloader, error)
+- **Quality**: Improved code maintainability and error handling
+
+### v0.3.2
+- Simplified cover art logic to use external cover only
+
+### v0.2.4
+- Default output to ~/Music directory (cross-platform)
+- Lighter binary with ureq instead of reqwest (6.3 MB)
+- Removed tokio async runtime (no longer needed)
+
+### v0.2.3
+- Added `--artist` and `--album` CLI options
+- Embedded album artwork in MP3 ID3 tags
+- Automatic artist/album parsing from video title
+
+### v0.2.2
+- Fixed folder names with slashes (removes content after FULL ALBUM)
+- Removed duplicate track numbers in chapter titles
+
+### v0.2.1
+- Improved folder name cleaning (pipes, capitalizes properly)
+- Better title display
+
+### v0.2.0
+- Initial public release
+
+## 📞 Support
+
+If you encounter any issues or have questions:
+- Open an issue on [GitHub](https://github.com/all3f0r1/youtube-chapter-splitter/issues)
+- Check existing issues for solutions
+
+---
+
+**Made with ❤️ and Rust**

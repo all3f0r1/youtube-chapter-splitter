@@ -3,9 +3,9 @@
 //! Ce module fournit les structures et fonctions pour manipuler les chapitres
 //! extraits des vidéos YouTube.
 
+use serde::{Deserialize, Serialize};
 use crate::error::{Result, YtcsError};
 use crate::utils;
-use serde::{Deserialize, Serialize};
 
 /// Représente un chapitre d'une vidéo YouTube.
 ///
@@ -30,18 +30,9 @@ impl Chapter {
     ///
     /// Panique si start_time < 0 ou si end_time <= start_time
     pub fn new(title: String, start_time: f64, end_time: f64) -> Self {
-        assert!(
-            start_time >= 0.0,
-            "start_time must be >= 0, got {}",
-            start_time
-        );
-        assert!(
-            end_time > start_time,
-            "end_time ({}) must be > start_time ({})",
-            end_time,
-            start_time
-        );
-
+        assert!(start_time >= 0.0, "start_time must be >= 0, got {}", start_time);
+        assert!(end_time > start_time, "end_time ({}) must be > start_time ({})", end_time, start_time);
+        
         Self {
             title,
             start_time,
@@ -70,7 +61,7 @@ impl Chapter {
     }
 }
 
-/// Parses chapters from yt-dlp JSON output.
+/// Parse les chapitres depuis la sortie JSON de yt-dlp.
 ///
 /// Extrait les chapitres depuis les métadonnées JSON d'une vidéo YouTube.
 ///
@@ -84,13 +75,13 @@ impl Chapter {
 ///
 /// # Errors
 ///
-/// Returns an error if :
+/// Retourne une erreur si :
 /// - Le JSON est mal formaté
 /// - Le champ "chapters" est absent
 /// - Les champs start_time ou end_time sont invalides
 pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     let data: serde_json::Value = serde_json::from_str(json_str)?;
-
+    
     let chapters_array = data["chapters"]
         .as_array()
         .ok_or_else(|| YtcsError::ChapterError("No chapters found".to_string()))?;
@@ -101,11 +92,11 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
             .as_str()
             .unwrap_or(&format!("Track {}", i + 1))
             .to_string();
-
+        
         let start_time = chapter["start_time"]
             .as_f64()
             .ok_or_else(|| YtcsError::ChapterError("Invalid start_time".to_string()))?;
-
+        
         let end_time = chapter["end_time"]
             .as_f64()
             .ok_or_else(|| YtcsError::ChapterError("Invalid end_time".to_string()))?;
@@ -116,7 +107,7 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     Ok(chapters)
 }
 
-/// Parses a timestamp in format HH:MM:SS, MM:SS ou SS.
+/// Parse un timestamp au format HH:MM:SS, MM:SS ou SS.
 ///
 /// # Arguments
 ///
@@ -128,40 +119,30 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
 ///
 /// # Errors
 ///
-/// Returns an error if the timestamp format is invalid
+/// Retourne une erreur si le format du timestamp est invalide
 pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
     let parts: Vec<&str> = timestamp.split(':').collect();
-
+    
     let seconds = match parts.len() {
-        1 => parts[0]
-            .parse::<f64>()
+        1 => parts[0].parse::<f64>()
             .map_err(|_| YtcsError::ChapterError("Invalid timestamp format".to_string()))?,
         2 => {
-            let minutes = parts[0]
-                .parse::<f64>()
+            let minutes = parts[0].parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid minutes".to_string()))?;
-            let seconds = parts[1]
-                .parse::<f64>()
+            let seconds = parts[1].parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid seconds".to_string()))?;
             minutes * 60.0 + seconds
         }
         3 => {
-            let hours = parts[0]
-                .parse::<f64>()
+            let hours = parts[0].parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid hours".to_string()))?;
-            let minutes = parts[1]
-                .parse::<f64>()
+            let minutes = parts[1].parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid minutes".to_string()))?;
-            let seconds = parts[2]
-                .parse::<f64>()
+            let seconds = parts[2].parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid seconds".to_string()))?;
             hours * 3600.0 + minutes * 60.0 + seconds
         }
-        _ => {
-            return Err(YtcsError::ChapterError(
-                "Invalid timestamp format".to_string(),
-            ));
-        }
+        _ => return Err(YtcsError::ChapterError("Invalid timestamp format".to_string())),
     };
 
     Ok(seconds)

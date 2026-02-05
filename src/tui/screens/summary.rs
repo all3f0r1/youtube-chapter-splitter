@@ -95,15 +95,23 @@ impl SummaryScreen {
     pub fn draw(&mut self, f: &mut Frame, data: &ScreenData, _config: &Config) {
         let size = f.area();
 
+        // Reserve 3 rows for the global footer (drawn by app)
+        let footer_height = 3;
+        let main_area = Rect {
+            x: 0,
+            y: 0,
+            width: size.width,
+            height: size.height.saturating_sub(footer_height),
+        };
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Title
                 Constraint::Min(0),    // Content
                 Constraint::Length(3), // Actions row
-                Constraint::Length(2), // Footer hints
             ])
-            .split(size);
+            .split(main_area);
 
         // Title
         let title = Paragraph::new("Download Summary")
@@ -126,14 +134,6 @@ impl SummaryScreen {
 
         // Actions row
         self.draw_actions(f, chunks[2], data);
-
-        // Footer hints
-        let footer_text = "↑↓: Select | Enter: Confirm | Esc: Welcome | Q: Quit";
-        let footer = Paragraph::new(footer_text)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Rgb(120, 120, 120)))
-            .block(Block::default().borders(Borders::ALL));
-        f.render_widget(footer, chunks[3]);
     }
 
     fn build_content(&self, data: &ScreenData) -> Vec<Line<'_>> {

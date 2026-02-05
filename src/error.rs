@@ -1,60 +1,53 @@
-//! Error handling for YouTube Chapter Splitter
+//! Gestion des erreurs pour YouTube Chapter Splitter.
 //!
-//! This module defines custom error types used throughout the application.
+//! Ce module définit les types d'erreurs personnalisés utilisés dans toute l'application.
 
 use thiserror::Error;
 
-/// Custom error type for YouTube Chapter Splitter
+/// Type d'erreur personnalisé pour YouTube Chapter Splitter.
 ///
-/// This enum groups all possible error types encountered during application execution.
+/// Cette énumération regroupe tous les types d'erreurs possibles rencontrés
+/// lors de l'exécution de l'application.
 #[derive(Error, Debug)]
 pub enum YtcsError {
-    /// Error during video or thumbnail download
+    /// Erreur survenue lors du téléchargement d'une vidéo ou d'une miniature.
     #[error("Download error: {0}")]
     DownloadError(String),
 
-    /// Error during audio processing (splitting, conversion, etc.)
+    /// Erreur survenue lors du traitement audio (découpage, conversion, etc.).
     #[error("Audio processing error: {0}")]
     AudioError(String),
 
-    /// Error during chapter parsing or manipulation
+    /// Erreur survenue lors de l'analyse ou de la manipulation des chapitres.
     #[error("Chapter parsing error: {0}")]
     ChapterError(String),
 
-    /// Invalid or malformed YouTube URL
+    /// URL YouTube invalide ou mal formatée.
     #[error("Invalid YouTube URL: {0}")]
     InvalidUrl(String),
 
-    /// Missing required system tool (yt-dlp, ffmpeg, etc.)
+    /// Outil système requis manquant (yt-dlp, ffmpeg, etc.).
     #[error("Missing system tool: {0}")]
     MissingTool(String),
 
-    /// Error during dependency installation
-    #[error("Installation error: {0}")]
-    InstallError(String),
-
-    /// I/O error (files, network, etc.)
+    /// Erreur d'entrée/sortie (fichiers, réseau, etc.).
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
 
-    /// JSON parsing error (video metadata, chapters, etc.)
+    /// Erreur de parsing JSON (métadonnées de vidéo, chapitres, etc.).
     #[error("JSON parsing error: {0}")]
     JsonError(#[from] serde_json::Error),
 
-    /// Regular expression compilation or execution error
+    /// Erreur de compilation ou d'exécution d'expression régulière.
     #[error("Regex error: {0}")]
     RegexError(#[from] regex::Error),
 
-    /// Configuration error (TOML file, invalid values, etc.)
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-
-    /// Generic error for cases not covered by other variants
+    /// Erreur générique pour les cas non couverts par les autres variantes.
     #[error("Generic error: {0}")]
     Other(String),
 }
 
-/// Type alias for `Result<T, YtcsError>`
+/// Type alias pour `Result<T, YtcsError>`.
 ///
-/// Simplifies function signatures by using our custom error type.
+/// Simplifie la signature des fonctions en utilisant notre type d'erreur personnalisé.
 pub type Result<T> = std::result::Result<T, YtcsError>;

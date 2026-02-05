@@ -1,0 +1,29 @@
+{
+  "chapters": [
+    {
+      "title": "Oblivion Gate",
+      "start_time": 0.0,
+      "end_time": 354.0
+    },
+    {
+      "title": "Obsidian Throne",
+      "start_time": 354.0,
+      "end_time": 689.0
+    },
+    {
+      "title": "Crimson Citadel",
+      "start_time": 689.0,
+      "end_time": 1036.0
+    },
+    {
+      "title": "Silver Spire",
+      "start_time": 1036.0,
+      "end_time": 1426.0
+    },
+    {
+      "title": "Eternal Pyre",
+      "start_time": 1426.0,
+      "end_time": 1769.0
+    }
+  ]
+}

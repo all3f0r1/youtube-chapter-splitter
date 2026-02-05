@@ -1,7 +1,8 @@
 /// Tests supplémentaires pour le module downloader
+
 #[cfg(test)]
 mod downloader_function_tests {
-    use youtube_chapter_splitter::downloader::{check_dependencies, extract_video_id};
+    use youtube_chapter_splitter::downloader::{extract_video_id, check_dependencies};
 
     #[test]
     fn test_extract_video_id_embedded() {
@@ -73,7 +74,7 @@ mod downloader_function_tests {
     fn test_video_id_alphanumeric() {
         let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
         let id = extract_video_id(url).unwrap();
-
+        
         // Vérifier que l'ID ne contient que des caractères alphanumériques, _ et -
         for c in id.chars() {
             assert!(c.is_alphanumeric() || c == '_' || c == '-');
@@ -84,10 +85,10 @@ mod downloader_function_tests {
     fn test_extract_video_id_case_sensitive() {
         let url1 = "https://www.youtube.com/watch?v=AbCdEfGhIjK";
         let url2 = "https://www.youtube.com/watch?v=ABCDEFGHIJK";
-
+        
         let id1 = extract_video_id(url1).unwrap();
         let id2 = extract_video_id(url2).unwrap();
-
+        
         // Les IDs doivent être sensibles à la casse
         assert_ne!(id1, id2);
         assert_eq!(id1, "AbCdEfGhIjK");

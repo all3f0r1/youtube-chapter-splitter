@@ -10,6 +10,8 @@ use crate::tui::layout::TerminalCapabilities;
 use crate::tui::screens::{
     HelpScreen, PlaylistScreen, ProgressScreen, ScreenResult, SettingsScreen,
 };
+use crate::yt_dlp_progress::DownloadProgress;
+use std::sync::{Arc, Mutex};
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
@@ -62,6 +64,8 @@ pub struct App {
     pub download_screen: crate::tui::screens::download::DownloadScreen,
     /// Download manager for async download operations
     pub download_manager: DownloadManager,
+    /// Shared progress for real-time download updates
+    pub shared_progress: Arc<Mutex<Option<DownloadProgress>>>,
     /// Track rapid Esc presses for "Esc Esc Esc = welcome" behavior
     esc_press_count: u8,
     last_esc_time: Option<Instant>,
@@ -122,6 +126,8 @@ impl App {
             ..Default::default()
         };
 
+        let shared_progress = Arc::new(Mutex::new(None));
+
         Ok(Self {
             current_screen: Screen::Welcome,
             should_quit: false,
@@ -135,6 +141,7 @@ impl App {
             summary_screen: crate::tui::screens::summary::SummaryScreen::new(),
             download_screen: crate::tui::screens::download::DownloadScreen::new(),
             download_manager: DownloadManager::new(config),
+            shared_progress,
             esc_press_count: 0,
             last_esc_time: None,
             resized: false,
@@ -263,11 +270,13 @@ impl App {
             }
             Screen::Progress => {
                 // Update progress from download manager before drawing
+                let progress_msg = self.download_manager.current_progress_message();
                 self.progress_screen.update_from_manager(
                     self.download_manager.overall_percent(),
                     self.download_manager.completed_count(),
                     self.download_manager.tasks().len(),
                     self.download_manager.failed_count(),
+                    progress_msg.as_deref(),
                 );
                 self.progress_screen
                     .draw(f, &self.screen_data, &self.config);
@@ -440,6 +449,8 @@ impl App {
                             Some(self.screen_data.input_album.clone())
                         };
                         self.download_manager.add_url(url, artist, album);
+                        // Set progress callback before starting
+                        self.download_manager.set_shared_progress(Arc::clone(&self.shared_progress));
                         self.download_manager.start();
                     }
                 }
@@ -465,6 +476,8 @@ impl App {
                         .collect();
                     if !urls.is_empty() {
                         self.download_manager.add_playlist_urls(urls);
+                        // Set progress callback before starting
+                        self.download_manager.set_shared_progress(Arc::clone(&self.shared_progress));
                         self.download_manager.start();
                     }
                 }
@@ -474,31 +487,44 @@ impl App {
     }
 
     fn update(&mut self) {
-        // Process downloads if the manager is active
+        // Poll downloads if the manager is active (non-blocking)
         if self.download_manager.is_active() {
-            if let Err(e) = self.download_manager.process_next() {
-                // Store error in screen data for TUI display
-                self.screen_data.error_message = Some(format!("Download error: {}", e));
-            }
+            match self.download_manager.poll_downloads() {
+                Ok(still_active) => {
+                    if !still_active {
+                        // All downloads complete - navigate to summary
+                        let tasks = self.download_manager.tasks();
+                        if !tasks.is_empty() {
+                            // Get results from all tasks
+                            let total_tracks: usize = tasks.iter()
+                                .filter_map(|t| t.result.as_ref())
+                                .map(|r| r.tracks_count)
+                                .sum();
 
-            // Check if all downloads are complete
-            if self.download_manager.pending_count() == 0 && !self.download_manager.is_active() {
-                // Store final download result in screen data
-                let tasks = self.download_manager.tasks();
-                if !tasks.is_empty() {
-                    let last_task = &tasks[tasks.len() - 1];
-                    if let Some(ref result) = last_task.result {
-                        self.screen_data.last_download_result =
-                            Some(crate::tui::app::DownloadResult {
-                                success: result.success,
-                                tracks_count: result.tracks_count,
-                                output_path: result.output_path.clone(),
-                                error: result.error.clone(),
-                            });
+                            let any_failed = tasks.iter().any(|t| matches!(t.status, crate::tui::download_manager::DownloadStatus::Failed(_)));
+
+                            self.screen_data.last_download_result =
+                                Some(crate::tui::app::DownloadResult {
+                                    success: !any_failed,
+                                    tracks_count: total_tracks,
+                                    output_path: tasks[0].result.as_ref()
+                                        .map(|r| r.output_path.clone())
+                                        .unwrap_or_default(),
+                                    error: if any_failed {
+                                        Some("Some downloads failed".to_string())
+                                    } else {
+                                        None
+                                    },
+                                });
+                        }
+                        self.current_screen = Screen::Summary;
                     }
                 }
-                // All downloads done - navigate to summary
-                self.current_screen = Screen::Summary;
+                Err(e) => {
+                    // Store error in screen data for TUI display
+                    self.screen_data.error_message = Some(format!("Download error: {}", e));
+                    self.download_manager.stop();
+                }
             }
         }
     }

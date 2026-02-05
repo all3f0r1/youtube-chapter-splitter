@@ -1,4 +1,4 @@
-use youtube_chapter_splitter::chapters::{Chapter, format_timestamp, parse_timestamp};
+use youtube_chapter_splitter::chapters::{Chapter, parse_timestamp, format_timestamp};
 
 #[test]
 fn test_chapter_creation() {
@@ -18,9 +18,9 @@ fn test_chapter_duration() {
 fn test_sanitize_title() {
     let chapter = Chapter::new("1 - Song Name".to_string(), 0.0, 100.0);
     assert_eq!(chapter.sanitize_title(), "Song Name");
-
+    
     let chapter2 = Chapter::new("Track 5: Test/Song".to_string(), 0.0, 100.0);
-    assert_eq!(chapter2.sanitize_title(), "Test_song");
+    assert_eq!(chapter2.sanitize_title(), "Test_Song");
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_chapter_serialization() {
     let chapter = Chapter::new("Test".to_string(), 0.0, 100.0);
     let json = serde_json::to_string(&chapter).unwrap();
     let deserialized: Chapter = serde_json::from_str(&json).unwrap();
-
+    
     assert_eq!(chapter.title, deserialized.title);
     assert_eq!(chapter.start_time, deserialized.start_time);
     assert_eq!(chapter.end_time, deserialized.end_time);

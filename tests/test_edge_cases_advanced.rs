@@ -1,8 +1,9 @@
 /// Tests de cas limites avancés et situations exceptionnelles
+
 #[cfg(test)]
 mod advanced_edge_cases_tests {
-    use youtube_chapter_splitter::chapters::Chapter;
     use youtube_chapter_splitter::utils::{clean_folder_name, parse_artist_album, sanitize_title};
+    use youtube_chapter_splitter::chapters::Chapter;
 
     // Tests de caractères spéciaux et Unicode
 
@@ -69,7 +70,7 @@ mod advanced_edge_cases_tests {
     #[test]
     fn test_parse_artist_album_very_long() {
         let long_title = format!("{} - {}", "A".repeat(500), "B".repeat(500));
-        let (artist, album) = parse_artist_album(&long_title, "TestChannel");
+        let (artist, album) = parse_artist_album(&long_title);
         assert!(!artist.is_empty());
         assert!(!album.is_empty());
     }
@@ -85,8 +86,7 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_nested_brackets() {
-        let (artist, album) =
-            parse_artist_album("Artist - Album [Disc 1 [Remastered]]", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist - Album [Disc 1 [Remastered]]");
         assert_eq!(artist, "Artist");
         // La regex supprime les crochets mais peut laisser des résidus avec des crochets imbriqués
         // C'est un comportement connu et acceptable
@@ -95,32 +95,27 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_multiple_dashes() {
-        let (artist, album) = parse_artist_album("Artist - Name - Album - Title", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist - Name - Album - Title");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Name"); // Prend le premier séparateur
     }
 
     #[test]
     fn test_parse_artist_album_mixed_separators() {
-        let (artist, _album) = parse_artist_album("Artist - Album | Extra Info", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist - Album | Extra Info");
         assert_eq!(artist, "Artist");
         // Devrait utiliser le premier séparateur trouvé
     }
 
     #[test]
     fn test_parse_artist_album_only_separators() {
-        let (artist, album) = parse_artist_album(" - | - ", "TestChannel");
+        let (artist, album) = parse_artist_album(" - | - ");
         // Avec uniquement des séparateurs, le parsing peut retourner Unknown Artist
         // ou des chaînes vides après nettoyage
         // On vérifie juste que ça ne crash pas
         println!("Artist: '{}', Album: '{}'", artist, album);
         // Le comportement exact dépend de l'implémentation de clean_folder_name
-        assert!(
-            artist == "Unknown Artist"
-                || artist.is_empty()
-                || artist == "-"
-                || artist == "Testchannel"
-        );
+        assert!(artist == "Unknown Artist" || artist.is_empty() || artist == "-");
     }
 
     // Tests de validation de chapitres
@@ -174,13 +169,13 @@ mod advanced_edge_cases_tests {
     #[test]
     fn test_sanitize_title_mixed_valid_invalid() {
         let result = sanitize_title("Valid/Invalid:Chars");
-        assert_eq!(result, "Valid_invalid_chars");
+        assert_eq!(result, "Valid_Invalid_Chars");
     }
 
     #[test]
     fn test_sanitize_title_unicode_with_invalid() {
         let result = sanitize_title("Café/Müller:Test");
-        assert_eq!(result, "Café_müller_test");
+        assert_eq!(result, "Café_Müller_Test");
     }
 
     #[test]
@@ -244,7 +239,7 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_url_encoded() {
-        let (artist, album) = parse_artist_album("Artist%20Name - Album%20Title", "TestChannel");
+        let (artist, album) = parse_artist_album("Artist%20Name - Album%20Title");
         // Devrait gérer les caractères encodés
         assert!(!artist.is_empty());
         assert!(!album.is_empty());
@@ -263,7 +258,7 @@ mod advanced_edge_cases_tests {
         ];
 
         for title in real_titles {
-            let (artist, album) = parse_artist_album(title, "TestChannel");
+            let (artist, album) = parse_artist_album(title);
             assert!(!artist.is_empty(), "Failed for: {}", title);
             assert!(!album.is_empty(), "Failed for: {}", title);
             assert_ne!(artist, "Unknown Artist", "Failed to parse: {}", title);
@@ -283,7 +278,7 @@ mod advanced_edge_cases_tests {
         for title in real_chapters {
             let chapter = Chapter::new(title.to_string(), 0.0, 100.0);
             let sanitized = chapter.sanitize_title();
-
+            
             // Vérifier que le numéro est enlevé
             assert!(!sanitized.starts_with("1"));
             assert!(!sanitized.starts_with("0"));
