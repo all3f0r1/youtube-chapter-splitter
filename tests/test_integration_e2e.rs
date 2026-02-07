@@ -8,7 +8,7 @@
 mod integration_e2e_tests {
     use std::fs;
     use std::path::PathBuf;
-    use youtube_chapter_splitter::{audio, downloader, utils};
+    use youtube_chapter_splitter::{audio, downloader, utils, yt_dlp_progress};
 
     /// Crée un répertoire de test temporaire
     fn create_test_dir(name: &str) -> PathBuf {
@@ -55,7 +55,9 @@ mod integration_e2e_tests {
 
         // 4. Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path).unwrap();
+        let audio_file =
+            yt_dlp_progress::download_audio_with_progress(url, &audio_path, None, None, None)
+                .unwrap();
         assert!(audio_file.exists(), "Audio file should exist");
 
         // 5. Télécharger la miniature
@@ -144,7 +146,9 @@ mod integration_e2e_tests {
 
         // Télécharger l'audio
         let audio_path = test_dir.join("temp_audio");
-        let audio_file = downloader::download_audio(url, &audio_path).unwrap();
+        let audio_file =
+            yt_dlp_progress::download_audio_with_progress(url, &audio_path, None, None, None)
+                .unwrap();
 
         // Détecter les silences
         let chapters = audio::detect_silence_chapters(&audio_file, -30.0, 2.0).unwrap();

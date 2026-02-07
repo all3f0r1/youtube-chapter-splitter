@@ -9,7 +9,7 @@
 //! # Example Usage
 //!
 //! ```no_run
-//! use youtube_chapter_splitter::{downloader, audio, Result};
+//! use youtube_chapter_splitter::{audio, downloader, yt_dlp_progress, Result};
 //! use std::path::PathBuf;
 //!
 //! fn main() -> Result<()> {
@@ -18,9 +18,15 @@
 //!     // Fetch video information
 //!     let video_info = downloader::get_video_info(url)?;
 //!
-//!     // Download audio
+//!     // Download audio with real-time progress
 //!     let output_path = PathBuf::from("temp_audio");
-//!     let audio_file = downloader::download_audio(url, &output_path)?;
+//!     let audio_file = yt_dlp_progress::download_audio_with_progress(
+//!         url,
+//!         &output_path,
+//!         None, // cookies_from_browser
+//!         None, // progress bar (auto-created)
+//!         None, // shared progress for TUI
+//!     )?;
 //!
 //!     // Split by chapters
 //!     let output_dir = PathBuf::from("output");

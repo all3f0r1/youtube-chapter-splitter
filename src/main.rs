@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use youtube_chapter_splitter::{Result, audio, downloader, utils};
+use youtube_chapter_splitter::{Result, audio, downloader, utils, yt_dlp_progress};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -132,7 +132,8 @@ fn main() -> Result<()> {
     // Download audio
     let temp_audio = output_dir.join("temp_audio");
     println!("{}", "Downloading audio...".yellow());
-    let audio_file = downloader::download_audio(&clean_url, &temp_audio)?;
+    let audio_file =
+        yt_dlp_progress::download_audio_with_progress(&clean_url, &temp_audio, None, None, None)?;
     println!("{} {}", "✓ Audio downloaded:".green(), audio_file.display());
     println!();
 

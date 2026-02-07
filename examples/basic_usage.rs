@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use youtube_chapter_splitter::{audio, downloader, utils};
+use youtube_chapter_splitter::{audio, downloader, utils, yt_dlp_progress};
 
 fn main() -> youtube_chapter_splitter::Result<()> {
     // Vérifier les dépendances
@@ -22,7 +22,13 @@ fn main() -> youtube_chapter_splitter::Result<()> {
     // Télécharger l'audio
     let output_path = PathBuf::from("./temp_audio");
     println!("Téléchargement...");
-    let audio_file = downloader::download_audio(url, &output_path)?;
+    let audio_file = yt_dlp_progress::download_audio_with_progress(
+        url,
+        &output_path,
+        None, // cookies_from_browser
+        None, // progress bar
+        None, // shared progress
+    )?;
 
     // Télécharger la miniature
     let output_dir = PathBuf::from("./output");

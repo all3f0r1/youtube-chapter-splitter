@@ -607,4 +607,85 @@ mod tests {
         let msg = extract_error_message(stderr);
         assert!(msg.contains("outdated"));
     }
+
+    #[test]
+    fn test_parse_download_progress_callback() {
+        // Test that DownloadProgress struct holds correct values
+        let progress = DownloadProgress {
+            percentage: 75.5,
+            downloaded: "75.5".to_string(),
+            total: "100.0".to_string(),
+            speed: "2.5MiB/s".to_string(),
+            eta: "00:30".to_string(),
+        };
+
+        assert!((progress.percentage - 75.5).abs() < 0.01);
+        assert_eq!(progress.downloaded, "75.5");
+        assert_eq!(progress.total, "100.0");
+        assert_eq!(progress.speed, "2.5MiB/s");
+        assert_eq!(progress.eta, "00:30");
+    }
+
+    #[test]
+    fn test_parse_download_line_kib() {
+        // Test KiB units
+        let line = "[download]  512.0KiB of  1.0MiB at  128.0KiB/s ETA 00:04";
+        let progress = parse_download_line(line).unwrap();
+        // 512 KiB / 1 MiB = 50%
+        assert!((progress.percentage - 50.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_parse_download_line_no_percentage() {
+        // Test line without explicit percentage, calculate from sizes
+        let line = "[download]  15.0MiB of  60.0MiB at  3.0MiB/s ETA 00:15";
+        let progress = parse_download_line(line).unwrap();
+        // 15 / 60 = 25%
+        assert!((progress.percentage - 25.0).abs() < 1.0);
+        assert_eq!(progress.downloaded, "15.0");
+        assert_eq!(progress.total, "60.0");
+    }
+
+    #[test]
+    fn test_shared_progress_callback() {
+        // Test SharedProgressCallback
+        let callback = SharedProgressCallback::new();
+
+        // Initially no progress
+        assert!(callback.get_progress().is_none());
+
+        // Set progress through callback
+        let progress = DownloadProgress {
+            percentage: 50.0,
+            downloaded: "50.0".to_string(),
+            total: "100.0".to_string(),
+            speed: "1.0MiB/s".to_string(),
+            eta: "00:50".to_string(),
+        };
+
+        callback.on_progress(&progress);
+
+        // Check progress is retrievable
+        let retrieved = callback.get_progress().unwrap();
+        assert!((retrieved.percentage - 50.0).abs() < 0.01);
+
+        // Reset and check it's cleared
+        callback.reset();
+        assert!(callback.get_progress().is_none());
+    }
+
+    #[test]
+    fn test_parse_download_line_ignores_complete() {
+        // 100% lines should be ignored (download is complete)
+        let line = "[download] 100% of  120.00MiB at  2.34MiB/s ETA 00:00";
+        assert!(parse_download_line(line).is_none());
+    }
+
+    #[test]
+    fn test_parse_download_line_extracts_speed_and_eta() {
+        let line = "[download]  45.0% of  120.00MiB at  5.67MiB/s ETA 01:23";
+        let progress = parse_download_line(line).unwrap();
+        assert_eq!(progress.speed, "5.67 MiB/s");
+        assert_eq!(progress.eta, "01:23");
+    }
 }
