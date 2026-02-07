@@ -1,42 +1,41 @@
-//! Module de gestion des playlists YouTube.
+//! YouTube playlist management module.
 //!
-//! Ce module détecte si une URL est une playlist et extrait les vidéos.
+//! This module detects if a URL is a playlist and extracts videos.
 //!
-//! **Note**: Par défaut, toutes les URLs sont traitées comme des vidéos uniques (mode "video only").
+//! **Note**: By default, all URLs are treated as single videos (mode "video only").
 
 use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
 use crate::ytdlp_error_parser;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-/// Information sur une vidéo dans une playlist
+/// Information about a video in a playlist
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistVideo {
-    /// ID de la vidéo
+    /// Video ID
     pub id: String,
 
-    /// Titre de la vidéo
+    /// Video title
     pub title: String,
 
-    /// URL complète de la vidéo
+    /// Full video URL
     pub url: String,
 
-    /// Durée en secondes
+    /// Duration in seconds
     pub duration: f64,
 }
 
-/// Information sur une playlist
+/// Information about a playlist
 #[derive(Debug, Clone)]
 pub struct PlaylistInfo {
-    /// ID de la playlist
+    /// Playlist ID
     pub id: String,
 
-    /// Titre de la playlist
+    /// Playlist title
     pub title: String,
 
-    /// Liste des vidéos
+    /// List of videos
     pub videos: Vec<PlaylistVideo>,
 }
 
@@ -48,47 +47,32 @@ pub struct PlaylistInfo {
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL à vérifier (non utilisé, toujours retourne None)
+/// * `url` - The URL to check (not used, always returns None)
 ///
 /// # Returns
 ///
-/// Toujours `None` - toutes les URLs sont traitées comme des vidéos uniques
+/// Always `None` - all URLs are treated as single videos
 pub fn is_playlist_url(_url: &str) -> Option<String> {
     // Always return None - treat all URLs as single videos
     // This implements the "video only" default behavior
     None
 }
 
-/// Extract video ID from a YouTube URL
+/// Get playlist information
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL YouTube
+/// * `url` - The playlist URL
 ///
 /// # Returns
 ///
-/// `Some(video_id)` si trouvé, `None` sinon
-pub fn extract_video_id(url: &str) -> Option<String> {
-    // Regex pour extraire l'ID de vidéo
-    let video_regex = Regex::new(r"(?:v=|/)([a-zA-Z0-9_-]{11})").unwrap();
-    video_regex.captures(url).map(|cap| cap[1].to_string())
-}
-
-/// Obtenir les informations d'une playlist
-///
-/// # Arguments
-///
-/// * `url` - L'URL de la playlist
-///
-/// # Returns
-///
-/// Les informations de la playlist
+/// Playlist information
 ///
 /// # Errors
 ///
 /// Returns an error if yt-dlp fails or if JSON parsing fails
 pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Result<PlaylistInfo> {
-    // Utiliser yt-dlp pour obtenir les informations de la playlist
+    // Use yt-dlp to get playlist information
     let mut cmd = Command::new("yt-dlp");
     cmd.args(["--dump-json", "--flat-playlist", "--no-warnings"]);
 
@@ -116,7 +100,7 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // Parser chaque ligne JSON (une vidéo par ligne)
+    // Parse each JSON line (one video per line)
     let mut videos = Vec::new();
     let mut playlist_title = String::new();
     let mut playlist_id = String::new();
@@ -128,7 +112,7 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
 
         let json: serde_json::Value = serde_json::from_str(line).map_err(YtcsError::JsonError)?;
 
-        // Extraire les informations de la playlist (première ligne)
+        // Extract playlist information (first line)
         if playlist_title.is_empty() {
             if let Some(title) = json.get("playlist_title").and_then(|v| v.as_str()) {
                 playlist_title = title.to_string();
@@ -141,7 +125,7 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
             }
         }
 
-        // Extraire les informations de la vidéo
+        // Extract video information
         if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
             let title = json
                 .get("title")
@@ -177,13 +161,13 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL à nettoyer
+/// * `url` - The URL to clean
 ///
 /// # Returns
 ///
-/// L'URL sans le paramètre de playlist
+/// The URL without the playlist parameter
 ///
-/// # Exemples
+/// # Examples
 ///
 /// ```
 /// use youtube_chapter_splitter::playlist::remove_playlist_param;
@@ -193,17 +177,25 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
 /// assert_eq!(clean, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 /// ```
 pub fn remove_playlist_param(url: &str) -> String {
-    // Supprimer le paramètre list= et tout ce qui suit
+    // Remove the list= parameter and everything after
     if let Some(pos) = url.find("&list=") {
         url[..pos].to_string()
-    } else if let Some(pos) = url.find("?list=") {
-        // Si list= est le premier paramètre
-        if let Some(video_pos) = url.find("?v=") {
-            // Garder le paramètre v=
-            url[..video_pos + url[video_pos..].find('&').unwrap_or(url.len() - video_pos)]
-                .to_string()
+    } else if let Some(list_pos) = url.find("?list=") {
+        // If list= is the first parameter, we need to extract v= if it exists
+        let base = &url[..list_pos];
+        if let Some(v_pos) = url.find("v=") {
+            // Find where the v= value ends (either at & or end of string)
+            let v_start = v_pos + 2;
+            let v_end = url[v_start..]
+                .find('&')
+                .map(|p| v_start + p)
+                .unwrap_or(url.len());
+            // Extract video ID and reconstruct clean URL
+            let video_id = &url[v_start..v_end];
+            format!("{}?v={}", base, video_id)
         } else {
-            url[..pos].to_string()
+            // No video parameter, return base URL
+            base.to_string()
         }
     } else {
         url.to_string()
@@ -213,6 +205,7 @@ pub fn remove_playlist_param(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::downloader::extract_video_id;
 
     #[test]
     fn test_is_playlist_url() {
@@ -229,21 +222,26 @@ mod tests {
         );
         assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
         // All playlist URLs are treated as single videos
-        assert!(is_playlist_url("https://www.youtube.com/watch?v=Kx0wf6xqzWg&list=RDKx0wf6xqzWg&start_radio=1").is_none());
+        assert!(
+            is_playlist_url(
+                "https://www.youtube.com/watch?v=Kx0wf6xqzWg&list=RDKx0wf6xqzWg&start_radio=1"
+            )
+            .is_none()
+        );
         assert!(is_playlist_url("https://www.youtube.com/watch?v=abc&list=RDMM12345").is_none());
     }
 
     #[test]
     fn test_extract_video_id() {
         assert_eq!(
-            extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ").ok(),
             Some("dQw4w9WgXcQ".to_string())
         );
         assert_eq!(
-            extract_video_id("https://youtu.be/dQw4w9WgXcQ"),
+            extract_video_id("https://youtu.be/dQw4w9WgXcQ").ok(),
             Some("dQw4w9WgXcQ".to_string())
         );
-        assert!(extract_video_id("https://www.youtube.com/").is_none());
+        assert!(extract_video_id("https://www.youtube.com/").is_err());
     }
 
     #[test]

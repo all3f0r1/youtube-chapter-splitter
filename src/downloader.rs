@@ -1,7 +1,7 @@
-//! Téléchargement de vidéos YouTube et extraction de métadonnées.
+//! YouTube video download and metadata extraction.
 //!
-//! Ce module gère l'interaction avec `yt-dlp` pour télécharger les vidéos
-//! et extraire leurs métadonnées (titre, durée, chapitres).
+//! This module handles interaction with `yt-dlp` to download videos
+//! and extract their metadata (title, duration, chapters).
 
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{Result, YtcsError};
@@ -9,7 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-/// Informations sur une vidéo YouTube.
+/// Information about a YouTube video.
 #[derive(Debug)]
 pub struct VideoInfo {
     pub title: String,
@@ -18,21 +18,21 @@ pub struct VideoInfo {
     pub video_id: String,
 }
 
-/// Informations sur une dépendance système manquante.
+/// Information about a missing system dependency.
 pub struct MissingDependency {
     pub tool: String,
     pub install_command: String,
 }
 
-/// Vérifie la présence des dépendances système requises.
+/// Checks for required system dependencies.
 ///
 /// # Returns
 ///
-/// Ok si toutes les dépendances sont présentes, sinon une erreur avec les détails
+/// Ok if all dependencies are present, otherwise an error with details
 ///
 /// # Errors
 ///
-/// Retourne une erreur si `yt-dlp` ou `ffmpeg` sont manquants
+/// Returns an error if `yt-dlp` or `ffmpeg` are missing
 pub fn check_dependencies() -> Result<()> {
     let mut missing = Vec::new();
 
@@ -69,15 +69,15 @@ pub fn check_dependencies() -> Result<()> {
     Ok(())
 }
 
-/// Installe une dépendance système manquante.
+/// Installs a missing system dependency.
 ///
 /// # Arguments
 ///
-/// * `tool` - Le nom de l'outil à installer ("yt-dlp" ou "ffmpeg")
+/// * `tool` - The name of the tool to install ("yt-dlp" or "ffmpeg")
 ///
 /// # Errors
 ///
-/// Retourne une erreur si l'installation échoue
+/// Returns an error if the installation fails
 pub fn install_dependency(tool: &str) -> Result<()> {
     let command = match tool {
         "yt-dlp" => "pip install yt-dlp",
@@ -87,7 +87,9 @@ pub fn install_dependency(tool: &str) -> Result<()> {
             } else if cfg!(target_os = "macos") {
                 "brew install ffmpeg"
             } else {
-                return Err(YtcsError::Other("Please install ffmpeg manually".to_string()));
+                return Err(YtcsError::Other(
+                    "Please install ffmpeg manually".to_string(),
+                ));
             }
         }
         _ => return Err(YtcsError::Other(format!("Unknown tool: {}", tool))),
@@ -95,9 +97,9 @@ pub fn install_dependency(tool: &str) -> Result<()> {
 
     println!("Installing {}...", tool);
     let output = if cfg!(target_os = "windows") {
-        Command::new("cmd").args(&["/C", command]).output()
+        Command::new("cmd").args(["/C", command]).output()
     } else {
-        Command::new("sh").args(&["-c", command]).output()
+        Command::new("sh").args(["-c", command]).output()
     };
 
     match output {
@@ -107,57 +109,64 @@ pub fn install_dependency(tool: &str) -> Result<()> {
         }
         Ok(out) => {
             let error = String::from_utf8_lossy(&out.stderr);
-            Err(YtcsError::Other(format!("Failed to install {}: {}", tool, error)))
+            Err(YtcsError::Other(format!(
+                "Failed to install {}: {}",
+                tool, error
+            )))
         }
-        Err(e) => Err(YtcsError::Other(format!("Failed to run install command: {}", e))),
+        Err(e) => Err(YtcsError::Other(format!(
+            "Failed to run install command: {}",
+            e
+        ))),
     }
 }
 
-/// Extrait l'ID d'une vidéo YouTube depuis son URL.
+/// Extracts a YouTube video ID from its URL.
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL de la vidéo YouTube
+/// * `url` - The YouTube video URL
 ///
 /// # Returns
 ///
-/// L'ID de la vidéo (11 caractères)
+/// The video ID (11 characters)
 ///
 /// # Errors
 ///
-/// Retourne une erreur si l'URL est invalide ou si l'ID ne peut pas être extrait
+/// Returns an error if the URL is invalid or if the ID cannot be extracted
 pub fn extract_video_id(url: &str) -> Result<String> {
-    let patterns = [
-        r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})",
-    ];
+    let patterns = [r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})"];
 
     for pattern in &patterns {
         let re = regex::Regex::new(pattern)?;
-        if let Some(caps) = re.captures(url) {
-            if let Some(id) = caps.get(1) {
-                return Ok(id.as_str().to_string());
-            }
+        if let Some(caps) = re.captures(url)
+            && let Some(id) = caps.get(1)
+        {
+            return Ok(id.as_str().to_string());
         }
     }
 
-    Err(YtcsError::InvalidUrl(format!("Unable to extract video ID from: {}", url)))
+    Err(YtcsError::InvalidUrl(format!(
+        "Unable to extract video ID from: {}",
+        url
+    )))
 }
 
-/// Récupère les informations d'une vidéo YouTube.
+/// Retrieves information about a YouTube video.
 ///
-/// Utilise `yt-dlp` pour extraire les métadonnées de la vidéo.
+/// Uses `yt-dlp` to extract video metadata.
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL de la vidéo YouTube
+/// * `url` - The YouTube video URL
 ///
 /// # Returns
 ///
-/// Les informations de la vidéo (titre, durée, chapitres, ID)
+/// Video information (title, duration, chapters, ID)
 ///
 /// # Errors
 ///
-/// Retourne une erreur si yt-dlp échoue ou si les métadonnées sont invalides
+/// Returns an error if yt-dlp fails or if metadata is invalid
 pub fn get_video_info(url: &str) -> Result<VideoInfo> {
     let output = Command::new("yt-dlp")
         .arg("--dump-json")
@@ -168,7 +177,10 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!("yt-dlp failed: {}", error)));
+        return Err(YtcsError::DownloadError(format!(
+            "yt-dlp failed: {}",
+            error
+        )));
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);
@@ -179,14 +191,9 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         .unwrap_or("Untitled Video")
         .to_string();
 
-    let duration = data["duration"]
-        .as_f64()
-        .unwrap_or(0.0);
+    let duration = data["duration"].as_f64().unwrap_or(0.0);
 
-    let video_id = data["id"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+    let video_id = data["id"].as_str().unwrap_or("").to_string();
 
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
@@ -206,37 +213,37 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
     })
 }
 
-/// Télécharge l'audio d'une vidéo YouTube en format MP3.
+/// Downloads the audio from a YouTube video as MP3.
 ///
-/// Utilise `yt-dlp` avec une barre de progression pour télécharger et convertir l'audio.
+/// Uses `yt-dlp` with a progress bar to download and convert the audio.
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL de la vidéo YouTube
-/// * `output_path` - Le chemin de sortie (sans extension)
+/// * `url` - The YouTube video URL
+/// * `output_path` - The output path (without extension)
 ///
 /// # Returns
 ///
-/// Le chemin du fichier MP3 téléchargé
+/// The path of the downloaded MP3 file
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le téléchargement échoue
+/// Returns an error if the download fails
 pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     println!("Downloading audio from YouTube...");
-    
-    // Créer une barre de progression indéterminée
+
+    // Create an indeterminate progress bar
     let pb = ProgressBar::new_spinner();
     pb.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.green} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     pb.set_message("Downloading...");
-    
-    // Lancer yt-dlp en arrière-plan
+
+    // Launch yt-dlp in the background
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
-    
+
     let output = Command::new("yt-dlp")
         .arg("-x")
         .arg("--audio-format")
@@ -256,7 +263,10 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!("yt-dlp failed: {}", error)));
+        return Err(YtcsError::DownloadError(format!(
+            "yt-dlp failed: {}",
+            error
+        )));
     }
 
     // yt-dlp adds .mp3 automatically
@@ -264,59 +274,61 @@ pub fn download_audio(url: &str, output_path: &PathBuf) -> Result<PathBuf> {
     final_path.set_extension("mp3");
 
     if !final_path.exists() {
-        return Err(YtcsError::DownloadError("Audio file was not created".to_string()));
+        return Err(YtcsError::DownloadError(
+            "Audio file was not created".to_string(),
+        ));
     }
 
     Ok(final_path)
 }
 
-
-/// Télécharge la miniature d'une vidéo YouTube.
+/// Downloads the thumbnail of a YouTube video.
 ///
-/// Tente de télécharger la miniature en plusieurs qualités (maxres, hq, mq)
-/// avec timeout et retry automatique.
+/// Attempts to download the thumbnail in multiple qualities (maxres, hq, mq)
+/// with timeout and automatic retry.
 ///
 /// # Arguments
 ///
-/// * `url` - L'URL de la vidéo YouTube
-/// * `output_dir` - Le répertoire de sortie pour la miniature
+/// * `url` - The YouTube video URL
+/// * `output_dir` - The output directory for the thumbnail
 ///
 /// # Returns
 ///
-/// Le chemin du fichier de miniature téléchargé
+/// The path of the downloaded thumbnail file
 ///
 /// # Errors
 ///
-/// Retourne une erreur si aucune miniature n'a pu être téléchargée
+/// Returns an error if no thumbnail could be downloaded
 pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
     // Get video ID
     let video_id = extract_video_id(url)?;
-    
+
     // YouTube thumbnail URLs (try different qualities)
     let thumbnail_urls = vec![
         format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id),
         format!("https://img.youtube.com/vi/{}/hqdefault.jpg", video_id),
         format!("https://img.youtube.com/vi/{}/mqdefault.jpg", video_id),
     ];
-    
+
     let output_path = output_dir.join("cover.jpg");
-    
-    // Créer un agent avec timeout
+
+    // Create an agent with timeout
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(30))
         .build();
-    
+
     // Try each thumbnail URL with retry
     for thumb_url in thumbnail_urls {
-        // Retry jusqu'à 3 fois
+        // Retry up to 3 times
         for attempt in 1..=3 {
             match agent.get(&thumb_url).call() {
                 Ok(response) if response.status() == 200 => {
                     let mut reader = response.into_reader();
                     let mut bytes = Vec::new();
-                    std::io::Read::read_to_end(&mut reader, &mut bytes)
-                        .map_err(|e| YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e)))?;
-                    
+                    std::io::Read::read_to_end(&mut reader, &mut bytes).map_err(|e| {
+                        YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e))
+                    })?;
+
                     std::fs::write(&output_path, bytes)?;
                     return Ok(output_path);
                 }
@@ -329,6 +341,8 @@ pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std
             }
         }
     }
-    
-    Err(YtcsError::DownloadError("Could not download thumbnail from any source".to_string()))
+
+    Err(YtcsError::DownloadError(
+        "Could not download thumbnail from any source".to_string(),
+    ))
 }

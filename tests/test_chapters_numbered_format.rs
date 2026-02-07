@@ -1,4 +1,4 @@
-// Tests pour le nouveau format de chapitres "N - Title (MM:SS)"
+// Tests for the numbered chapter format "N - Title (MM:SS)"
 
 use youtube_chapter_splitter::chapters_from_description::parse_chapters_from_description;
 
@@ -14,12 +14,11 @@ fn test_numbered_format_basic() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
-    // Title Case is now applied
-    assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
+    assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
     assert_eq!(chapters[0].start_time, 0.0);
-    assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
+    assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
     assert_eq!(chapters[1].start_time, 4.0 * 60.0 + 24.0);
-    assert_eq!(chapters[2].title, "The Ritual Of The Octagonal Chamber");
+    assert_eq!(chapters[2].title, "The Ritual of the Octagonal Chamber");
     assert_eq!(chapters[2].start_time, 11.0 * 60.0 + 1.0);
 }
 
@@ -35,24 +34,23 @@ fn test_numbered_format_with_parentheses_in_title() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
-    // Title Case is now applied
     assert_eq!(
         chapters[0].title,
-        "Colors At The Bottom Of The Gesture (instrumental)"
+        "Colors at the Bottom of the Gesture (Instrumental)"
     );
     assert_eq!(
         chapters[1].title,
-        "Mirror Against The Firmament (suite In Three Parts)"
+        "Mirror Against the Firmament (Suite in Three Parts)"
     );
     assert_eq!(
         chapters[2].title,
-        "Architects Of Inner Time (part Ii_ The Awakening)"
-    ); // Note: les deux-points sont remplacés par underscore
+        "Architects of Inner Time (Part II_ The Awakening)"
+    ); // Note: colons are replaced with underscore
 }
 
 #[test]
 fn test_numbered_format_mixed_with_standard() {
-    // Le parser devrait détecter le format numéroté même s'il y a d'autres lignes
+    // The parser should detect the numbered format even if there are other lines
     let description = r#"
 Album: Test Album
 Artist: Test Artist
@@ -112,7 +110,7 @@ fn test_numbered_format_with_hour_timestamps() {
 
 #[test]
 fn test_standard_format_still_works() {
-    // S'assurer que le format standard fonctionne toujours
+    // Ensure standard format still works
     let description = r#"
 0:00 - Track One
 3:45 - Track Two
@@ -130,7 +128,7 @@ fn test_standard_format_still_works() {
 
 #[test]
 fn test_numbered_format_sanitization() {
-    // Vérifier que les caractères spéciaux sont bien nettoyés
+    // Verify that special characters are properly sanitized
     let description = r#"
 1 - Track: With Colon (0:00)
 2 - Track/With/Slash (3:00)
@@ -142,10 +140,9 @@ fn test_numbered_format_sanitization() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 4);
-    // Les deux-points, slashes, backslashes et pipes devraient être remplacés
-    // Title Case is now applied
+    // Colons, slashes, backslashes, and pipes should be replaced
     assert_eq!(chapters[0].title, "Track_ With Colon");
-    assert_eq!(chapters[1].title, "Track_with_slash");
-    assert_eq!(chapters[2].title, "Track_with_backslash");
-    assert_eq!(chapters[3].title, "Track_with_pipe");
+    assert_eq!(chapters[1].title, "Track_With_Slash");
+    assert_eq!(chapters[2].title, "Track_With_Backslash");
+    assert_eq!(chapters[3].title, "Track_With_Pipe");
 }

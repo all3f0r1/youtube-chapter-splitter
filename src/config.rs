@@ -20,19 +20,6 @@ pub enum PlaylistBehavior {
     PlaylistOnly,
 }
 
-/// TUI progress display mode
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum ProgressMode {
-    /// Show only percentage bar
-    Minimal,
-    /// Show bar, percentage, speed, and ETA
-    Detailed,
-    /// Automatically choose based on terminal size
-    #[default]
-    Auto,
-}
-
 /// Automatic dependency installation behavior
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -44,45 +31,6 @@ pub enum AutoInstallBehavior {
     Always,
     /// Never auto-install (manual only)
     Never,
-}
-
-/// TUI keyboard key bindings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KeyBindings {
-    /// Key to quit the application
-    #[serde(default = "default_key_quit")]
-    pub quit: String,
-
-    /// Key to show help screen
-    #[serde(default = "default_key_help")]
-    pub help: String,
-
-    /// Key to confirm selection
-    #[serde(default = "default_key_confirm")]
-    pub confirm: String,
-}
-
-impl Default for KeyBindings {
-    fn default() -> Self {
-        Self {
-            quit: "q".to_string(),
-            help: "?".to_string(),
-            confirm: "Enter".to_string(),
-        }
-    }
-}
-
-// Default functions for serde
-fn default_key_quit() -> String {
-    "q".to_string()
-}
-
-fn default_key_help() -> String {
-    "?".to_string()
-}
-
-fn default_key_confirm() -> String {
-    "Enter".to_string()
 }
 
 /// Application configuration
@@ -142,15 +90,6 @@ pub struct Config {
     #[serde(default = "default_download_timeout")]
     pub download_timeout: u64,
 
-    // === TUI Settings (v1.0) ===
-    /// TUI progress display mode
-    #[serde(default = "default_tui_progress_mode")]
-    pub tui_progress_mode: ProgressMode,
-
-    /// TUI keyboard key bindings
-    #[serde(default)]
-    pub tui_key_bindings: KeyBindings,
-
     /// Automatic dependency installation behavior
     #[serde(default = "default_dependency_auto_install")]
     pub dependency_auto_install: AutoInstallBehavior,
@@ -189,10 +128,6 @@ fn default_download_timeout() -> u64 {
     300 // 5 minutes default
 }
 
-fn default_tui_progress_mode() -> ProgressMode {
-    ProgressMode::Auto
-}
-
 fn default_dependency_auto_install() -> AutoInstallBehavior {
     AutoInstallBehavior::Prompt
 }
@@ -219,8 +154,6 @@ impl Default for Config {
             playlist_behavior: PlaylistBehavior::VideoOnly, // Changed from Ask for v1.0
             cookies_from_browser: None,
             download_timeout: 300,
-            tui_progress_mode: ProgressMode::Auto,
-            tui_key_bindings: KeyBindings::default(),
             dependency_auto_install: AutoInstallBehavior::Prompt,
             ytdlp_auto_update: true,
             ytdlp_update_interval_days: 1,
@@ -331,13 +264,6 @@ pub fn show_config() -> Result<()> {
         "  cookies_from_browser  = {:?}",
         config.cookies_from_browser.as_deref().unwrap_or("None")
     );
-    println!();
-    println!("TUI Settings:");
-    println!("  tui_progress_mode     = {:?}", config.tui_progress_mode);
-    println!(
-        "  tui_key_bindings      = quit:'{}' help:'{}' confirm:'{}'",
-        config.tui_key_bindings.quit, config.tui_key_bindings.help, config.tui_key_bindings.confirm
-    );
     println!(
         "  dependency_auto_install = {:?}",
         config.dependency_auto_install
@@ -443,20 +369,6 @@ pub fn set_config(key: &str, value: &str) -> Result<()> {
                     valid_browsers.join(", ")
                 )));
             }
-        }
-        "tui_progress_mode" => {
-            let mode = match value {
-                "minimal" => ProgressMode::Minimal,
-                "detailed" => ProgressMode::Detailed,
-                "auto" => ProgressMode::Auto,
-                _ => {
-                    return Err(YtcsError::ConfigError(
-                        "Value must be 'minimal', 'detailed', or 'auto'".to_string(),
-                    ));
-                }
-            };
-            println!("✓ Set tui_progress_mode to: {:?}", mode);
-            config.tui_progress_mode = mode;
         }
         "dependency_auto_install" => {
             let behavior = match value {

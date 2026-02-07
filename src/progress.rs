@@ -1,19 +1,19 @@
-//! Module pour gérer les barres de progression
+//! Module for managing progress bars
 
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
-/// Constante pour le taux de rafraîchissement des barres de progression
+/// Constant for progress bar refresh rate
 const PROGRESS_TICK_RATE_MS: u64 = 100;
 
-/// Type de barre de progression
+/// Progress bar type
 #[derive(Debug, Clone, Copy)]
 pub enum ProgressType {
-    /// Barre de progression pour le téléchargement
+    /// Progress bar for download
     Download,
-    /// Barre de progression pour le traitement audio
+    /// Progress bar for audio processing
     Audio,
-    /// Barre de progression pour le splitting d'une piste
+    /// Progress bar for splitting a track
     Track,
 }
 
@@ -21,12 +21,12 @@ pub enum ProgressType {
 ///
 /// # Arguments
 ///
-/// * `message` - Message à afficher
-/// * `progress_type` - Type de barre de progression
+/// * `message` - Message to display
+/// * `progress_type` - Type of progress bar
 ///
 /// # Returns
 ///
-/// Une barre de progression configurée
+/// A configured progress bar
 ///
 /// # Examples
 ///
@@ -34,7 +34,7 @@ pub enum ProgressType {
 /// use youtube_chapter_splitter::progress::{create_progress, ProgressType};
 ///
 /// let pb = create_progress("Downloading...", ProgressType::Download);
-/// // ... faire quelque chose ...
+/// // ... do something ...
 /// pb.finish_and_clear();
 /// ```
 pub fn create_progress(message: &str, progress_type: ProgressType) -> ProgressBar {
@@ -56,11 +56,11 @@ pub fn create_progress(message: &str, progress_type: ProgressType) -> ProgressBa
 ///
 /// # Arguments
 ///
-/// * `message` - Message à afficher
+/// * `message` - Message to display
 ///
 /// # Returns
 ///
-/// Une barre de progression configurée pour le téléchargement
+/// A configured progress bar for download
 pub fn create_download_progress(message: &str) -> ProgressBar {
     create_progress(message, ProgressType::Download)
 }
@@ -69,11 +69,11 @@ pub fn create_download_progress(message: &str) -> ProgressBar {
 ///
 /// # Arguments
 ///
-/// * `message` - Message à afficher
+/// * `message` - Message to display
 ///
 /// # Returns
 ///
-/// Une barre de progression configurée pour le traitement audio
+/// A configured progress bar for audio processing
 pub fn create_audio_progress(message: &str) -> ProgressBar {
     create_progress(message, ProgressType::Audio)
 }
@@ -82,11 +82,11 @@ pub fn create_audio_progress(message: &str) -> ProgressBar {
 ///
 /// # Arguments
 ///
-/// * `message` - Message à afficher
+/// * `message` - Message to display
 ///
 /// # Returns
 ///
-/// Une barre de progression configurée pour le splitting
+/// A configured progress bar for splitting
 pub fn create_track_progress(message: &str) -> ProgressBar {
     create_progress(message, ProgressType::Track)
 }

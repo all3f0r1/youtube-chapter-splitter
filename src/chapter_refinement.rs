@@ -1,17 +1,17 @@
-//! Affinement des chapitres par détection de silence.
+//! Chapter refinement by silence detection.
 //!
-//! Ce module ajuste les timecodes des chapitres déclarés en utilisant
-//! la détection de silence pour trouver les points de coupe optimaux.
+//! This module adjusts declared chapter timecodes using
+//! silence detection to find optimal split points.
 //!
-//! # Principe
+//! # Principle
 //!
-//! Les timecodes de chapitres YouTube sont souvent imprécis (quelques secondes
-//! d'écart). Ce module :
-//! 1. Analyse tout l'audio pour trouver tous les silences
-//! 2. Pour chaque chapitre, cherche le silence le plus proche (dans une fenêtre)
-//! 3. Ajuste le timecode vers ce silence
+//! YouTube chapter timecodes are often imprecise (a few seconds off).
+//! This module:
+//! 1. Analyzes all audio to find all silences
+//! 2. For each chapter, finds the nearest silence (within a window)
+//! 3. Adjusts the timecode towards that silence
 //!
-//! # Exemple
+//! # Example
 //!
 //! ```no_run
 //! # use youtube_chapter_splitter::chapter_refinement::refine_chapters_with_silence;
@@ -24,9 +24,9 @@
 //! let refined = refine_chapters_with_silence(
 //!     &chapters,
 //!     &audio_file,
-//!     5.0,  // fenêtre de ±5 secondes
-//!     -35.0, // seuil de silence
-//!     1.5,  // durée minimale de silence
+//!     5.0,  // window of ±5 seconds
+//!     -35.0, // silence threshold
+//!     1.5,  // minimum silence duration
 //! )?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -38,10 +38,10 @@ use regex::Regex;
 use std::path::Path;
 use std::process::Command;
 
-/// Point de silence détecté dans l'audio
+/// Detected silence point in the audio
 #[derive(Debug, Clone)]
 struct SilencePoint {
-    /// Position du silence en secondes
+    /// Position of the silence in seconds
     position: f64,
 }
 
@@ -52,13 +52,13 @@ impl SilencePoint {
     }
 }
 
-/// Analyse l'audio et extrait tous les points de silence.
+/// Analyzes the audio and extracts all silence points.
 ///
 /// # Arguments
 ///
-/// * `audio_file` - Fichier audio à analyser
-/// * `noise_threshold` - Seuil de silence en dB (ex: -35.0)
-/// * `min_duration` - Durée minimale d'un silence en secondes (ex: 1.0)
+/// * `audio_file` - Audio file to analyze
+/// * `noise_threshold` - Silence threshold in dB (ex: -35.0)
+/// * `min_duration` - Minimum duration of a silence in seconds (ex: 1.0)
 fn detect_all_silences(
     audio_file: &Path,
     noise_threshold: f64,
@@ -112,13 +112,13 @@ fn detect_all_silences(
     Ok(silence_points)
 }
 
-/// Trouve le silence le plus proche d'une position cible.
+/// Finds the silence point closest to a target position.
 ///
 /// # Arguments
 ///
-/// * `silences` - Liste des points de silence
-/// * `target` - Position cible en secondes
-/// * `window` - Fenêtre de recherche en secondes (ex: 5.0 = ±5s)
+/// * `silences` - List of silence points
+/// * `target` - Target position in seconds
+/// * `window` - Search window in seconds (ex: 5.0 = ±5s)
 fn find_nearest_silence(
     silences: &[SilencePoint],
     target: f64,
@@ -136,25 +136,25 @@ fn find_nearest_silence(
         })
 }
 
-/// Affine les chapitres en utilisant les points de silence.
+/// Refines chapters using silence points.
 ///
 /// # Arguments
 ///
-/// * `chapters` - Chapitres originaux avec timecodes déclarés
-/// * `audio_file` - Fichier audio à analyser
-/// * `window` - Fenêtre de recherche en secondes (recommandé: 3.0 à 8.0)
-/// * `noise_threshold` - Seuil de silence en dB (recommandé: -35.0 à -50.0)
-/// * `min_silence_duration` - Durée minimale de silence (recommandé: 0.8 à 2.0)
+/// * `chapters` - Original chapters with declared timecodes
+/// * `audio_file` - Audio file to analyze
+/// * `window` - Search window in seconds (recommended: 3.0 to 8.0)
+/// * `noise_threshold` - Silence threshold in dB (recommended: -35.0 to -50.0)
+/// * `min_silence_duration` - Minimum silence duration (recommended: 0.8 to 2.0)
 ///
 /// # Returns
 ///
-/// Nouveaux chapitres avec timecodes ajustés vers les silences les plus proches.
+/// New chapters with timecodes adjusted towards the nearest silences.
 ///
-/// # Stratégie
+/// # Strategy
 ///
-/// - **Début de piste** : Ajusté vers le silence le plus proche **après** le timecode
-/// - **Fin de piste** : Ajusté vers le silence le plus proche **avant** le timecode
-/// - Si aucun silence n'est trouvé dans la fenêtre, le timecode original est conservé
+/// - **Track start**: Adjusted towards the nearest silence **after** the timecode
+/// - **Track end**: Adjusted towards the nearest silence **before** the timecode
+/// - If no silence is found within the window, the original timecode is kept
 pub fn refine_chapters_with_silence(
     chapters: &[Chapter],
     audio_file: &Path,
@@ -166,7 +166,7 @@ pub fn refine_chapters_with_silence(
         return Ok(Vec::new());
     }
 
-    // Détecter tous les silences une seule fois
+    // Detect all silences once
     let silences = detect_all_silences(audio_file, noise_threshold, min_silence_duration)?;
 
     if silences.is_empty() {
@@ -179,16 +179,16 @@ pub fn refine_chapters_with_silence(
     for (i, chapter) in chapters.iter().enumerate() {
         let is_last = i == chapters.len() - 1;
 
-        // Pour le début, chercher un silence APRÈS le timecode déclaré
-        // Pour la fin (sauf dernière piste), chercher un silence AVANT
+        // For start, look for a silence AFTER the declared timecode
+        // For end (except last track), look for a silence BEFORE
         let new_start = if i == 0 {
-            // Première piste : garder le début ou chercher avant
+            // First track: keep the beginning or look before
             let before = find_nearest_silence(&silences, chapter.start_time, window);
             before
                 .map(|s| s.position)
                 .filter(|&pos| pos <= chapter.start_time + 0.5)
         } else {
-            // Pistes suivantes : chercher après le timecode
+            // Following tracks: look for a silence after the timecode
             let after = find_nearest_silence(&silences, chapter.start_time, window);
             after
                 .map(|s| s.position)
@@ -196,10 +196,10 @@ pub fn refine_chapters_with_silence(
         };
 
         let new_end = if is_last {
-            // Dernière piste : garder la fin originale
+            // Last track: keep the original end
             chapter.end_time
         } else {
-            // Chercher un silence avant la fin déclarée
+            // Look for a silence before the declared end
             let before = find_nearest_silence(&silences, chapter.end_time, window);
             before
                 .map(|s| s.position)
@@ -210,7 +210,7 @@ pub fn refine_chapters_with_silence(
         let final_start = new_start.unwrap_or(chapter.start_time);
         let final_end = new_end;
 
-        // S'assurer que les chapitres ne se chevauchent pas
+        // Ensure chapters don't overlap
         let previous_end = refined.last().map(|c: &Chapter| c.end_time);
         let final_end = if let Some(prev_end) = previous_end {
             if final_start < prev_end {
@@ -222,7 +222,7 @@ pub fn refine_chapters_with_silence(
             final_end
         };
 
-        // Vérifier que la durée est raisonnable (au moins 30 secondes)
+        // Check that duration is reasonable (at least 30 seconds)
         let final_end = final_end.max(final_start + 30.0);
 
         let duration_delta = (final_end - final_start) - chapter.duration();
@@ -245,7 +245,7 @@ pub fn refine_chapters_with_silence(
     Ok(refined)
 }
 
-/// Affiche un rapport de comparaison entre chapitres originaux et affinés.
+/// Prints a comparison report between original and refined chapters.
 pub fn print_refinement_report(original: &[Chapter], refined: &[Chapter]) {
     if original.len() != refined.len() {
         println!("⚠ Cannot compare: different chapter counts");
@@ -280,13 +280,13 @@ pub fn print_refinement_report(original: &[Chapter], refined: &[Chapter]) {
 mod tests {
     use super::*;
 
-    /// Crée un fichier audio de test avec des silences artificiels.
-    /// Note: nécessite ffmpeg dans le PATH.
+    /// Creates a test audio file with artificial silences.
+    /// Note: requires ffmpeg in PATH.
     #[test]
-    #[ignore] // Ignoré par défaut car lent et nécessite ffmpeg
+    #[ignore] // Ignored by default because it's slow and requires ffmpeg
     fn test_refine_chapters() {
-        // Créer un fichier audio de test avec silence
-        // Ce test est principalement documentatif
+        // Create a test audio file with silence
+        // This test is mainly documentary
         let test_audio = std::path::PathBuf::from("/tmp/test_silence.mp3");
 
         let chapters = vec![
@@ -306,7 +306,7 @@ mod tests {
         let s1 = SilencePoint::new(10.0, 11.0);
         let s2 = SilencePoint::new(10.0, 14.0);
 
-        // La position est le point médian du silence
+        // Position is the midpoint of the silence
         assert_eq!(s1.position, 10.5); // (10 + 11) / 2
         assert_eq!(s2.position, 12.0); // (10 + 14) / 2
     }
@@ -319,15 +319,15 @@ mod tests {
             SilencePoint::new(19.0, 20.0), // position: 19.5
         ];
 
-        // Cible exacte
+        // Exact target
         let nearest = find_nearest_silence(&silences, 10.0, 2.0);
         assert_eq!(nearest.unwrap().position, 10.0);
 
-        // Cible proche
+        // Close target
         let nearest = find_nearest_silence(&silences, 9.8, 2.0);
         assert_eq!(nearest.unwrap().position, 10.0);
 
-        // Cible hors fenêtre
+        // Target outside window
         let nearest = find_nearest_silence(&silences, 15.0, 2.0);
         assert!(nearest.is_none());
     }

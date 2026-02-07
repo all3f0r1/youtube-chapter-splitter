@@ -1,6 +1,6 @@
-//! Module pour parser la progression de yt-dlp en temps réel.
+//! Module for parsing yt-dlp progress in real time.
 //!
-//! yt-dlp affiche la progression sur stderr avec ce format :
+//! yt-dlp displays progress on stderr with this format:
 //! [download]  23.5MiB of  52.3MiB at  2.34MiB/s ETA 00:12
 //! [download]  45.0% of  ~120.00MiB at  1.23MiB/s ETA 01:23
 
@@ -16,38 +16,38 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-/// État de la progression du téléchargement
+/// Download progress state
 #[derive(Debug, Clone)]
 pub struct DownloadProgress {
-    /// Pourcentage (0-100)
+    /// Percentage (0-100)
     pub percentage: f64,
-    /// Taille téléchargée (ex: "23.5MiB")
+    /// Downloaded size (e.g. "23.5MiB")
     pub downloaded: String,
-    /// Taille totale (ex: "52.3MiB")
+    /// Total size (e.g. "52.3MiB")
     pub total: String,
-    /// Vitesse (ex: "2.34MiB/s")
+    /// Speed (e.g. "2.34MiB/s")
     pub speed: String,
-    /// ETA (ex: "00:12")
+    /// ETA (e.g. "00:12")
     pub eta: String,
 }
 
-/// Callback pour rapporter la progression du téléchargement
+/// Callback to report download progress
 pub trait ProgressCallback: Send + Sync {
-    /// Appelé périodiquement pendant le téléchargement avec la progression actuelle
+    /// Called periodically during download with current progress
     fn on_progress(&self, progress: &DownloadProgress);
 
-    /// Appelé quand le téléchargement commence
+    /// Called when the download starts
     fn on_start(&self) {
         // Default implementation does nothing
     }
 
-    /// Appelé quand le téléchargement est terminé
+    /// Called when the download is complete
     fn on_complete(&self) {
         // Default implementation does nothing
     }
 }
 
-/// Implémentation vide pour quand aucun callback n'est nécessaire
+/// No-op implementation for when no callback is needed
 pub struct NoProgressCallback;
 
 impl ProgressCallback for NoProgressCallback {
@@ -56,10 +56,10 @@ impl ProgressCallback for NoProgressCallback {
     }
 }
 
-/// Implémentation de callback qui stocke la progression dans un Arc<Mutex>
-/// Utilisé pour partager la progression entre le thread de téléchargement et la TUI
+/// Callback implementation that stores progress in an Arc<Mutex>
+/// Used to share progress between the download thread and the TUI
 pub struct SharedProgressCallback {
-    /// La progression actuelle (partagée)
+    /// Current progress (shared)
     pub progress: Arc<Mutex<Option<DownloadProgress>>>,
 }
 
@@ -70,12 +70,12 @@ impl SharedProgressCallback {
         }
     }
 
-    /// Obtenir la progression actuelle
+    /// Get the current progress
     pub fn get_progress(&self) -> Option<DownloadProgress> {
         self.progress.lock().ok().and_then(|p| p.clone())
     }
 
-    /// Réinitialiser la progression
+    /// Reset the progress
     pub fn reset(&self) {
         if let Ok(mut p) = self.progress.lock() {
             *p = None;
@@ -97,33 +97,33 @@ impl ProgressCallback for SharedProgressCallback {
     }
 }
 
-/// Regex compilée pour extraire le pourcentage
+/// Compiled regex to extract percentage
 static RE_PERCENTAGE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d+\.\d+)%").unwrap());
 
-/// Regex compilée pour extraire la vitesse
+/// Compiled regex to extract speed
 static RE_SPEED: Lazy<Regex> = Lazy::new(|| Regex::new(r"at\s+([\d.]+)(GiB|MiB|KiB)/s").unwrap());
 
-/// Regex compilée pour extraire l'ETA
+/// Compiled regex to extract ETA
 static RE_ETA: Lazy<Regex> = Lazy::new(|| Regex::new(r"ETA\s+(\d{2}:\d{2})").unwrap());
 
-/// Parse une ligne de progression de yt-dlp.
+/// Parse a yt-dlp progress line.
 ///
-/// # Exemples de formats reconnus
+/// # Recognized format examples
 /// - `[download]  23.5MiB of  52.3MiB at  2.34MiB/s ETA 00:12`
 /// - `[download]  45.0% of  ~120.00MiB at  1.23MiB/s ETA 01:23`
 /// - `[download]   3.0% at  450.00KiB/s ETA 02:34`
 fn parse_download_line(line: &str) -> Option<DownloadProgress> {
-    // Vérifier que c'est une ligne de download
+    // Verify this is a download line
     if !line.contains("[download]") || line.contains("100%") {
         return None;
     }
 
-    // Extraire le pourcentage
+    // Extract the percentage
     let percentage = if let Some(caps) = RE_PERCENTAGE.captures(line) {
         caps.get(1)?.as_str().parse().ok()?
     } else {
-        // Format sans pourcentage explicite, calculer depuis les tailles
-        // Parser les valeurs avec les unités
+        // Format without explicit percentage, calculate from sizes
+        // Parse values with units
         let re_with_unit = Regex::new(r"(\d+\.\d+)(GiB|MiB|KiB)").ok()?;
         let sizes: Vec<_> = re_with_unit.captures_iter(line).collect();
 
@@ -148,7 +148,7 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
         }
     };
 
-    // Extraire la vitesse
+    // Extract the speed
     let speed = RE_SPEED
         .captures(line)
         .and_then(|caps| {
@@ -160,15 +160,15 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
         })
         .unwrap_or_default();
 
-    // Extraire l'ETA
+    // Extract the ETA
     let eta = RE_ETA
         .captures(line)
         .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()))
         .unwrap_or_default();
 
-    // Extraire les tailles (réutiliser les captures si disponibles)
+    // Extract sizes (reuse captures if available)
     let (downloaded, total) = if RE_PERCENTAGE.is_match(line) {
-        // Format avec pourcentage, extraire les tailles directement
+        // Format with percentage, extract sizes directly
         let re_full = Regex::new(r"(\d+\.\d+)(GiB|MiB|KiB)").ok()?;
         let sizes: Vec<_> = re_full.captures_iter(line).collect();
         if sizes.len() >= 2 {
@@ -180,7 +180,7 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
             ("?".to_string(), "?".to_string())
         }
     } else {
-        // Format sans pourcentage, réutiliser les captures du calcul
+        // Format without percentage, reuse calculation captures
         let re_with_unit = Regex::new(r"(\d+\.\d+)(GiB|MiB|KiB)").ok()?;
         let sizes: Vec<_> = re_with_unit.captures_iter(line).collect();
         if sizes.len() >= 2 {
@@ -202,18 +202,18 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
     })
 }
 
-/// Télécharge l'audio avec une barre de progression en temps réel.
+/// Download audio with a real-time progress bar.
 ///
-/// Cette fonction lit stderr de yt-dlp en continu pour afficher la progression.
-/// En cas d'erreur, propose de mettre à jour yt-dlp si nécessaire.
+/// This function reads yt-dlp stderr continuously to display progress.
+/// On error, prompts to update yt-dlp if necessary.
 ///
 /// # Arguments
 ///
-/// * `url` - URL YouTube
-/// * `output_path` - Chemin de sortie (sans extension)
-/// * `cookies_from_browser` - Navigateur pour les cookies
-/// * `pb` - ProgressBar optionnelle (créée automatiquement si None)
-/// * `progress_shared` - Progress partagée pour TUI (Arc<Mutex<Option<DownloadProgress>>>)
+/// * `url` - YouTube URL
+/// * `output_path` - Output path (without extension)
+/// * `cookies_from_browser` - Browser for cookies
+/// * `pb` - Optional ProgressBar (created automatically if None)
+/// * `progress_shared` - Shared progress for TUI (Arc<Mutex<Option<DownloadProgress>>>)
 pub fn download_audio_with_progress(
     url: &str,
     output_path: &std::path::Path,
@@ -237,10 +237,10 @@ pub fn download_audio_with_progress(
     });
 
     // Reset progress at start
-    if let Some(shared) = progress_shared {
-        if let Ok(mut p) = shared.lock() {
-            *p = None;
-        }
+    if let Some(shared) = progress_shared
+        && let Ok(mut p) = shared.lock()
+    {
+        *p = None;
     }
 
     // Try downloading, with auto-update retry on failure
@@ -338,7 +338,7 @@ fn download_audio_with_progress_impl(
     progress_bar: &ProgressBar,
     progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
-    // Fallback strategy pour les formats
+    // Fallback strategy for formats
     const FORMAT_SELECTORS: &[Option<&str>] = &[
         Some("bestaudio[ext=m4a]/bestaudio"),
         Some("140"),
@@ -392,7 +392,7 @@ fn download_audio_with_progress_impl(
     }
 }
 
-/// Tente le téléchargement avec un sélecteur de format spécifique.
+/// Attempt download with a specific format selector.
 fn try_download_with_format(
     url: &str,
     output_path: &std::path::Path,
@@ -426,7 +426,7 @@ fn try_download_with_format(
         .spawn()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to spawn yt-dlp: {}", e)))?;
 
-    // Prendre ownership du stderr
+    // Take ownership of stderr
     let stderr = child
         .stderr
         .take()
@@ -435,7 +435,7 @@ fn try_download_with_format(
     // Shared buffer to capture stderr for error reporting
     let stderr_buffer = Arc::new(Mutex::new(String::new()));
 
-    // Thread pour lire stderr en continu et mettre à jour la progress bar
+    // Thread to continuously read stderr and update the progress bar
     let pb = progress_bar.clone();
     let stderr_clone = Arc::clone(&stderr_buffer);
     // Clone the shared progress Arc for the thread
@@ -477,10 +477,10 @@ fn try_download_with_format(
                                     last_percentage = progress.percentage;
 
                                     // Update shared progress for TUI
-                                    if let Some(ref shared) = progress_shared_clone {
-                                        if let Ok(mut p) = shared.lock() {
-                                            *p = Some(progress.clone());
-                                        }
+                                    if let Some(ref shared) = progress_shared_clone
+                                        && let Ok(mut p) = shared.lock()
+                                    {
+                                        *p = Some(progress.clone());
                                     }
                                 }
                                 log::trace!("{}", partial_line);
@@ -496,7 +496,7 @@ fn try_download_with_format(
         }
     });
 
-    // Attendre la fin du processus
+    // Wait for the process to finish
     let status = child
         .wait()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to wait: {}", e)))?;

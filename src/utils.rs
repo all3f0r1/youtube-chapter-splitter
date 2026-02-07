@@ -1,40 +1,34 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-// Regex compilées une seule fois au démarrage
-static RE_FULL_ALBUM: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap()
-});
+// Regex compiled once at startup
+static RE_FULL_ALBUM: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
-static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\[.*?\]|\(.*?\)").unwrap()
-});
+static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)").unwrap());
 
-static RE_SPACES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\s+").unwrap()
-});
+static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 
-static RE_TRACK_PREFIX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap()
-});
+static RE_TRACK_PREFIX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap());
 
-/// Nettoie et formate le nom de dossier selon les règles définies.
+/// Cleans and formats a folder name according to defined rules.
 ///
-/// Cette fonction applique plusieurs transformations pour normaliser les noms de dossiers :
-/// - Retire tout le contenu après `[FULL ALBUM]` ou `(FULL ALBUM)` (insensible à la casse)
-/// - Supprime tous les crochets `[]` et parenthèses `()` avec leur contenu
-/// - Remplace les underscores `_`, pipes `|` et slashes `/` par des tirets `-`
-/// - Normalise les espaces multiples en un seul espace
-/// - Capitalise chaque mot (première lettre en majuscule, reste en minuscule)
-/// - Supprime les espaces et tirets en début/fin de chaîne
+/// This function applies several transformations to normalize folder names:
+/// - Removes everything after `[FULL ALBUM]` or `(FULL ALBUM)` (case insensitive)
+/// - Removes all brackets `[]` and parentheses `()` with their content
+/// - Replaces underscores `_`, pipes `|` and slashes `/` with dashes `-`
+/// - Normalizes multiple spaces into a single space
+/// - Capitalizes each word (first letter uppercase, rest lowercase)
+/// - Removes spaces and dashes at the beginning/end of the string
 ///
 /// # Arguments
 ///
-/// * `name` - Le nom de dossier brut à nettoyer
+/// * `name` - The raw folder name to clean
 ///
 /// # Returns
 ///
-/// Une chaîne nettoyée et formatée, prête à être utilisée comme nom de dossier
+/// A cleaned and formatted string ready to use as a folder name
 ///
 /// # Examples
 ///
@@ -45,19 +39,19 @@ static RE_TRACK_PREFIX: Lazy<Regex> = Lazy::new(|| {
 /// assert_eq!(result, "Marigold - Oblivion Gate");
 /// ```
 pub fn clean_folder_name(name: &str) -> String {
-    // Retirer tout après (FULL ALBUM) ou [FULL ALBUM] (case insensitive)
+    // Remove everything after (FULL ALBUM) or [FULL ALBUM] (case insensitive)
     let without_suffix = RE_FULL_ALBUM.replace_all(name, "");
-    
-    // Retirer les [] et () avec leur contenu restants
+
+    // Remove remaining [] and () with their content
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
-    
-    // Remplacer les underscores, pipes et slashes par des tirets
-    let with_dashes = cleaned.replace('_', "-").replace('|', "-").replace('/', "-");
-    
-    // Nettoyer les espaces multiples
+
+    // Replace underscores, pipes and slashes with dashes
+    let with_dashes = cleaned.replace(['_', '|', '/'], "-");
+
+    // Clean multiple spaces
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");
-    
-    // Capitaliser chaque mot
+
+    // Capitalize each word
     let capitalized = normalized
         .split_whitespace()
         .map(|word| {
@@ -65,30 +59,31 @@ pub fn clean_folder_name(name: &str) -> String {
             match chars.next() {
                 None => String::new(),
                 Some(first) => {
-                    first.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str()
+                    first.to_uppercase().collect::<String>()
+                        + chars.as_str().to_lowercase().as_str()
                 }
             }
         })
         .collect::<Vec<String>>()
         .join(" ");
-    
-    // Nettoyer les tirets et espaces en début/fin
+
+    // Clean dashes and spaces at beginning/end
     capitalized.trim().trim_matches('-').trim().to_string()
 }
 
-/// Formate une durée en secondes au format lisible.
+/// Formats a duration in seconds as a readable string.
 ///
-/// Convertit une durée en secondes en une chaîne formatée :
-/// - Format `Mm SSs` si la durée est inférieure à une heure
-/// - Format `Hh MMm SSs` si la durée est d'une heure ou plus
+/// Converts a duration in seconds to a formatted string:
+/// - `Mm SSs` format if duration is less than an hour
+/// - `Hh MMm SSs` format if duration is an hour or more
 ///
 /// # Arguments
 ///
-/// * `seconds` - La durée en secondes (peut être décimale)
+/// * `seconds` - The duration in seconds (can be decimal)
 ///
 /// # Returns
 ///
-/// Une chaîne formatée représentant la durée
+/// A formatted string representing the duration
 ///
 /// # Examples
 ///
@@ -110,18 +105,18 @@ pub fn format_duration(seconds: f64) -> String {
     }
 }
 
-/// Formate une durée en secondes au format court.
+/// Formats a duration in seconds in short format.
 ///
-/// Convertit une durée en secondes en une chaîne compacte au format `Mm SSs`,
-/// sans afficher les heures même si la durée dépasse une heure.
+/// Converts a duration in seconds to a compact string in `Mm SSs` format,
+/// without displaying hours even if the duration exceeds one hour.
 ///
 /// # Arguments
 ///
-/// * `seconds` - La durée en secondes (peut être décimale)
+/// * `seconds` - The duration in seconds (can be decimal)
 ///
 /// # Returns
 ///
-/// Une chaîne formatée au format court
+/// A formatted string in short format
 ///
 /// # Examples
 ///
@@ -136,25 +131,25 @@ pub fn format_duration_short(seconds: f64) -> String {
     format!("{}m {:02}s", minutes, secs)
 }
 
-/// Parse le titre d'une vidéo YouTube pour extraire l'artiste et l'album.
+/// Parses a YouTube video title to extract artist and album.
 ///
-/// Cette fonction analyse le titre d'une vidéo et tente d'en extraire le nom de l'artiste
-/// et le titre de l'album en se basant sur des conventions de nommage courantes.
+/// This function analyzes a video title and attempts to extract the artist name
+/// and album title based on common naming conventions.
 ///
-/// # Format attendu
+/// # Expected format
 ///
-/// - `"ARTIST - ALBUM [...]"` (séparateur tiret)
-/// - `"ARTIST | ALBUM [...]"` (séparateur pipe)
+/// - `"ARTIST - ALBUM [...]"` (dash separator)
+/// - `"ARTIST | ALBUM [...]"` (pipe separator)
 ///
 /// # Arguments
 ///
-/// * `title` - Le titre de la vidéo YouTube
+/// * `title` - The YouTube video title
 ///
 /// # Returns
 ///
-/// Un tuple `(artiste, album)` où :
-/// - Si le parsing réussit : les deux valeurs sont extraites et nettoyées
-/// - Si le parsing échoue : `("Unknown Artist", titre_nettoyé)`
+/// A tuple `(artist, album)` where:
+/// - If parsing succeeds: both values are extracted and cleaned
+/// - If parsing fails: `("Unknown Artist", cleaned_title)`
 ///
 /// # Examples
 ///
@@ -166,13 +161,13 @@ pub fn format_duration_short(seconds: f64) -> String {
 /// assert_eq!(album, "Dark Side");
 /// ```
 pub fn parse_artist_album(title: &str) -> (String, String) {
-    // Retirer tout après (FULL ALBUM) ou [FULL ALBUM]
+    // Remove everything after (FULL ALBUM) or [FULL ALBUM]
     let without_suffix = RE_FULL_ALBUM.replace_all(title, "");
-    
-    // Retirer les [] et () restants
+
+    // Remove remaining [] and ()
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
-    
-    // Séparer par - ou |
+
+    // Split by - or |
     let parts: Vec<&str> = if cleaned.contains(" - ") {
         cleaned.split(" - ").collect()
     } else if cleaned.contains(" | ") {
@@ -180,7 +175,7 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     } else {
         vec![cleaned.trim()]
     };
-    
+
     if parts.len() >= 2 {
         let artist = clean_folder_name(parts[0].trim());
         let album = clean_folder_name(parts[1].trim());
@@ -191,23 +186,23 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     }
 }
 
-/// Nettoie un titre de chapitre pour l'utiliser comme nom de fichier.
+/// Cleans a chapter title for use as a filename.
 ///
-/// Cette fonction supprime les préfixes de numérotation de piste et remplace
-/// les caractères invalides pour les systèmes de fichiers.
+/// This function removes track numbering prefixes and replaces
+/// invalid characters for file systems.
 ///
-/// # Transformations appliquées
+/// # Applied transformations
 ///
-/// - Supprime les préfixes comme `"1 - "`, `"01. "`, `"Track 5: "`
-/// - Remplace les caractères interdits (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) par `_`
+/// - Removes prefixes like `"1 - "`, `"01. "`, `"Track 5: "`
+/// - Replaces forbidden characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) with `_`
 ///
 /// # Arguments
 ///
-/// * `title` - Le titre brut du chapitre
+/// * `title` - The raw chapter title
 ///
 /// # Returns
 ///
-/// Un titre nettoyé, sûr pour une utilisation comme nom de fichier
+/// A cleaned title safe for use as a filename
 ///
 /// # Examples
 ///
@@ -218,10 +213,10 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
 /// assert_eq!(sanitize_title("Track 5: Test/Song"), "Test_Song");
 /// ```
 pub fn sanitize_title(title: &str) -> String {
-    // Retirer les numéros de piste au début
+    // Remove track numbers at the beginning
     let title = RE_TRACK_PREFIX.replace(title, "");
-    
-    // Remplacer les caractères invalides
+
+    // Replace invalid characters
     title
         .chars()
         .map(|c| match c {
@@ -238,22 +233,26 @@ mod tests {
     #[test]
     fn test_clean_folder_name() {
         assert_eq!(
-            clean_folder_name("MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"),
+            clean_folder_name(
+                "MARIGOLD - Oblivion Gate [Full Album] (70s Psychedelic Blues Acid Rock)"
+            ),
             "Marigold - Oblivion Gate"
         );
-        
+
         assert_eq!(
             clean_folder_name("Artist_Name - Album_Title [2024]"),
             "Artist-name - Album-title"
         );
-        
+
         assert_eq!(
             clean_folder_name("test_album (bonus tracks) [remastered]"),
             "Test-album"
         );
-        
+
         assert_eq!(
-            clean_folder_name("PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"),
+            clean_folder_name(
+                "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
+            ),
             "Purple Dreams - Wandering Shadows"
         );
     }
@@ -275,7 +274,10 @@ mod tests {
     fn test_sanitize_title() {
         assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
         assert_eq!(sanitize_title("Track 5: Another Song"), "Another Song");
-        assert_eq!(sanitize_title("Invalid/Characters:Here"), "Invalid_Characters_Here");
+        assert_eq!(
+            sanitize_title("Invalid/Characters:Here"),
+            "Invalid_Characters_Here"
+        );
     }
 
     #[test]

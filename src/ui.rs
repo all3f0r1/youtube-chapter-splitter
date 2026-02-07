@@ -163,10 +163,10 @@ impl Default for PlainTextPresenter {
 /// Display minimal header
 pub fn print_header() {
     println!(
-        "{}
-",
+        "{}",
         format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()
     );
+    println!();
 }
 
 /// Display section header
@@ -182,7 +182,7 @@ pub fn print_video_info(
     from_description: bool,
     silence_detection: bool,
 ) {
-    // Nettoyer le titre des éléments inutiles
+    // Clean the title of unnecessary elements
     let clean_title = clean_title(title);
 
     println!(
@@ -191,7 +191,7 @@ pub fn print_video_info(
         clean_title.bright_white().bold()
     );
 
-    // Affichage du nombre de tracks
+    // Display track count
     let tracks_display = if silence_detection {
         "? tracks → silence detection mode".to_string()
     } else if tracks > 0 {
@@ -215,7 +215,7 @@ pub fn print_video_info(
 pub fn clean_title(title: &str) -> String {
     use crate::utils;
 
-    // Utiliser la même logique que clean_folder_name pour avoir un affichage cohérent
+    // Use the same logic as clean_folder_name for consistent display
     utils::clean_folder_name(title)
 }
 
@@ -226,7 +226,7 @@ pub fn print_cover_status(cover_status: Status) {
 
 /// Display track with full format
 pub fn print_track(track: &TrackProgress, artist: &str, album: &str, filename_format: &str) {
-    // Construire le nom de fichier selon le format
+    // Build filename according to format
     let formatted_name = filename_format
         .replace("{track}", &format!("{:02}", track.number))
         .replace("{title}", &track.title)
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_clean_title() {
-        // clean_title utilise maintenant clean_folder_name qui capitalise
+        // clean_title now uses clean_folder_name which capitalizes
         assert_eq!(clean_title("Artist - Song [Full Album]"), "Artist - Song");
         assert_eq!(clean_title("Normal Title"), "Normal Title");
     }

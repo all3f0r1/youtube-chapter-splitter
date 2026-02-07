@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod advanced_edge_cases_tests {
-    use youtube_chapter_splitter::utils::{clean_folder_name, parse_artist_album, sanitize_title};
     use youtube_chapter_splitter::chapters::Chapter;
+    use youtube_chapter_splitter::utils::{clean_folder_name, parse_artist_album, sanitize_title};
 
     // Tests de caractères spéciaux et Unicode
 
@@ -278,7 +278,7 @@ mod advanced_edge_cases_tests {
         for title in real_chapters {
             let chapter = Chapter::new(title.to_string(), 0.0, 100.0);
             let sanitized = chapter.sanitize_title();
-            
+
             // Vérifier que le numéro est enlevé
             assert!(!sanitized.starts_with("1"));
             assert!(!sanitized.starts_with("0"));

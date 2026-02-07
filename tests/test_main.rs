@@ -68,7 +68,7 @@ mod main_tests {
 
         // Vérifier que le chemin est valide
         assert!(music_dir.to_str().is_some());
-        
+
         // Vérifier que le chemin contient "Music" ou est le répertoire home
         let path_str = music_dir.to_str().unwrap();
         assert!(path_str.contains("Music") || path_str.contains("home") || path_str == ".");

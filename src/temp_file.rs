@@ -1,15 +1,15 @@
-//! Module de gestion RAII des fichiers temporaires
+//! RAII temporary file management module
 //!
-//! Ce module fournit une structure `TempFile` qui supprime automatiquement
-//! les fichiers temporaires lorsqu'elle sort du scope, utilisant le pattern RAII.
+//! This module provides a `TempFile` structure that automatically deletes
+//! temporary files when it goes out of scope, using the RAII pattern.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Fichier temporaire avec nettoyage automatique via RAII
+/// Temporary file with automatic cleanup via RAII
 ///
-/// Le fichier est automatiquement supprimé lorsque `TempFile` est dropped,
-/// sauf si `keep()` a été appelé.
+/// The file is automatically deleted when `TempFile` is dropped,
+/// unless `keep()` has been called.
 ///
 /// # Examples
 ///
@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// {
 ///     let temp = TempFile::new(Path::new("/tmp/audio.mp3"));
 ///     // Use the file...
-///     // Le fichier sera automatiquement supprimé ici
+///     // The file will be automatically deleted here
 /// }
 /// ```
 #[derive(Debug)]
@@ -30,11 +30,11 @@ pub struct TempFile {
 }
 
 impl TempFile {
-    /// Crée un nouveau fichier temporaire
+    /// Creates a new temporary file
     ///
     /// # Arguments
     ///
-    /// * `path` - Chemin du fichier temporaire
+    /// * `path` - Path of the temporary file
     ///
     /// # Examples
     ///
@@ -67,10 +67,10 @@ impl TempFile {
         &self.path
     }
 
-    /// Conserve le fichier après le drop
+    /// Keeps the file after the drop
     ///
-    /// Par défaut, le fichier est supprimé automatiquement.
-    /// Appeler cette méthode empêche la suppression.
+    /// By default, the file is automatically deleted.
+    /// Calling this method prevents deletion.
     ///
     /// # Examples
     ///
@@ -79,7 +79,7 @@ impl TempFile {
     /// use std::path::Path;
     ///
     /// let mut temp = TempFile::new(Path::new("/tmp/audio.mp3"));
-    /// temp.keep(); // Le fichier ne sera pas supprimé
+    /// temp.keep(); // The file will not be deleted
     /// ```
     pub fn keep(&mut self) {
         log::debug!("Keeping temp file: {:?}", self.path);

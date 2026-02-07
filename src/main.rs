@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use youtube_chapter_splitter::{audio, downloader, utils, Result};
+use youtube_chapter_splitter::{Result, audio, downloader, utils};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -55,11 +55,14 @@ fn main() -> Result<()> {
     if let Err(e) = downloader::check_dependencies() {
         eprintln!("{}", format!("⚠ {}", e).yellow());
         eprintln!();
-        eprintln!("{}", "Would you like to install the missing dependencies? (y/n)".bold());
-        
+        eprintln!(
+            "{}",
+            "Would you like to install the missing dependencies? (y/n)".bold()
+        );
+
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).ok();
-        
+
         if input.trim().to_lowercase() == "y" {
             if e.to_string().contains("yt-dlp") {
                 downloader::install_dependency("yt-dlp")?;
@@ -75,7 +78,7 @@ fn main() -> Result<()> {
 
     // Clean the URL
     let clean_url = clean_url(&cli.url);
-    
+
     println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
     println!();
 
@@ -84,27 +87,32 @@ fn main() -> Result<()> {
     let video_info = downloader::get_video_info(&clean_url)?;
 
     println!("{} {}", "Title:".bold(), video_info.title);
-    println!("{} {}", "Duration:".bold(), utils::format_duration(video_info.duration));
+    println!(
+        "{} {}",
+        "Duration:".bold(),
+        utils::format_duration(video_info.duration)
+    );
     println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
     println!();
 
     // Parse artist and album from title or use forced values
     let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
-        // Nettoyer les valeurs forcées par l'utilisateur
+        // Clean user-forced values
         (utils::clean_folder_name(a), utils::clean_folder_name(al))
     } else {
         utils::parse_artist_album(&video_info.title)
     };
-    
+
     // Create output directory with cleaned name
     let folder_name = if cli.artist.is_some() || cli.album.is_some() {
         format!("{} - {}", artist, album)
     } else {
         utils::clean_folder_name(&video_info.title)
     };
-    let base_output = cli.output
+    let base_output = cli
+        .output
         .as_ref()
-        .map(|p| std::path::PathBuf::from(p))
+        .map(std::path::PathBuf::from)
         .unwrap_or_else(get_default_music_dir);
     let output_dir = base_output.join(&folder_name);
     std::fs::create_dir_all(&output_dir)?;
@@ -158,7 +166,11 @@ fn main() -> Result<()> {
         &output_dir,
         &artist,
         &album,
-        if cover_path.exists() { Some(&cover_path) } else { None },
+        if cover_path.exists() {
+            Some(&cover_path)
+        } else {
+            None
+        },
     )?;
 
     // Clean up temporary file

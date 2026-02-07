@@ -1,7 +1,7 @@
-//! Extraction de chapitres depuis la description d'une vidéo YouTube.
+//! Chapter extraction from YouTube video descriptions.
 //!
-//! Ce module détecte et parse les timestamps dans la description des vidéos
-//! pour créer des chapitres lorsque les métadonnées YouTube n'en contiennent pas.
+//! This module detects and parses timestamps in video descriptions
+//! to create chapters when YouTube metadata doesn't contain any.
 
 use crate::chapters::{Chapter, parse_timestamp};
 use crate::error::{Result, YtcsError};
@@ -10,17 +10,17 @@ use regex::Regex;
 
 /// Parses chapters from a video description.
 ///
-/// Détecte les lignes contenant un timestamp suivi d'un titre.
-/// Format attendu: [HH:MM:SS] - Titre ou HH:MM:SS - Titre
+/// Detects lines containing a timestamp followed by a title.
+/// Expected format: [HH:MM:SS] - Title or HH:MM:SS - Title
 ///
 /// # Arguments
 ///
-/// * `description` - La description de la vidéo
-/// * `video_duration` - La durée totale de la vidéo en secondes
+/// * `description` - The video description
+/// * `video_duration` - The total duration of the video in seconds
 ///
 /// # Returns
 ///
-/// Un vecteur de chapitres extraits, ou une erreur si aucun chapitre n'est trouvé
+/// A vector of extracted chapters, or an error if no chapter is found
 ///
 /// # Errors
 ///
@@ -48,8 +48,8 @@ pub fn parse_chapters_from_description(
     log::debug!("Video duration: {:.2}s", video_duration);
     log::debug!("Description length: {} characters", description.len());
 
-    // Regex pour détecter: timestamp optionnel entre crochets + séparateur + titre
-    // Formats supportés:
+    // Regex to detect: optional timestamp in brackets + separator + title
+    // Supported formats:
     // [00:00:00] - Title
     // [00:00] - Title
     // 00:00:00 - Title
@@ -60,14 +60,14 @@ pub fn parse_chapters_from_description(
     let re = Regex::new(r"(?m)^\s*\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*[-–—:]?\s*(.+?)\s*$")
         .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
 
-    // Regex pour le format avec numéro de piste au début: "1 - Title (0:00)"
+    // Regex for the format with track number at beginning: "1 - Title (0:00)"
     let re_track_format =
         Regex::new(r"(?m)^\s*(\d+)\s*[-–—]\s*(.+?)\s*\((\d{1,2}:\d{2}(?::\d{2})?)\)\s*$")
             .map_err(|e| YtcsError::ChapterError(format!("Regex error: {}", e)))?;
 
     let mut chapters_data: Vec<(f64, String)> = Vec::new();
 
-    // Essayer d'abord le format avec numéro de piste: "1 - Title (0:00)"
+    // First try the format with track number: "1 - Title (0:00)"
     for cap in re_track_format.captures_iter(description) {
         if let (Some(_track_num_match), Some(title_match), Some(timestamp_match)) =
             (cap.get(1), cap.get(2), cap.get(3))
@@ -75,16 +75,16 @@ pub fn parse_chapters_from_description(
             let timestamp_str = timestamp_match.as_str();
             let title = title_match.as_str().trim();
 
-            // Ignorer les lignes vides ou trop courtes
+            // Ignore empty or too short lines
             if title.is_empty() || title.len() < 2 {
                 continue;
             }
 
-            // Parser le timestamp
+            // Parse the timestamp
             if let Ok(start_time) = parse_timestamp(timestamp_str) {
-                // Vérifier que le timestamp est dans la durée de la vidéo
+                // Check that timestamp is within video duration
                 if start_time < video_duration {
-                    // Nettoyer le titre
+                    // Clean the title
                     let clean_title = utils::sanitize_title(title);
                     if !clean_title.is_empty() {
                         chapters_data.push((start_time, clean_title));
@@ -94,23 +94,23 @@ pub fn parse_chapters_from_description(
         }
     }
 
-    // Si aucun chapitre trouvé avec le format piste, essayer le format classique
+    // If no chapter found with track format, try the classic format
     if chapters_data.is_empty() {
         for cap in re.captures_iter(description) {
             if let (Some(timestamp_match), Some(title_match)) = (cap.get(1), cap.get(2)) {
                 let timestamp_str = timestamp_match.as_str();
                 let title = title_match.as_str().trim();
 
-                // Ignorer les lignes vides ou trop courtes
+                // Ignore empty or too short lines
                 if title.is_empty() || title.len() < 2 {
                     continue;
                 }
 
-                // Parser le timestamp
+                // Parse the timestamp
                 if let Ok(start_time) = parse_timestamp(timestamp_str) {
-                    // Vérifier que le timestamp est dans la durée de la vidéo
+                    // Check that timestamp is within video duration
                     if start_time < video_duration {
-                        // Nettoyer le titre
+                        // Clean the title
                         let clean_title = utils::sanitize_title(title);
                         if !clean_title.is_empty() {
                             chapters_data.push((start_time, clean_title));
@@ -121,17 +121,17 @@ pub fn parse_chapters_from_description(
         }
     }
 
-    // Vérifier qu'on a trouvé au moins 2 chapitres
+    // Check that we found at least 2 chapters
     if chapters_data.len() < 2 {
         return Err(YtcsError::ChapterError(
             "Not enough chapters found in description (need at least 2)".to_string(),
         ));
     }
 
-    // Trier par timestamp
+    // Sort by timestamp
     chapters_data.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
-    // Créer les chapitres avec end_time
+    // Create chapters with end_time
     let mut chapters = Vec::new();
     for i in 0..chapters_data.len() {
         let (start_time, title) = &chapters_data[i];
@@ -141,7 +141,7 @@ pub fn parse_chapters_from_description(
             video_duration
         };
 
-        // Vérifier que le chapitre a une durée valide (au moins 1 seconde)
+        // Check that chapter has a valid duration (at least 1 second)
         if end_time > *start_time + 1.0 {
             chapters.push(Chapter::new(title.clone(), *start_time, end_time));
         }
@@ -238,13 +238,13 @@ Tracklist:
 "#;
         let chapters = parse_chapters_from_description(description, 3600.0).unwrap();
         assert_eq!(chapters.len(), 12);
-        assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
+        assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
         assert_eq!(chapters[0].start_time, 0.0);
-        assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
+        assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
         assert_eq!(chapters[1].start_time, 264.0); // 4:24
         assert_eq!(
             chapters[11].title,
-            "Architects Of Inner Time (part Ii_ The Awakening)"
+            "Architects of Inner Time (Part II_ The Awakening)"
         );
         assert_eq!(chapters[11].start_time, 3102.0); // 51:42
     }

@@ -1,15 +1,15 @@
-//! Gestion des chapitres de vidéos YouTube.
+//! YouTube video chapter management.
 //!
-//! Ce module fournit les structures et fonctions pour manipuler les chapitres
-//! extraits des vidéos YouTube.
+//! This module provides structures and functions to manipulate chapters
+//! extracted from YouTube videos.
 
-use serde::{Deserialize, Serialize};
 use crate::error::{Result, YtcsError};
 use crate::utils;
+use serde::{Deserialize, Serialize};
 
-/// Représente un chapitre d'une vidéo YouTube.
+/// Represents a chapter of a YouTube video.
 ///
-/// Un chapitre est défini par un titre et une plage temporelle (début et fin).
+/// A chapter is defined by a title and a time range (start and end).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chapter {
     pub title: String,
@@ -18,21 +18,30 @@ pub struct Chapter {
 }
 
 impl Chapter {
-    /// Crée un nouveau chapitre.
+    /// Creates a new chapter.
     ///
     /// # Arguments
     ///
-    /// * `title` - Le titre du chapitre
-    /// * `start_time` - Le temps de début en secondes (doit être >= 0)
-    /// * `end_time` - Le temps de fin en secondes (doit être > start_time)
+    /// * `title` - The chapter title
+    /// * `start_time` - The start time in seconds (must be >= 0)
+    /// * `end_time` - The end time in seconds (must be > start_time)
     ///
     /// # Panics
     ///
-    /// Panique si start_time < 0 ou si end_time <= start_time
+    /// Panics if start_time < 0 or if end_time <= start_time
     pub fn new(title: String, start_time: f64, end_time: f64) -> Self {
-        assert!(start_time >= 0.0, "start_time must be >= 0, got {}", start_time);
-        assert!(end_time > start_time, "end_time ({}) must be > start_time ({})", end_time, start_time);
-        
+        assert!(
+            start_time >= 0.0,
+            "start_time must be >= 0, got {}",
+            start_time
+        );
+        assert!(
+            end_time > start_time,
+            "end_time ({}) must be > start_time ({})",
+            end_time,
+            start_time
+        );
+
         Self {
             title,
             start_time,
@@ -40,48 +49,48 @@ impl Chapter {
         }
     }
 
-    /// Calcule la durée du chapitre en secondes.
+    /// Calculates the chapter duration in seconds.
     ///
     /// # Returns
     ///
-    /// La durée du chapitre (end_time - start_time)
+    /// The chapter duration (end_time - start_time)
     pub fn duration(&self) -> f64 {
         self.end_time - self.start_time
     }
 
-    /// Nettoie le titre du chapitre pour l'utiliser comme nom de fichier.
+    /// Cleans the chapter title for use as a filename.
     ///
-    /// Délègue le traitement à [`utils::sanitize_title`].
+    /// Delegates processing to [`utils::sanitize_title`].
     ///
     /// # Returns
     ///
-    /// Un titre nettoyé, sûr pour une utilisation comme nom de fichier
+    /// A cleaned title safe for use as a filename
     pub fn sanitize_title(&self) -> String {
         utils::sanitize_title(&self.title)
     }
 }
 
-/// Parse les chapitres depuis la sortie JSON de yt-dlp.
+/// Parses chapters from yt-dlp JSON output.
 ///
-/// Extrait les chapitres depuis les métadonnées JSON d'une vidéo YouTube.
+/// Extracts chapters from YouTube video JSON metadata.
 ///
 /// # Arguments
 ///
-/// * `json_str` - La chaîne JSON contenant les métadonnées de la vidéo
+/// * `json_str` - The JSON string containing video metadata
 ///
 /// # Returns
 ///
-/// Un vecteur de chapitres extraits, ou une erreur si le parsing échoue
+/// A vector of extracted chapters, or an error if parsing fails
 ///
 /// # Errors
 ///
-/// Retourne une erreur si :
-/// - Le JSON est mal formaté
-/// - Le champ "chapters" est absent
-/// - Les champs start_time ou end_time sont invalides
+/// Returns an error if:
+/// - JSON is malformed
+/// - The "chapters" field is missing
+/// - start_time or end_time fields are invalid
 pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     let data: serde_json::Value = serde_json::from_str(json_str)?;
-    
+
     let chapters_array = data["chapters"]
         .as_array()
         .ok_or_else(|| YtcsError::ChapterError("No chapters found".to_string()))?;
@@ -92,11 +101,11 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
             .as_str()
             .unwrap_or(&format!("Track {}", i + 1))
             .to_string();
-        
+
         let start_time = chapter["start_time"]
             .as_f64()
             .ok_or_else(|| YtcsError::ChapterError("Invalid start_time".to_string()))?;
-        
+
         let end_time = chapter["end_time"]
             .as_f64()
             .ok_or_else(|| YtcsError::ChapterError("Invalid end_time".to_string()))?;
@@ -107,56 +116,66 @@ pub fn parse_chapters_from_json(json_str: &str) -> Result<Vec<Chapter>> {
     Ok(chapters)
 }
 
-/// Parse un timestamp au format HH:MM:SS, MM:SS ou SS.
+/// Parses a timestamp in HH:MM:SS, MM:SS, or SS format.
 ///
 /// # Arguments
 ///
-/// * `timestamp` - Le timestamp à parser (ex: "1:23:45", "5:30", "42")
+/// * `timestamp` - The timestamp to parse (ex: "1:23:45", "5:30", "42")
 ///
 /// # Returns
 ///
-/// Le nombre de secondes correspondant au timestamp
+/// The number of seconds corresponding to the timestamp
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le format du timestamp est invalide
+/// Returns an error if the timestamp format is invalid
 pub fn parse_timestamp(timestamp: &str) -> Result<f64> {
     let parts: Vec<&str> = timestamp.split(':').collect();
-    
+
     let seconds = match parts.len() {
-        1 => parts[0].parse::<f64>()
+        1 => parts[0]
+            .parse::<f64>()
             .map_err(|_| YtcsError::ChapterError("Invalid timestamp format".to_string()))?,
         2 => {
-            let minutes = parts[0].parse::<f64>()
+            let minutes = parts[0]
+                .parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid minutes".to_string()))?;
-            let seconds = parts[1].parse::<f64>()
+            let seconds = parts[1]
+                .parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid seconds".to_string()))?;
             minutes * 60.0 + seconds
         }
         3 => {
-            let hours = parts[0].parse::<f64>()
+            let hours = parts[0]
+                .parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid hours".to_string()))?;
-            let minutes = parts[1].parse::<f64>()
+            let minutes = parts[1]
+                .parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid minutes".to_string()))?;
-            let seconds = parts[2].parse::<f64>()
+            let seconds = parts[2]
+                .parse::<f64>()
                 .map_err(|_| YtcsError::ChapterError("Invalid seconds".to_string()))?;
             hours * 3600.0 + minutes * 60.0 + seconds
         }
-        _ => return Err(YtcsError::ChapterError("Invalid timestamp format".to_string())),
+        _ => {
+            return Err(YtcsError::ChapterError(
+                "Invalid timestamp format".to_string(),
+            ));
+        }
     };
 
     Ok(seconds)
 }
 
-/// Formate un nombre de secondes en timestamp HH:MM:SS ou MM:SS.
+/// Formats a number of seconds as HH:MM:SS or MM:SS timestamp.
 ///
 /// # Arguments
 ///
-/// * `seconds` - Le nombre de secondes à formater
+/// * `seconds` - The number of seconds to format
 ///
 /// # Returns
 ///
-/// Un timestamp formaté (HH:MM:SS si >= 1h, sinon MM:SS)
+/// A formatted timestamp (HH:MM:SS if >= 1h, otherwise MM:SS)
 pub fn format_timestamp(seconds: f64) -> String {
     let hours = (seconds / 3600.0).floor() as u32;
     let minutes = ((seconds % 3600.0) / 60.0).floor() as u32;

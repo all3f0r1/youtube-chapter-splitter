@@ -1,14 +1,14 @@
 /// Tests d'intégration end-to-end
-/// 
+///
 /// Ces tests vérifient le workflow complet du téléchargement au découpage.
 /// Ils sont ignorés par défaut car ils nécessitent une connexion internet
 /// et des dépendances externes (yt-dlp, ffmpeg).
 
 #[cfg(test)]
 mod integration_e2e_tests {
-    use youtube_chapter_splitter::{audio, downloader, utils};
     use std::fs;
     use std::path::PathBuf;
+    use youtube_chapter_splitter::{audio, downloader, utils};
 
     /// Crée un répertoire de test temporaire
     fn create_test_dir(name: &str) -> PathBuf {
@@ -39,8 +39,14 @@ mod integration_e2e_tests {
 
         // 2. Obtenir les informations vidéo
         let video_info = downloader::get_video_info(url).unwrap();
-        assert!(!video_info.title.is_empty(), "Video title should not be empty");
-        assert!(video_info.duration > 0.0, "Video duration should be positive");
+        assert!(
+            !video_info.title.is_empty(),
+            "Video title should not be empty"
+        );
+        assert!(
+            video_info.duration > 0.0,
+            "Video duration should be positive"
+        );
 
         // 3. Parser artiste et album
         let (artist, album) = utils::parse_artist_album(&video_info.title);
@@ -75,15 +81,20 @@ mod integration_e2e_tests {
             &artist,
             &album,
             cover_path.as_deref(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // 7. Vérifier les fichiers de sortie
-        assert_eq!(output_files.len(), chapters.len(), "Should create one file per chapter");
-        
+        assert_eq!(
+            output_files.len(),
+            chapters.len(),
+            "Should create one file per chapter"
+        );
+
         for file in &output_files {
             assert!(file.exists(), "Output file should exist: {:?}", file);
             assert!(file.extension().unwrap() == "mp3", "Output should be MP3");
-            
+
             // Vérifier que le fichier n'est pas vide
             let metadata = fs::metadata(file).unwrap();
             assert!(metadata.len() > 0, "Output file should not be empty");
@@ -93,19 +104,21 @@ mod integration_e2e_tests {
         if let Some(first_file) = output_files.first() {
             // Utiliser ffprobe pour vérifier les métadonnées
             use std::process::Command;
-            
+
             let output = Command::new("ffprobe")
                 .args(&[
-                    "-v", "quiet",
-                    "-print_format", "json",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
                     "-show_format",
-                    first_file.to_str().unwrap()
+                    first_file.to_str().unwrap(),
                 ])
                 .output();
 
             if let Ok(result) = output {
                 let json_str = String::from_utf8_lossy(&result.stdout);
-                
+
                 // Vérifier que les métadonnées contiennent artist et album
                 assert!(json_str.contains("artist") || json_str.contains("ARTIST"));
                 assert!(json_str.contains("album") || json_str.contains("ALBUM"));
@@ -165,10 +178,13 @@ mod integration_e2e_tests {
         // Vérifications de base
         assert!(!video_info.title.is_empty());
         assert!(video_info.duration > 0.0);
-        
+
         // Vérifier le format du titre
-        assert!(video_info.title.len() < 500, "Title should be reasonable length");
-        
+        assert!(
+            video_info.title.len() < 500,
+            "Title should be reasonable length"
+        );
+
         // Vérifier la durée (devrait être entre 1 seconde et 24 heures)
         assert!(video_info.duration >= 1.0);
         assert!(video_info.duration <= 86400.0);
@@ -239,8 +255,16 @@ mod integration_e2e_tests {
     fn test_e2e_metadata_parsing() {
         // Test sans connexion internet
         let test_titles = vec![
-            ("Pink Floyd - Dark Side of the Moon [1973]", "Pink Floyd", "Dark Side Of The Moon"),
-            ("MARIGOLD - Oblivion Gate [Full Album]", "Marigold", "Oblivion Gate"),
+            (
+                "Pink Floyd - Dark Side of the Moon [1973]",
+                "Pink Floyd",
+                "Dark Side Of The Moon",
+            ),
+            (
+                "MARIGOLD - Oblivion Gate [Full Album]",
+                "Marigold",
+                "Oblivion Gate",
+            ),
             ("Artist | Album Name", "Artist", "Album Name"),
             ("Just A Title", "Unknown Artist", "Just A Title"),
         ];

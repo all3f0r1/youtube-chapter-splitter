@@ -1,7 +1,7 @@
-//! Traitement audio et découpage par chapitres.
+//! Audio processing and chapter-based splitting.
 //!
-//! Ce module gère le découpage des fichiers audio en pistes individuelles
-//! et l'ajout de métadonnées ID3 avec pochettes d'album.
+//! This module handles splitting audio files into individual tracks
+//! and adding ID3 metadata with album cover art.
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
@@ -17,36 +17,33 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-// Regex compilées une seule fois au démarrage
-static RE_SILENCE_START: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"silence_start: ([\d.]+)").unwrap()
-});
+// Regex compiled once at startup
+static RE_SILENCE_START: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"silence_start: ([\d.]+)").unwrap());
 
-static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"silence_end: ([\d.]+)").unwrap()
-});
+static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d.]+)").unwrap());
 
-/// Découpe un fichier audio en pistes individuelles basées sur les chapitres.
+/// Splits an audio file into individual tracks based on chapters.
 ///
-/// Cette fonction utilise `ffmpeg` pour découper l'audio et `lofty` pour ajouter
-/// les métadonnées ID3 et la pochette d'album.
+/// This function uses `ffmpeg` to split the audio and `lofty` to add
+/// ID3 metadata and album cover art.
 ///
 /// # Arguments
 ///
-/// * `input_file` - Le fichier audio source
-/// * `chapters` - Les chapitres définissant les points de découpe
-/// * `output_dir` - Le répertoire de sortie pour les pistes
-/// * `artist` - Le nom de l'artiste
-/// * `album` - Le nom de l'album
-/// * `cover_path` - Chemin optionnel vers l'image de pochette
+/// * `input_file` - The source audio file
+/// * `chapters` - The chapters defining the split points
+/// * `output_dir` - The output directory for tracks
+/// * `artist` - The artist name
+/// * `album` - The album name
+/// * `cover_path` - Optional path to the cover image
 ///
 /// # Returns
 ///
-/// Un vecteur contenant les chemins des fichiers créés
+/// A vector containing the paths of created files
 ///
 /// # Errors
 ///
-/// Retourne une erreur si le découpage ou l'ajout de métadonnées échoue
+/// Returns an error if splitting or adding metadata fails
 pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
@@ -56,25 +53,25 @@ pub fn split_audio_by_chapters(
     cover_path: Option<&Path>,
 ) -> Result<Vec<PathBuf>> {
     println!("Splitting audio into {} tracks...", chapters.len());
-    
+
     std::fs::create_dir_all(output_dir)?;
-    
-    // Créer une barre de progression
+
+    // Create a progress bar
     let pb = ProgressBar::new(chapters.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
             .unwrap()
-            .progress_chars("#>-")
+            .progress_chars("#>-"),
     );
-    
-    // Charger l'image de couverture une seule fois si elle existe
+
+    // Load cover image once if it exists
     let cover_data = if let Some(cover) = cover_path {
         load_cover_image(cover)?
     } else {
         None
     };
-    
+
     let mut output_files = Vec::new();
 
     for (index, chapter) in chapters.iter().enumerate() {
@@ -86,8 +83,8 @@ pub fn split_audio_by_chapters(
         pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
-        
-        // Découper l'audio avec ffmpeg (sans cover art)
+
+        // Split audio with ffmpeg (without cover art)
         let mut cmd = Command::new("ffmpeg");
         cmd.arg("-i")
             .arg(input_file)
@@ -109,8 +106,9 @@ pub fn split_audio_by_chapters(
             .arg(format!("track={}/{}", track_number, chapters.len()))
             .arg("-y")
             .arg(&output_path);
-        
-        let output = cmd.output()
+
+        let output = cmd
+            .output()
             .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
         if !output.status.success() {
@@ -118,7 +116,7 @@ pub fn split_audio_by_chapters(
             return Err(YtcsError::AudioError(format!("ffmpeg failed: {}", error)));
         }
 
-        // Ajouter la pochette d'album avec lofty si elle existe
+        // Add album cover art with lofty if it exists
         if let Some(ref cover) = cover_data {
             add_cover_to_file(&output_path, cover)?;
         }
@@ -131,51 +129,51 @@ pub fn split_audio_by_chapters(
     Ok(output_files)
 }
 
-/// Charge une image de couverture depuis un fichier.
+/// Loads a cover image from a file.
 ///
 /// # Arguments
 ///
-/// * `cover_path` - Chemin vers le fichier image
+/// * `cover_path` - Path to the image file
 ///
 /// # Returns
 ///
-/// Les données de l'image sous forme de vecteur d'octets
+/// The image data as a byte vector
 fn load_cover_image(cover_path: &Path) -> Result<Option<Vec<u8>>> {
     let mut file = File::open(cover_path)
         .map_err(|e| YtcsError::AudioError(format!("Failed to open cover image: {}", e)))?;
-    
+
     let mut data = Vec::new();
     file.read_to_end(&mut data)
         .map_err(|e| YtcsError::AudioError(format!("Failed to read cover image: {}", e)))?;
-    
+
     Ok(Some(data))
 }
 
-/// Ajoute une pochette d'album à un fichier audio avec lofty.
+/// Adds album cover art to an audio file using lofty.
 ///
 /// # Arguments
 ///
-/// * `audio_path` - Chemin vers le fichier audio
-/// * `cover_data` - Données de l'image de couverture
+/// * `audio_path` - Path to the audio file
+/// * `cover_data` - Cover image data
 fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
-    // Charger le fichier audio
+    // Load the audio file
     let mut tagged_file = Probe::open(audio_path)
         .map_err(|e| YtcsError::AudioError(format!("Failed to open audio file: {}", e)))?
         .guess_file_type()
         .map_err(|e| YtcsError::AudioError(format!("Failed to guess file type: {}", e)))?
         .read()
         .map_err(|e| YtcsError::AudioError(format!("Failed to read audio file: {}", e)))?;
-    
-    // Créer l'objet Picture depuis les données
-    let mut cover_reader = &cover_data[..];
+
+    // Create Picture object from data
+    let mut cover_reader = cover_data;
     let mut picture = Picture::from_reader(&mut cover_reader)
         .map_err(|e| YtcsError::AudioError(format!("Failed to create picture: {}", e)))?;
-    
-    // Définir le type et la description
+
+    // Set type and description
     picture.set_pic_type(PictureType::CoverFront);
     picture.set_description(Some("Album Cover".to_string()));
-    
-    // Obtenir ou créer le tag principal
+
+    // Get or create primary tag
     let tag = match tagged_file.primary_tag_mut() {
         Some(primary_tag) => primary_tag,
         None => {
@@ -184,43 +182,44 @@ fn add_cover_to_file(audio_path: &Path, cover_data: &[u8]) -> Result<()> {
             tagged_file.primary_tag_mut().unwrap()
         }
     };
-    
-    // Ajouter l'image au tag
+
+    // Add image to tag
     tag.push_picture(picture);
-    
-    // Sauvegarder les modifications avec tagged_file.save_to() pour préserver tous les tags
-    // Note: save_to() préserve toutes les métadonnées existantes, contrairement à save_to_path()
-    tagged_file.save_to_path(audio_path, WriteOptions::default())
+
+    // Save changes with tagged_file.save_to() to preserve all tags
+    // Note: save_to() preserves all existing metadata, unlike save_to_path()
+    tagged_file
+        .save_to_path(audio_path, WriteOptions::default())
         .map_err(|e| YtcsError::AudioError(format!("Failed to save tags: {}", e)))?;
-    
+
     Ok(())
 }
 
-/// Détecte les chapitres automatiquement en analysant les périodes de silence.
+/// Automatically detects chapters by analyzing silence periods.
 ///
-/// Utilise `ffmpeg` avec le filtre `silencedetect` pour identifier les points
-/// de découpe potentiels dans l'audio.
+/// Uses `ffmpeg` with the `silencedetect` filter to identify potential
+/// split points in the audio.
 ///
 /// # Arguments
 ///
-/// * `input_file` - Le fichier audio à analyser
-/// * `silence_threshold` - Seuil de silence en dB (ex: -30.0)
-/// * `min_silence_duration` - Durée minimale de silence en secondes (ex: 2.0)
+/// * `input_file` - The audio file to analyze
+/// * `silence_threshold` - Silence threshold in dB (ex: -30.0)
+/// * `min_silence_duration` - Minimum silence duration in seconds (ex: 2.0)
 ///
 /// # Returns
 ///
-/// Un vecteur de chapitres détectés automatiquement
+/// A vector of automatically detected chapters
 ///
 /// # Errors
 ///
-/// Retourne une erreur si aucun silence n'est détecté ou si ffmpeg échoue
+/// Returns an error if no silence is detected or if ffmpeg fails
 pub fn detect_silence_chapters(
     input_file: &Path,
     silence_threshold: f64,
     min_silence_duration: f64,
 ) -> Result<Vec<Chapter>> {
     println!("Detecting silence to identify tracks...");
-    
+
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(input_file)
@@ -236,7 +235,7 @@ pub fn detect_silence_chapters(
         .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     let mut silence_periods = Vec::new();
     let mut current_start: Option<f64> = None;
 
@@ -245,20 +244,20 @@ pub fn detect_silence_chapters(
             if let Some(start_str) = caps.get(1) {
                 current_start = start_str.as_str().parse::<f64>().ok();
             }
-        } else if let Some(caps) = RE_SILENCE_END.captures(line) {
-            if let (Some(start), Some(end_str)) = (current_start, caps.get(1)) {
-                if let Ok(end) = end_str.as_str().parse::<f64>() {
-                    let mid_point = (start + end) / 2.0;
-                    silence_periods.push(mid_point);
-                }
-                current_start = None;
+        } else if let Some(caps) = RE_SILENCE_END.captures(line)
+            && let (Some(start), Some(end_str)) = (current_start, caps.get(1))
+        {
+            if let Ok(end) = end_str.as_str().parse::<f64>() {
+                let mid_point = (start + end) / 2.0;
+                silence_periods.push(mid_point);
             }
+            current_start = None;
         }
     }
 
     if silence_periods.is_empty() {
         return Err(YtcsError::ChapterError(
-            "No silence detected. Try adjusting the parameters.".to_string()
+            "No silence detected. Try adjusting the parameters.".to_string(),
         ));
     }
 
@@ -288,21 +287,21 @@ pub fn detect_silence_chapters(
     Ok(chapters)
 }
 
-/// Obtient la durée totale d'un fichier audio.
+/// Gets the total duration of an audio file.
 ///
-/// Utilise `ffprobe` pour extraire la durée du fichier.
+/// Uses `ffprobe` to extract the file duration.
 ///
 /// # Arguments
 ///
-/// * `input_file` - Le fichier audio à analyser
+/// * `input_file` - The audio file to analyze
 ///
 /// # Returns
 ///
-/// La durée en secondes
+/// The duration in seconds
 ///
 /// # Errors
 ///
-/// Retourne une erreur si ffprobe échoue ou si la durée est invalide
+/// Returns an error if ffprobe fails or if duration is invalid
 pub fn get_audio_duration(input_file: &Path) -> Result<f64> {
     let output = Command::new("ffprobe")
         .arg("-v")
