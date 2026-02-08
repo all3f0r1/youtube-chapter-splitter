@@ -1,4 +1,4 @@
-/// Tests supplémentaires pour le module downloader
+//! Tests supplémentaires pour le module downloader
 
 #[cfg(test)]
 mod downloader_function_tests {

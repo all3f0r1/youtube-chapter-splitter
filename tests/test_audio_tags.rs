@@ -1,22 +1,22 @@
-/// Test pour vérifier que les tags ID3 sont correctement préservés
-/// lors de l'ajout de la pochette d'album avec lofty
+//! Test pour vérifier que les tags ID3 sont correctement préservés
+//! lors de l'ajout de la pochette d'album avec lofty
 
 #[cfg(test)]
 mod audio_tags_tests {
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
     /// Crée un fichier MP3 de test avec des métadonnées
     fn create_test_mp3_with_metadata(
-        path: &PathBuf,
+        path: &Path,
         title: &str,
         artist: &str,
         album: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Créer un fichier audio silencieux de 1 seconde
         let output = Command::new("ffmpeg")
-            .args(&[
+            .args([
                 "-f",
                 "lavfi",
                 "-i",
@@ -51,10 +51,10 @@ mod audio_tags_tests {
 
     /// Vérifie les métadonnées d'un fichier MP3
     fn verify_metadata(
-        path: &PathBuf,
+        path: &Path,
     ) -> Result<(String, String, String), Box<dyn std::error::Error>> {
         let output = Command::new("ffprobe")
-            .args(&[
+            .args([
                 "-v",
                 "quiet",
                 "-print_format",

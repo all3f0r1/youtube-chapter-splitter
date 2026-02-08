@@ -1,4 +1,4 @@
-/// Tests de cas limites avancés et situations exceptionnelles
+//! Tests de cas limites avancés et situations exceptionnelles
 
 #[cfg(test)]
 mod advanced_edge_cases_tests {
@@ -102,7 +102,7 @@ mod advanced_edge_cases_tests {
 
     #[test]
     fn test_parse_artist_album_mixed_separators() {
-        let (artist, album) = parse_artist_album("Artist - Album | Extra Info");
+        let (artist, _album) = parse_artist_album("Artist - Album | Extra Info");
         assert_eq!(artist, "Artist");
         // Devrait utiliser le premier séparateur trouvé
     }

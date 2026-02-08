@@ -79,20 +79,25 @@ fn main() -> Result<()> {
     // Clean the URL
     let clean_url = clean_url(&cli.url);
 
+    // Print header with borders
+    println!("{}", "================================".cyan());
     println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
+    println!("{}", "================================".cyan());
     println!();
 
     // Get video information
-    println!("{}", "Fetching video information...".yellow());
+    println!(
+        "{}",
+        ">> Fetching video information <<".bright_cyan().bold()
+    );
     let video_info = downloader::get_video_info(&clean_url)?;
 
-    println!("{} {}", "Title:".bold(), video_info.title);
-    println!(
-        "{} {}",
-        "Duration:".bold(),
-        utils::format_duration(video_info.duration)
-    );
-    println!("{} {}", "Tracks found:".bold(), video_info.chapters.len());
+    // Show both raw title and cleaned title
+    println!("Video Title: {}", video_info.title);
+    let cleaned_title = utils::clean_folder_name(&video_info.title);
+    println!("Cleaned Title: {}", cleaned_title);
+    println!("Duration: {}", utils::format_duration(video_info.duration));
+    println!("Tracks found: {}", video_info.chapters.len());
     println!();
 
     // Parse artist and album from title or use forced values
@@ -104,11 +109,7 @@ fn main() -> Result<()> {
     };
 
     // Create output directory with cleaned name
-    let folder_name = if cli.artist.is_some() || cli.album.is_some() {
-        format!("{} - {}", artist, album)
-    } else {
-        utils::clean_folder_name(&video_info.title)
-    };
+    let folder_name = format!("{} - {}", artist, album);
     let base_output = cli
         .output
         .as_ref()
@@ -118,10 +119,11 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&output_dir)?;
 
     // Download thumbnail
-    println!("{}", "Downloading album artwork...".yellow());
+    println!("{}", ">> Downloading album artwork <<".bright_cyan().bold());
     match downloader::download_thumbnail(&clean_url, &output_dir) {
         Ok(thumb_path) => {
-            println!("{} {}", "✓ Artwork saved:".green(), thumb_path.display());
+            println!("✓ Artwork saved:");
+            println!("{}", thumb_path.display());
         }
         Err(e) => {
             println!("{} {}", "⚠ Could not download artwork:".yellow(), e);
@@ -131,37 +133,29 @@ fn main() -> Result<()> {
 
     // Download audio
     let temp_audio = output_dir.join("temp_audio");
-    println!("{}", "Downloading audio...".yellow());
+    println!("{}", ">> Downloading audio <<".bright_cyan().bold());
     let audio_file =
         yt_dlp_progress::download_audio_with_progress(&clean_url, &temp_audio, None, None, None)?;
-    println!("{} {}", "✓ Audio downloaded:".green(), audio_file.display());
-    println!();
 
     // Determine chapters to use
     let chapters_to_use = if !video_info.chapters.is_empty() {
-        println!("{}", "Using YouTube tracks".green());
         video_info.chapters
     } else {
-        println!("{}", "No tracks found, detecting automatically...".yellow());
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
 
-    // Display chapters
-    println!();
-    println!("{}", "Tracks to create:".bold());
-    for (i, chapter) in chapters_to_use.iter().enumerate() {
-        println!(
-            "  {}. {} [{}]",
-            i + 1,
-            chapter.title,
-            utils::format_duration_short(chapter.duration())
-        );
-    }
-    println!();
-
     // Split audio with metadata
     let cover_path = output_dir.join("cover.jpg");
-    let output_files = audio::split_audio_by_chapters(
+    println!(
+        "{}",
+        format!(
+            ">> Splitting audio into {} tracks <<",
+            chapters_to_use.len()
+        )
+        .bright_cyan()
+        .bold()
+    );
+    let _output_files = audio::split_audio_by_chapters(
         &audio_file,
         &chapters_to_use,
         &output_dir,
@@ -178,9 +172,20 @@ fn main() -> Result<()> {
     std::fs::remove_file(&audio_file).ok();
 
     println!();
+    println!("{}", "Tracks to create:".bold());
+    for (i, chapter) in chapters_to_use.iter().enumerate() {
+        println!(
+            "✓ {}. {} [{}]",
+            i + 1,
+            chapter.title,
+            utils::format_duration_short(chapter.duration())
+        );
+    }
+
+    println!();
     println!("{}", "✓ Processing completed successfully!".bold().green());
-    println!("{} {}", "Files created:".bold(), output_files.len());
-    println!("{} {}", "Directory:".bold(), output_dir.display());
+    println!("Directory:");
+    println!("{}", output_dir.display());
 
     Ok(())
 }

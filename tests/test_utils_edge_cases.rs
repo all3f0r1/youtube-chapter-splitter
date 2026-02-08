@@ -1,4 +1,4 @@
-/// Tests de cas limites pour le module utils
+//! Tests de cas limites pour le module utils
 
 #[cfg(test)]
 mod utils_edge_cases_tests {

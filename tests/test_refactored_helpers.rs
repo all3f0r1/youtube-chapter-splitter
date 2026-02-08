@@ -7,8 +7,10 @@ use youtube_chapter_splitter::config;
 #[test]
 fn test_handle_playlist_detection_video_only() {
     // Test avec comportement VideoOnly
-    let mut cfg = config::Config::default();
-    cfg.playlist_behavior = config::PlaylistBehavior::VideoOnly;
+    let _cfg = config::Config {
+        playlist_behavior: config::PlaylistBehavior::VideoOnly,
+        ..Default::default()
+    };
 
     // URL avec playlist
     let _url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLtest123";
@@ -51,8 +53,10 @@ fn test_setup_output_directory_default() {
 #[test]
 fn test_setup_output_directory_custom_format() {
     // Test avec format personnalisé
-    let mut cfg = config::Config::default();
-    cfg.directory_format = "%a/%A".to_string();
+    let cfg = config::Config {
+        directory_format: "%a/%A".to_string(),
+        ..Default::default()
+    };
 
     let artist = "Pink Floyd";
     let album = "The Wall";
@@ -80,7 +84,7 @@ fn test_chapters_fallback_logic() {
     use youtube_chapter_splitter::chapters::Chapter;
 
     // Cas 1: Chapitres YouTube disponibles
-    let youtube_chapters = vec![
+    let youtube_chapters = [
         Chapter::new("Chapter 1".to_string(), 0.0, 60.0),
         Chapter::new("Chapter 2".to_string(), 60.0, 120.0),
     ];
@@ -149,7 +153,7 @@ fn test_modular_functions_count() {
     // Test documentant le nombre de fonctions modulaires créées
     // Cela aide à détecter si des fonctions sont ajoutées ou supprimées
 
-    let helper_functions = vec![
+    let helper_functions = [
         "handle_playlist_detection",
         "fetch_and_display_video_info",
         "setup_output_directory",

@@ -5,6 +5,9 @@ use regex::Regex;
 static RE_FULL_ALBUM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
+static RE_FULL_ALBUM_UNBRACKETED: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\s*-\s*full\s+album\s*$").unwrap());
+
 static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)").unwrap());
 
 static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
@@ -47,6 +50,9 @@ pub fn clean_folder_name(name: &str) -> String {
 
     // Replace underscores, pipes and slashes with dashes
     let with_dashes = cleaned.replace(['_', '|', '/'], "-");
+
+    // Remove trailing - Full Album (without brackets) after pipe replacement
+    let with_dashes = RE_FULL_ALBUM_UNBRACKETED.replace_all(&with_dashes, "");
 
     // Clean multiple spaces
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");
@@ -254,6 +260,18 @@ mod tests {
                 "PURPLE DREAMS - WANDERING SHADOWS (FULL ALBUM) | 70s Progressive/Psychedelic Rock"
             ),
             "Purple Dreams - Wandering Shadows"
+        );
+
+        // Test for pipe-separated full album (like Chronomancer | MAGNUM OPUS | FULL ALBUM)
+        assert_eq!(
+            clean_folder_name("Chronomancer | MAGNUM OPUS | FULL ALBUM (Progressive Rock)"),
+            "Chronomancer - Magnum Opus"
+        );
+
+        // Test for hyphen-separated full album without brackets
+        assert_eq!(
+            clean_folder_name("Artist Name - Album Name - Full Album"),
+            "Artist Name - Album Name"
         );
     }
 

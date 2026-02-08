@@ -1,4 +1,4 @@
-/// Tests pour les fonctions utilitaires de main.rs
+//! Tests pour les fonctions utilitaires de main.rs
 
 #[cfg(test)]
 mod main_tests {

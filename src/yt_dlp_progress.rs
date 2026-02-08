@@ -260,7 +260,7 @@ pub fn download_audio_with_progress(
 
         match result {
             Ok(path) => {
-                progress_bar.finish_with_message("  ✓ Audio downloaded");
+                progress_bar.finish_with_message("✓ Audio downloaded");
                 println!();
                 return Ok(path);
             }

@@ -1,4 +1,4 @@
-/// Tests pour la gestion d'erreur stdin et interactions utilisateur
+//! Tests pour la gestion d'erreur stdin et interactions utilisateur
 
 #[cfg(test)]
 mod stdin_handling_tests {
@@ -129,7 +129,7 @@ mod stdin_handling_tests {
         // Note: Difficile à tester directement, mais on peut vérifier la présence
 
         // Pour l'instant, juste documenter le comportement attendu
-        assert!(true, "Program should handle SIGINT gracefully");
+        // Le programme doit gérer SIGINT gracieusement
     }
 
     /// Test de timeout sur stdin

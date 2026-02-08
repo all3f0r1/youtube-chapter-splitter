@@ -52,15 +52,13 @@ pub fn split_audio_by_chapters(
     album: &str,
     cover_path: Option<&Path>,
 ) -> Result<Vec<PathBuf>> {
-    println!("Splitting audio into {} tracks...", chapters.len());
-
     std::fs::create_dir_all(output_dir)?;
 
     // Create a progress bar
     let pb = ProgressBar::new(chapters.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .template("[{bar:40.cyan/blue}]")
             .unwrap()
             .progress_chars("#>-"),
     );
@@ -79,8 +77,6 @@ pub fn split_audio_by_chapters(
         let sanitized_title = chapter.sanitize_title();
         let output_filename = format!("{:02} - {}.mp3", track_number, sanitized_title);
         let output_path = output_dir.join(&output_filename);
-
-        pb.set_message(format!("Track {}: {}", track_number, chapter.title));
 
         let duration = chapter.duration();
 
@@ -125,7 +121,12 @@ pub fn split_audio_by_chapters(
         pb.inc(1);
     }
 
-    pb.finish_with_message("Splitting completed successfully!");
+    pb.finish();
+    println!(
+        "{}/{} Splitting completed successfully!",
+        chapters.len(),
+        chapters.len()
+    );
     Ok(output_files)
 }
 
