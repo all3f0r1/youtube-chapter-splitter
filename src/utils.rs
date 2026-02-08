@@ -173,13 +173,17 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     // Remove remaining [] and ()
     let cleaned = RE_BRACKETS.replace_all(&without_suffix, "");
 
+    // Normalize various dash types to hyphen for splitting
+    // Handle: - (hyphen), – (en dash), — (em dash), ― (horizontal bar)
+    let normalized = cleaned.replace(['–', '—', '―'], "-");
+
     // Split by - or |
-    let parts: Vec<&str> = if cleaned.contains(" - ") {
-        cleaned.split(" - ").collect()
-    } else if cleaned.contains(" | ") {
-        cleaned.split(" | ").collect()
+    let parts: Vec<&str> = if normalized.contains(" - ") {
+        normalized.split(" - ").collect()
+    } else if normalized.contains(" | ") {
+        normalized.split(" | ").collect()
     } else {
-        vec![cleaned.trim()]
+        vec![normalized.trim()]
     };
 
     if parts.len() >= 2 {
@@ -187,7 +191,7 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
         let album = clean_folder_name(parts[1].trim());
         (artist, album)
     } else {
-        let cleaned_title = clean_folder_name(cleaned.trim());
+        let cleaned_title = clean_folder_name(normalized.trim());
         ("Unknown Artist".to_string(), cleaned_title)
     }
 }
@@ -303,5 +307,15 @@ mod tests {
         let (artist, album) = parse_artist_album("Pink Floyd - Dark Side of the Moon [1973]");
         assert_eq!(artist, "Pink Floyd");
         assert_eq!(album, "Dark Side Of The Moon");
+
+        // Test with en dash (–)
+        let (artist, album) = parse_artist_album("MARIGOLD – ACCIDENTAL SENSE [FULL ALBUM]");
+        assert_eq!(artist, "Marigold");
+        assert_eq!(album, "Accidental Sense");
+
+        // Test with em dash (—)
+        let (artist, album) = parse_artist_album("Artist — Album Name");
+        assert_eq!(artist, "Artist");
+        assert_eq!(album, "Album Name");
     }
 }

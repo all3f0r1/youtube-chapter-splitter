@@ -177,7 +177,7 @@ fn main() -> Result<()> {
         println!(
             "✓ {}. {} [{}]",
             i + 1,
-            chapter.title,
+            chapter.display_title(),
             utils::format_duration_short(chapter.duration())
         );
     }

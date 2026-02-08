@@ -58,6 +58,23 @@ impl Chapter {
         self.end_time - self.start_time
     }
 
+    /// Returns the title in a display-friendly format (Title Case).
+    ///
+    /// Converts all-uppercase titles to Title Case for better readability.
+    /// Leaves mixed-case titles unchanged.
+    ///
+    /// # Returns
+    ///
+    /// The title formatted for display
+    pub fn display_title(&self) -> String {
+        // If the title is mostly uppercase, convert to title case
+        if self.title.chars().filter(|c| c.is_uppercase()).count() > self.title.len() / 2 {
+            to_title_case(&self.title)
+        } else {
+            self.title.clone()
+        }
+    }
+
     /// Cleans the chapter title for use as a filename.
     ///
     /// Delegates processing to [`utils::sanitize_title`].
@@ -68,6 +85,34 @@ impl Chapter {
     pub fn sanitize_title(&self) -> String {
         utils::sanitize_title(&self.title)
     }
+}
+
+/// Converts a string to title case.
+///
+/// Each word is capitalized (first letter uppercase, rest lowercase).
+/// Small words like "a", "an", "the", "in", "on", "of", "and" are not capitalized
+/// unless they are the first word.
+fn to_title_case(s: &str) -> String {
+    let small_words = [
+        "a", "an", "the", "in", "on", "of", "and", "or", "but", "for", "nor", "to", "at", "by",
+    ];
+
+    s.split_whitespace()
+        .enumerate()
+        .map(|(i, word)| {
+            let lower = word.to_lowercase();
+            if i > 0 && small_words.contains(&lower.as_str()) {
+                lower
+            } else {
+                let mut chars = lower.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Parses chapters from yt-dlp JSON output.
