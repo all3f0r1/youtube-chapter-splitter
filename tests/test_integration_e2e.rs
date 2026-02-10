@@ -83,6 +83,7 @@ mod integration_e2e_tests {
             &artist,
             &album,
             cover_path.as_deref(),
+            None, // progress_callback
         )
         .unwrap();
 

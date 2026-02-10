@@ -1,6 +1,7 @@
 use clap::Parser;
 use colored::Colorize;
-use youtube_chapter_splitter::{Result, audio, downloader, utils, yt_dlp_progress};
+use ui::MetadataSource;
+use youtube_chapter_splitter::{Result, audio, downloader, ui, utils, yt_dlp_progress};
 
 #[derive(Parser)]
 #[command(name = "ytcs")]
@@ -48,8 +49,16 @@ fn get_default_music_dir() -> std::path::PathBuf {
     }
 }
 
+/// Progress callback for track splitting
+fn track_progress_callback(track_number: usize, total_tracks: usize, title: &str, duration: &str) {
+    ui::print_track_progress(track_number, total_tracks, title, duration);
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Print minimal header
+    ui::print_header();
 
     // Check system dependencies at startup
     if let Err(e) = downloader::check_dependencies() {
@@ -79,34 +88,79 @@ fn main() -> Result<()> {
     // Clean the URL
     let clean_url = clean_url(&cli.url);
 
-    // Print header with borders
-    println!("{}", "================================".cyan());
-    println!("{}", "=== YouTube Chapter Splitter ===".bold().cyan());
-    println!("{}", "================================".cyan());
-    println!();
-
     // Get video information
-    println!(
-        "{}",
-        ">> Fetching video information <<".bright_cyan().bold()
-    );
+    ui::print_section_header("Fetching video information");
     let video_info = downloader::get_video_info(&clean_url)?;
 
-    // Show both raw title and cleaned title
-    println!("Video Title: {}", video_info.title);
-    let cleaned_title = utils::clean_folder_name(&video_info.title);
-    println!("Cleaned Title: {}", cleaned_title);
-    println!("Duration: {}", utils::format_duration(video_info.duration));
-    println!("Tracks found: {}", video_info.chapters.len());
-    println!();
-
-    // Parse artist and album from title or use forced values
-    let (artist, album) = if let (Some(a), Some(al)) = (&cli.artist, &cli.album) {
-        // Clean user-forced values
-        (utils::clean_folder_name(a), utils::clean_folder_name(al))
+    // Determine initial metadata sources and values
+    let (mut artist, mut album, mut artist_source, mut album_source) = if let (Some(a), Some(al)) =
+        (&cli.artist, &cli.album)
+    {
+        // Both forced by user
+        (
+            utils::clean_folder_name(a),
+            utils::clean_folder_name(al),
+            MetadataSource::Forced,
+            MetadataSource::Forced,
+        )
+    } else if let Some(a) = &cli.artist {
+        // Only artist forced
+        let ((_, parsed_album), _, _) = utils::parse_artist_album_with_source(&video_info.title);
+        (
+            utils::clean_folder_name(a),
+            parsed_album,
+            MetadataSource::Forced,
+            MetadataSource::Detected,
+        )
+    } else if let Some(al) = &cli.album {
+        // Only album forced
+        let ((parsed_artist, _), _, _) = utils::parse_artist_album_with_source(&video_info.title);
+        (
+            parsed_artist,
+            utils::clean_folder_name(al),
+            MetadataSource::Detected,
+            MetadataSource::Forced,
+        )
     } else {
-        utils::parse_artist_album(&video_info.title)
+        // Nothing forced - parse from title
+        let ((artist, album), artist_src, album_src) =
+            utils::parse_artist_album_with_source(&video_info.title);
+        (artist, album, artist_src, album_src)
     };
+
+    // Prompt for metadata if unknown and not forced
+    if artist == "Unknown Artist" && cli.artist.is_none() {
+        let (input_artist, input_album) = ui::prompt_metadata(
+            &video_info.title,
+            &artist,
+            &utils::clean_folder_name(&video_info.title),
+        );
+        artist = input_artist;
+        album = input_album;
+        artist_source = MetadataSource::Forced;
+        album_source = MetadataSource::Forced;
+    } else if album == utils::clean_folder_name(&video_info.title)
+        && cli.album.is_none()
+        && !utils::clean_folder_name(&video_info.title).contains(" - ")
+    {
+        // Only album is unknown
+        let (input_artist, input_album) = ui::prompt_metadata(&video_info.title, &artist, &album);
+        artist = input_artist;
+        album = input_album;
+        artist_source = MetadataSource::Forced;
+        album_source = MetadataSource::Forced;
+    }
+
+    // Display video metadata in unified tree style
+    ui::print_video_metadata_tree(
+        &video_info.title,
+        &utils::format_duration(video_info.duration),
+        video_info.chapters.len(),
+        &artist,
+        &album,
+        artist_source,
+        album_source,
+    );
 
     // Create output directory with cleaned name
     let folder_name = format!("{} - {}", artist, album);
@@ -119,23 +173,21 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&output_dir)?;
 
     // Download thumbnail
-    println!("{}", ">> Downloading album artwork <<".bright_cyan().bold());
     match downloader::download_thumbnail(&clean_url, &output_dir) {
         Ok(thumb_path) => {
-            println!("✓ Artwork saved:");
-            println!("{}", thumb_path.display());
+            ui::print_artwork_section(thumb_path.to_str().unwrap_or("cover.jpg"));
         }
-        Err(e) => {
-            println!("{} {}", "⚠ Could not download artwork:".yellow(), e);
+        Err(_) => {
+            ui::print_artwork_section("");
         }
     }
-    println!();
 
     // Download audio
-    let temp_audio = output_dir.join("temp_audio");
-    println!("{}", ">> Downloading audio <<".bright_cyan().bold());
+    ui::print_audio_section_header();
+    let temp_audio = output_dir.join("temp_audio.mp3");
     let audio_file =
         yt_dlp_progress::download_audio_with_progress(&clean_url, &temp_audio, None, None, None)?;
+    ui::print_audio_complete(audio_file.to_str().unwrap_or("audio.mp3"));
 
     // Determine chapters to use
     let chapters_to_use = if !video_info.chapters.is_empty() {
@@ -144,17 +196,10 @@ fn main() -> Result<()> {
         audio::detect_silence_chapters(&audio_file, -30.0, 2.0)?
     };
 
-    // Split audio with metadata
+    // Split audio with metadata (with progress callback)
     let cover_path = output_dir.join("cover.jpg");
-    println!(
-        "{}",
-        format!(
-            ">> Splitting audio into {} tracks <<",
-            chapters_to_use.len()
-        )
-        .bright_cyan()
-        .bold()
-    );
+    ui::print_splitting_section_header(chapters_to_use.len());
+
     let _output_files = audio::split_audio_by_chapters(
         &audio_file,
         &chapters_to_use,
@@ -166,26 +211,14 @@ fn main() -> Result<()> {
         } else {
             None
         },
+        Some(track_progress_callback),
     )?;
 
     // Clean up temporary file
     std::fs::remove_file(&audio_file).ok();
 
-    println!();
-    println!("{}", "Tracks to create:".bold());
-    for (i, chapter) in chapters_to_use.iter().enumerate() {
-        println!(
-            "✓ {}. {} [{}]",
-            i + 1,
-            chapter.display_title(),
-            utils::format_duration_short(chapter.duration())
-        );
-    }
-
-    println!();
-    println!("{}", "✓ Processing completed successfully!".bold().green());
-    println!("Directory:");
-    println!("{}", output_dir.display());
+    // Display final result
+    ui::print_final_result(&output_dir);
 
     Ok(())
 }

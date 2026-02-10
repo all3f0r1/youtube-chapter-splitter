@@ -227,7 +227,7 @@ pub fn download_audio_with_progress(
         let pb = ProgressBar::new(100);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}")
+                .template("[{bar:40}] {msg}")
                 .unwrap()
                 .progress_chars("=> "),
         );
@@ -260,10 +260,7 @@ pub fn download_audio_with_progress(
 
         match result {
             Ok(path) => {
-                progress_bar.finish();
-                println!();
-                println!("✓ Audio downloaded");
-                println!();
+                progress_bar.finish_and_clear();
                 return Ok(path);
             }
             Err(YtcsError::DownloadError(ref e)) if attempts < MAX_ATTEMPTS => {
@@ -290,9 +287,7 @@ pub fn download_audio_with_progress(
                             let new_pb = ProgressBar::new(100);
                             new_pb.set_style(
                                 ProgressStyle::default_bar()
-                                    .template(
-                                        "{spinner:.green} [{bar:40.cyan/blue}] {percent}% {msg}",
-                                    )
+                                    .template("[{bar:40}] {msg}")
                                     .unwrap()
                                     .progress_chars("=> "),
                             );

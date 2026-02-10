@@ -167,6 +167,39 @@ pub fn format_duration_short(seconds: f64) -> String {
 /// assert_eq!(album, "Dark Side");
 /// ```
 pub fn parse_artist_album(title: &str) -> (String, String) {
+    parse_artist_album_with_source(title).0
+}
+
+/// Parses a YouTube video title to extract artist and album with source information.
+///
+/// This is a version of `parse_artist_album` that also returns the source
+/// (detected vs default) for use in UI display.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - `((String, String), MetadataSource, MetadataSource)` - (artist, album) tuple, artist source, album source
+///
+/// # Examples
+///
+/// ```
+/// use youtube_chapter_splitter::utils::parse_artist_album_with_source;
+/// use youtube_chapter_splitter::ui::MetadataSource;
+///
+/// let ((artist, album), artist_src, album_src) = parse_artist_album_with_source("Pink Floyd - Dark Side [1973]");
+/// assert_eq!(artist, "Pink Floyd");
+/// assert_eq!(album, "Dark Side");
+/// assert_eq!(artist_src, MetadataSource::Detected);
+/// ```
+pub fn parse_artist_album_with_source(
+    title: &str,
+) -> (
+    (String, String),
+    crate::ui::MetadataSource,
+    crate::ui::MetadataSource,
+) {
+    use crate::ui::MetadataSource;
+
     // Remove everything after (FULL ALBUM) or [FULL ALBUM]
     let without_suffix = RE_FULL_ALBUM.replace_all(title, "");
 
@@ -189,10 +222,18 @@ pub fn parse_artist_album(title: &str) -> (String, String) {
     if parts.len() >= 2 {
         let artist = clean_folder_name(parts[0].trim());
         let album = clean_folder_name(parts[1].trim());
-        (artist, album)
+        (
+            (artist, album),
+            MetadataSource::Detected,
+            MetadataSource::Detected,
+        )
     } else {
         let cleaned_title = clean_folder_name(normalized.trim());
-        ("Unknown Artist".to_string(), cleaned_title)
+        (
+            ("Unknown Artist".to_string(), cleaned_title),
+            MetadataSource::Default,
+            MetadataSource::Default,
+        )
     }
 }
 

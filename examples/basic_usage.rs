@@ -62,6 +62,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
         &artist,
         &album,
         cover_path.as_deref(),
+        None, // progress_callback
     )?;
 
     // Nettoyer

@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.2.4-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -91,39 +91,30 @@ ytcs URL    # ❌ May cause issues with & characters
 ## 📊 Example Output
 
 ```
-=== YouTube Chapter Splitter ===
+ytcs v0.15.0
 
-Fetching video information...
-Title: Marigold - Oblivion Gate
-Duration: 29m 29s
-Tracks found: 5
+▶ Fetching video information
+▶ Marigold - Oblivion Gate
+  ├─ Duration   29m 29s
+  ├─ Tracks     5
+  ├─ Artist     Marigold (detected)
+  └─ Album      Oblivion Gate (detected)
 
-Downloading album artwork...
-✓ Artwork saved: ~/Music/Marigold - Oblivion Gate/cover.jpg
+▶ Downloading artwork
+  └─ Saved ~/Music/Marigold - Oblivion Gate/cover.jpg
 
-Downloading audio...
-✓ Audio downloaded: ~/Music/Marigold - Oblivion Gate/temp_audio.mp3
+▶ Downloading audio
+[========================================] Downloading audio...
+  └─ Saved ~/Music/Marigold - Oblivion Gate/temp_audio.mp3
 
-Using YouTube tracks
+▶ Splitting into 5 tracks
+  ├─ 1  Oblivion Gate [5m 54s]
+  ├─ 2  Obsidian Throne [5m 35s]
+  ├─ 3  Crimson Citadel [5m 47s]
+  ├─ 4  Silver Spire [6m 30s]
+  └─ 5  Eternal Pyre [5m 43s]
 
-Tracks to create:
-  1. Oblivion Gate [5m 54s]
-  2. Obsidian Throne [5m 35s]
-  3. Crimson Citadel [5m 47s]
-  4. Silver Spire [6m 30s]
-  5. Eternal Pyre [5m 43s]
-
-Splitting audio into 5 tracks...
-  Track 1/5: Oblivion Gate
-  Track 2/5: Obsidian Throne
-  Track 3/5: Crimson Citadel
-  Track 4/5: Silver Spire
-  Track 5/5: Eternal Pyre
-✓ Splitting completed successfully!
-
-✓ Processing completed successfully!
-Files created: 5
-Directory: ~/Music/Marigold - Oblivion Gate
+✓ ~/Music/Marigold - Oblivion Gate
 ```
 
 **Result:**
@@ -305,38 +296,14 @@ A: Yes! The album artwork is automatically embedded in each MP3 file using the `
 
 ## 📈 Changelog
 
-### v0.4.0 (Latest)
-- **Performance**: Optimized regex compilation with `once_cell` for faster processing
-- **UX**: Added progress bars for downloads and track splitting with `indicatif`
-- **Cover Art**: Switched to `lofty` library for reliable album artwork embedding
-- **Documentation**: Complete rustdoc coverage for all public APIs
-- **Robustness**: Network timeout and retry mechanism for thumbnail downloads
-- **Testing**: Unit tests for core modules (chapters, downloader, error)
-- **Quality**: Improved code maintainability and error handling
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### v0.3.2
-- Simplified cover art logic to use external cover only
-
-### v0.2.4
-- Default output to ~/Music directory (cross-platform)
-- Lighter binary with ureq instead of reqwest (6.3 MB)
-- Removed tokio async runtime (no longer needed)
-
-### v0.2.3
-- Added `--artist` and `--album` CLI options
-- Embedded album artwork in MP3 ID3 tags
-- Automatic artist/album parsing from video title
-
-### v0.2.2
-- Fixed folder names with slashes (removes content after FULL ALBUM)
-- Removed duplicate track numbers in chapter titles
-
-### v0.2.1
-- Improved folder name cleaning (pipes, capitalizes properly)
-- Better title display
-
-### v0.2.0
-- Initial public release
+### v0.15.0 (Latest)
+- **UI Redesign**: Clean tree-style interface with "Pragmatic • Direct • Classy" philosophy
+- **Metadata Prompts**: Interactive prompts when artist/album cannot be detected
+- **Progressive Feedback**: Real-time track display during splitting
+- **Simplified Output**: Removed excessive colors, bold section headers only
+- **Better Alignment**: Vertically aligned track numbers and durations
 
 ## 📞 Support
 

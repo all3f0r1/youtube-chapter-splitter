@@ -23,6 +23,10 @@ static RE_SILENCE_START: Lazy<Regex> =
 
 static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d.]+)").unwrap());
 
+/// Callback type for track progress during splitting
+pub type TrackProgressCallback =
+    fn(track_number: usize, total_tracks: usize, title: &str, duration: &str);
+
 /// Splits an audio file into individual tracks based on chapters.
 ///
 /// This function uses `ffmpeg` to split the audio and `lofty` to add
@@ -36,6 +40,7 @@ static RE_SILENCE_END: Lazy<Regex> = Lazy::new(|| Regex::new(r"silence_end: ([\d
 /// * `artist` - The artist name
 /// * `album` - The album name
 /// * `cover_path` - Optional path to the cover image
+/// * `progress_callback` - Optional callback for track-by-track progress
 ///
 /// # Returns
 ///
@@ -51,6 +56,7 @@ pub fn split_audio_by_chapters(
     artist: &str,
     album: &str,
     cover_path: Option<&Path>,
+    progress_callback: Option<TrackProgressCallback>,
 ) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(output_dir)?;
 
@@ -118,15 +124,26 @@ pub fn split_audio_by_chapters(
         }
 
         output_files.push(output_path);
+
+        // Call progress callback if provided
+        if let Some(callback) = progress_callback {
+            let duration_str = format!(
+                "{}m {:02}s",
+                (duration / 60.0).floor() as u32,
+                (duration % 60.0).floor() as u32
+            );
+            callback(
+                track_number,
+                chapters.len(),
+                &chapter.display_title(),
+                &duration_str,
+            );
+        }
+
         pb.inc(1);
     }
 
     pb.finish();
-    println!(
-        "{}/{} Splitting completed successfully!",
-        chapters.len(),
-        chapters.len()
-    );
     Ok(output_files)
 }
 

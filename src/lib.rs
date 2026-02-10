@@ -37,6 +37,7 @@
 //!         "Artist Name",
 //!         "Album Name",
 //!         None,
+//!         None, // progress_callback
 //!     )?;
 //!
 //!     Ok(())
@@ -77,3 +78,4 @@ pub use chapters::Chapter;
 pub use config::Config;
 pub use downloader::VideoInfo;
 pub use error::{Result, YtcsError};
+pub use ui::MetadataSource;
