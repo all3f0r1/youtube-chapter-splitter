@@ -143,7 +143,7 @@ pub fn split_audio_by_chapters(
         pb.inc(1);
     }
 
-    pb.finish();
+    pb.finish_and_clear();
     Ok(output_files)
 }
 
