@@ -30,7 +30,10 @@ fn to_title_case(s: &str) -> String {
             let mut chars = word.chars();
             match chars.next() {
                 None => String::new(),
-                Some(first) => first.to_uppercase().collect::<String>() + &chars.collect::<String>().to_lowercase(),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>()
+                        + &chars.collect::<String>().to_lowercase()
+                }
             }
         })
         .collect::<Vec<_>>()

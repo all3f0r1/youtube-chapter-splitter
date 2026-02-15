@@ -179,7 +179,10 @@ mod filename_sanitization_tests {
 
     #[test]
     fn test_sanitize_mixed_prefix_caps_invalid() {
-        assert_eq!(sanitize_title("01. CAFÉ/DELUXE: SPECIAL"), "Café_deluxe_ Special");
+        assert_eq!(
+            sanitize_title("01. CAFÉ/DELUXE: SPECIAL"),
+            "Café_deluxe_ Special"
+        );
     }
 
     #[test]
