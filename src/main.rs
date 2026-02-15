@@ -214,6 +214,8 @@ fn main() -> Result<()> {
         Some(track_progress_callback),
     )?;
 
+    ui::print_splitting_complete();
+
     // Clean up temporary file
     std::fs::remove_file(&audio_file).ok();
 
