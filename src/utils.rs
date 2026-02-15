@@ -15,6 +15,28 @@ static RE_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
 static RE_TRACK_PREFIX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(?:Track\s+)?\d+\s*[-.:)]?\s+").unwrap());
 
+/// Converts a string to title case (first letter of each word capitalized).
+///
+/// # Arguments
+///
+/// * `s` - The input string
+///
+/// # Returns
+///
+/// A title-cased string
+fn to_title_case(s: &str) -> String {
+    s.split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + &chars.collect::<String>().to_lowercase(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Cleans and formats a folder name according to defined rules.
 ///
 /// This function applies several transformations to normalize folder names:
@@ -268,13 +290,16 @@ pub fn sanitize_title(title: &str) -> String {
     let title = RE_TRACK_PREFIX.replace(title, "");
 
     // Replace invalid characters
-    title
+    let sanitized: String = title
         .chars()
         .map(|c| match c {
             '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
             _ => c,
         })
-        .collect()
+        .collect();
+
+    // Apply title case
+    to_title_case(&sanitized)
 }
 
 #[cfg(test)]
