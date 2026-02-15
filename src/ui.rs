@@ -191,6 +191,11 @@ pub fn print_splitting_section_header(tracks_count: usize) {
     print_section_header(&format!("Splitting into {} tracks", tracks_count));
 }
 
+/// Display splitting completion message
+pub fn print_splitting_complete() {
+    println!("{} {}", "✓".bold(), "Splitting achieved");
+}
+
 /// Display final success with output directory
 pub fn print_final_result(output_dir: &std::path::Path) {
     println!();
@@ -451,7 +456,6 @@ mod tests {
     fn test_track_progress_alignment() {
         // Test that track progress outputs correctly formatted lines
         // This is mainly to ensure the formatting string is valid
-        let mut output = Vec::new();
         let _ = std::io::stdout().flush();
         // The function should not panic
         print_track_progress(1, 12, "Test Track", "3:45");
