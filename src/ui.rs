@@ -193,7 +193,7 @@ pub fn print_splitting_section_header(tracks_count: usize) {
 
 /// Display splitting completion message
 pub fn print_splitting_complete() {
-    println!("{} {}", "✓".bold(), "Splitting achieved");
+    println!("{} Splitting achieved", "✓".bold());
 }
 
 /// Display final success with output directory
