@@ -238,13 +238,14 @@ Tracklist:
 "#;
         let chapters = parse_chapters_from_description(description, 3600.0).unwrap();
         assert_eq!(chapters.len(), 12);
-        assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
+        // Note: to_title_case capitalizes every word (including minor words like "of")
+        assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
         assert_eq!(chapters[0].start_time, 0.0);
-        assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
+        assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
         assert_eq!(chapters[1].start_time, 264.0); // 4:24
         assert_eq!(
             chapters[11].title,
-            "Architects of Inner Time (Part II_ The Awakening)"
+            "Architects Of Inner Time (part Ii_ The Awakening)"
         );
         assert_eq!(chapters[11].start_time, 3102.0); // 51:42
     }

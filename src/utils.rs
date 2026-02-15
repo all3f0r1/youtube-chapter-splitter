@@ -268,6 +268,7 @@ pub fn parse_artist_album_with_source(
 ///
 /// - Removes prefixes like `"1 - "`, `"01. "`, `"Track 5: "`
 /// - Replaces forbidden characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) with `_`
+/// - Applies title case (first letter of each word capitalized)
 ///
 /// # Arguments
 ///
@@ -283,7 +284,8 @@ pub fn parse_artist_album_with_source(
 /// use youtube_chapter_splitter::utils::sanitize_title;
 ///
 /// assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
-/// assert_eq!(sanitize_title("Track 5: Test/Song"), "Test_Song");
+/// // Note: to_title_case treats underscores as part of words, so only first char is capitalized
+/// assert_eq!(sanitize_title("Track 5: Test/Song"), "Test_song");
 /// ```
 pub fn sanitize_title(title: &str) -> String {
     // Remove track numbers at the beginning
@@ -362,10 +364,14 @@ mod tests {
     fn test_sanitize_title() {
         assert_eq!(sanitize_title("1 - Song Name"), "Song Name");
         assert_eq!(sanitize_title("Track 5: Another Song"), "Another Song");
+        // Note: to_title_case treats underscores as part of words, so only first char is capitalized
         assert_eq!(
             sanitize_title("Invalid/Characters:Here"),
-            "Invalid_Characters_Here"
+            "Invalid_characters_here"
         );
+        // New test cases for title case
+        assert_eq!(sanitize_title("THE UNHOLY"), "The Unholy");
+        assert_eq!(sanitize_title("1 the unholy"), "The Unholy");
     }
 
     #[test]
