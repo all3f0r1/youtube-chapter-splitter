@@ -5,8 +5,14 @@ use regex::Regex;
 static RE_FULL_ALBUM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
-static RE_FULL_ALBUM_UNBRACKETED: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)\s*-\s*full\s+album\s*$").unwrap());
+/// Trailing ` - Full Album` or ` - Full Album - promo…` (YouTube-style), unbracketed.
+static RE_FULL_ALBUM_UNBRACKETED: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)\s*-\s*full\s+album(?:\s*-\s*.*)?\s*$").unwrap()
+});
+
+fn strip_unbracketed_full_album_suffix(s: &str) -> String {
+    RE_FULL_ALBUM_UNBRACKETED.replace_all(s, "").into_owned()
+}
 
 static RE_BRACKETS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]|\(.*?\)").unwrap());
 
@@ -44,6 +50,7 @@ fn to_title_case(s: &str) -> String {
 ///
 /// This function applies several transformations to normalize folder names:
 /// - Removes everything after `[FULL ALBUM]` or `(FULL ALBUM)` (case insensitive)
+/// - Removes trailing ` - Full Album` or ` - Full Album - …` (case insensitive)
 /// - Removes all brackets `[]` and parentheses `()` with their content
 /// - Replaces underscores `_`, pipes `|` and slashes `/` with dashes `-`
 /// - Normalizes multiple spaces into a single space
@@ -76,8 +83,8 @@ pub fn clean_folder_name(name: &str) -> String {
     // Replace underscores, pipes and slashes with dashes
     let with_dashes = cleaned.replace(['_', '|', '/'], "-");
 
-    // Remove trailing - Full Album (without brackets) after pipe replacement
-    let with_dashes = RE_FULL_ALBUM_UNBRACKETED.replace_all(&with_dashes, "");
+    // Remove trailing - Full Album (without brackets) and optional - promo tail
+    let with_dashes = strip_unbracketed_full_album_suffix(&with_dashes);
 
     // Clean multiple spaces
     let normalized = RE_SPACES.replace_all(&with_dashes, " ");
@@ -234,6 +241,7 @@ pub fn parse_artist_album_with_source(
     // Normalize various dash types to hyphen for splitting
     // Handle: - (hyphen), – (en dash), — (em dash), ― (horizontal bar)
     let normalized = cleaned.replace(['–', '—', '―'], "-");
+    let normalized = strip_unbracketed_full_album_suffix(normalized.trim());
 
     // Split by - or |
     let parts: Vec<&str> = if normalized.contains(" - ") {
@@ -348,6 +356,14 @@ mod tests {
             clean_folder_name("Artist Name - Album Name - Full Album"),
             "Artist Name - Album Name"
         );
+
+        // YouTube-style: Full Album then genre / promo tail (unbracketed)
+        assert_eq!(
+            clean_folder_name(
+                "Aurion - A Fire That Doesn't Burn - Full Album - 70s Inspired Progressive Rock"
+            ),
+            "Aurion - A Fire That Doesn't Burn"
+        );
     }
 
     #[test]
@@ -392,5 +408,12 @@ mod tests {
         let (artist, album) = parse_artist_album("Artist — Album Name");
         assert_eq!(artist, "Artist");
         assert_eq!(album, "Album Name");
+
+        // Full Album + trailing promo (real-world YouTube title shape)
+        let (artist, album) = parse_artist_album(
+            "Aurion - A Fire That Doesn't Burn - Full Album - 70s Inspired Progressive Rock",
+        );
+        assert_eq!(artist, "Aurion");
+        assert_eq!(album, "A Fire That Doesn't Burn");
     }
 }
