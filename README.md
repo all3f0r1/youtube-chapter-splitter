@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.0-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.5-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -100,7 +100,7 @@ ytcs URL    # ❌ May cause issues with & characters
 ## 📊 Example Output
 
 ```
-ytcs v0.15.0
+ytcs v0.15.5
 
 ▶ Fetching video information
 ▶ Marigold - Oblivion Gate
@@ -303,12 +303,11 @@ A: Yes! The album artwork is automatically embedded in each MP3 file using the `
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### v0.15.0 (Latest)
-- **UI Redesign**: Clean tree-style interface with "Pragmatic • Direct • Classy" philosophy
-- **Metadata Prompts**: Interactive prompts when artist/album cannot be detected
-- **Progressive Feedback**: Real-time track display during splitting
-- **Simplified Output**: Removed excessive colors, bold section headers only
-- **Better Alignment**: Vertically aligned track numbers and durations
+### v0.15.5 (Latest)
+- **`ytcs config`**: Interactive configuration wizard and `ytcs config --show`; downloads honor `~/.config/ytcs/config.toml`
+- **Parsing**: Album titles no longer keep trailing ` - Full Album - …` promo segments
+- **Splitting UI**: Track list without overlapping progress bars
+- **UI** (from v0.15.0): Tree-style output, metadata prompts, aligned track lines
 
 ## 📞 Support
 

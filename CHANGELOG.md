@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.5] - 2026-03-27
+
+### Added
+- `ytcs config` interactive wizard: walks every setting; **Enter** keeps the current value
+- `ytcs config --show` (`-s`) prints the config file path and all values without prompts
+- Persistent settings are applied to downloads: output base directory, `directory_format` / `filename_format`, `download_cover`, `cookies_from_browser`, MP3 bitrate (128/192/320), `max_retries`, `download_timeout`, `dependency_auto_install`, `ytdlp_auto_update`, etc.
+- `YtdlpDownloadOpts` and `impl From<&Config>` for yt-dlp invocation
+- `Config::format_filename_with_template` for track filenames from the configured template
+
+### Changed
+- `main` loads `~/.config/ytcs/config.toml` (created on first run); CLI `-o` overrides only `default_output_dir` for that run
+- yt-dlp uses config-driven `--audio-quality`, `--retries`, `--socket-timeout` (skipped when timeout is 0)
+- Dependency install behavior respects `dependency_auto_install` (`prompt` / `always` / `never`)
+
+### Fixed
+- Artist/album parsing: strip trailing unbracketed ` - Full Album` and ` - Full Album - …` promo tails from titles (e.g. genre suffixes after “Full Album”)
+- Splitting output: removed per-track indicatif bars that overlapped the tree-style track list
+
+### Removed
+- Unused string-based config helpers (`set_config`, `reset_config`, former `show_config`) in favor of the wizard and `print_config_summary`
+
+### Documentation
+- README, CLAUDE.md, and COOKIES_SETUP.md updated for `ytcs config`; error hints in `ytdlp_error_parser` no longer reference a non-existent `ytcs set` command
+
 ## [0.15.0] - 2025-02-10
 
 ### Added
