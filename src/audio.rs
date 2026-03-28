@@ -5,7 +5,6 @@
 
 use crate::chapters::Chapter;
 use crate::error::{Result, YtcsError};
-use indicatif::{ProgressBar, ProgressStyle};
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
 use lofty::prelude::*;
@@ -59,15 +58,6 @@ pub fn split_audio_by_chapters(
     progress_callback: Option<TrackProgressCallback>,
 ) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(output_dir)?;
-
-    // Create a progress bar
-    let pb = ProgressBar::new(chapters.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{bar:40.cyan/blue}]")
-            .unwrap()
-            .progress_chars("#>-"),
-    );
 
     // Load cover image once if it exists
     let cover_data = if let Some(cover) = cover_path {
@@ -139,11 +129,8 @@ pub fn split_audio_by_chapters(
                 &duration_str,
             );
         }
-
-        pb.inc(1);
     }
 
-    pb.finish_and_clear();
     Ok(output_files)
 }
 
