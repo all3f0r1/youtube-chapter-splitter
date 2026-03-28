@@ -6,9 +6,8 @@ static RE_FULL_ALBUM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)\s*[\[(]full\s+album[\])].*$").unwrap());
 
 /// Trailing ` - Full Album` or ` - Full Album - promo…` (YouTube-style), unbracketed.
-static RE_FULL_ALBUM_UNBRACKETED: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\s*-\s*full\s+album(?:\s*-\s*.*)?\s*$").unwrap()
-});
+static RE_FULL_ALBUM_UNBRACKETED: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\s*-\s*full\s+album(?:\s*-\s*.*)?\s*$").unwrap());
 
 fn strip_unbracketed_full_album_suffix(s: &str) -> String {
     RE_FULL_ALBUM_UNBRACKETED.replace_all(s, "").into_owned()
