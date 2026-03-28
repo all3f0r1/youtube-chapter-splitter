@@ -9,8 +9,36 @@ permissions:
   contents: write
 
 jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Extract changelog for current version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md | sed '/^$/d; 1s/^/\n/' > release_notes.md
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | sed -n '2p' || true)
+          if [ -n "$PREV_TAG" ]; then
+            echo "" >> release_notes.md
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION}" >> release_notes.md
+          fi
+          cat release_notes.md
+
+      - name: Create release with changelog
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-release:
     name: Build and Release
+    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
