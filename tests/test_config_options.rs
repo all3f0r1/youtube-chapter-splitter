@@ -85,6 +85,12 @@ fn test_config_format_filename_custom() {
 }
 
 #[test]
+fn test_config_format_filename_with_template() {
+    let out = Config::format_filename_with_template("%n %t", 3, "Song", "Artist", "Album");
+    assert_eq!(out, "03 Song");
+}
+
+#[test]
 fn test_config_format_directory() {
     let config = Config::default();
 

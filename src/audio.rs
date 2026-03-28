@@ -39,6 +39,7 @@ pub type TrackProgressCallback =
 /// * `artist` - The artist name
 /// * `album` - The album name
 /// * `cover_path` - Optional path to the cover image
+/// * `filename_format` - Template with `%n`, `%t`, `%a`, `%A` (same as config `filename_format`)
 /// * `progress_callback` - Optional callback for track-by-track progress
 ///
 /// # Returns
@@ -48,6 +49,7 @@ pub type TrackProgressCallback =
 /// # Errors
 ///
 /// Returns an error if splitting or adding metadata fails
+#[allow(clippy::too_many_arguments)]
 pub fn split_audio_by_chapters(
     input_file: &Path,
     chapters: &[Chapter],
@@ -55,6 +57,7 @@ pub fn split_audio_by_chapters(
     artist: &str,
     album: &str,
     cover_path: Option<&Path>,
+    filename_format: &str,
     progress_callback: Option<TrackProgressCallback>,
 ) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(output_dir)?;
@@ -71,7 +74,14 @@ pub fn split_audio_by_chapters(
     for (index, chapter) in chapters.iter().enumerate() {
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
-        let output_filename = format!("{:02} - {}.mp3", track_number, sanitized_title);
+        let base_name = crate::config::Config::format_filename_with_template(
+            filename_format,
+            track_number,
+            &sanitized_title,
+            artist,
+            album,
+        );
+        let output_filename = format!("{}.mp3", base_name);
         let output_path = output_dir.join(&output_filename);
 
         let duration = chapter.duration();

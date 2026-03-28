@@ -16,6 +16,37 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+/// yt-dlp options for audio download (mirrors fields from [`crate::config::Config`]).
+#[derive(Debug, Clone)]
+pub struct YtdlpDownloadOpts {
+    pub audio_quality_kbps: u32,
+    pub socket_timeout_secs: u64,
+    pub retries: u32,
+    pub ytdlp_auto_update_on_failure: bool,
+}
+
+impl Default for YtdlpDownloadOpts {
+    fn default() -> Self {
+        Self {
+            audio_quality_kbps: 192,
+            socket_timeout_secs: 300,
+            retries: 3,
+            ytdlp_auto_update_on_failure: true,
+        }
+    }
+}
+
+impl From<&crate::config::Config> for YtdlpDownloadOpts {
+    fn from(c: &crate::config::Config) -> Self {
+        Self {
+            audio_quality_kbps: c.audio_quality,
+            socket_timeout_secs: c.download_timeout,
+            retries: c.max_retries,
+            ytdlp_auto_update_on_failure: c.ytdlp_auto_update,
+        }
+    }
+}
+
 /// Download progress state
 #[derive(Debug, Clone)]
 pub struct DownloadProgress {
@@ -212,12 +243,14 @@ fn parse_download_line(line: &str) -> Option<DownloadProgress> {
 /// * `url` - YouTube URL
 /// * `output_path` - Output path (without extension)
 /// * `cookies_from_browser` - Browser for cookies
+/// * `opts` - Bitrate, timeouts, retries, auto-update behavior
 /// * `pb` - Optional ProgressBar (created automatically if None)
 /// * `progress_shared` - Shared progress for TUI (Arc<Mutex<Option<DownloadProgress>>>)
 pub fn download_audio_with_progress(
     url: &str,
     output_path: &std::path::Path,
     cookies_from_browser: Option<&str>,
+    opts: YtdlpDownloadOpts,
     pb: Option<ProgressBar>,
     progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
@@ -246,6 +279,7 @@ pub fn download_audio_with_progress(
     // Try downloading, with auto-update retry on failure
     let mut attempts = 0;
     const MAX_ATTEMPTS: usize = 2; // Initial try + one retry after update
+    let opts_clone = opts.clone();
 
     loop {
         attempts += 1;
@@ -254,6 +288,7 @@ pub fn download_audio_with_progress(
             url,
             output_path,
             cookies_from_browser,
+            &opts_clone,
             &progress_bar,
             progress_shared,
         );
@@ -263,7 +298,9 @@ pub fn download_audio_with_progress(
                 progress_bar.finish_and_clear();
                 return Ok(path);
             }
-            Err(YtcsError::DownloadError(ref e)) if attempts < MAX_ATTEMPTS => {
+            Err(YtcsError::DownloadError(ref e))
+                if attempts < MAX_ATTEMPTS && opts_clone.ytdlp_auto_update_on_failure =>
+            {
                 // Check if error is due to outdated yt-dlp
                 if ytdlp_helper::is_outdated_error(e) {
                     progress_bar.abandon();
@@ -332,6 +369,7 @@ fn download_audio_with_progress_impl(
     url: &str,
     output_path: &std::path::Path,
     cookies_from_browser: Option<&str>,
+    opts: &YtdlpDownloadOpts,
     progress_bar: &ProgressBar,
     progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
 ) -> Result<std::path::PathBuf> {
@@ -352,6 +390,7 @@ fn download_audio_with_progress_impl(
             url,
             output_path,
             cookies_from_browser,
+            opts,
             *format,
             progress_bar,
             progress_shared,
@@ -394,6 +433,7 @@ fn try_download_with_format(
     url: &str,
     output_path: &std::path::Path,
     cookies_from_browser: Option<&str>,
+    opts: &YtdlpDownloadOpts,
     format_selector: Option<&str>,
     progress_bar: &ProgressBar,
     progress_shared: Option<&Arc<Mutex<Option<DownloadProgress>>>>,
@@ -404,17 +444,24 @@ fn try_download_with_format(
         cmd.arg("-f").arg(fmt);
     }
 
-    cmd.arg("-x")
+    cmd.arg("--retries")
+        .arg(opts.retries.to_string())
+        .arg("-x")
         .arg("--audio-format")
         .arg("mp3")
         .arg("--audio-quality")
-        .arg("0")
+        .arg(format!("{}K", opts.audio_quality_kbps))
         .arg("-o")
         .arg(output_path.to_str().unwrap())
         .arg("--no-playlist")
         .arg(url)
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+
+    if opts.socket_timeout_secs > 0 {
+        cmd.arg("--socket-timeout")
+            .arg(opts.socket_timeout_secs.to_string());
+    }
 
     // Add cookie arguments
     crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);

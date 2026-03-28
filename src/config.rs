@@ -5,6 +5,7 @@
 use crate::error::{Result, YtcsError};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 /// Playlist detection behavior
@@ -223,7 +224,24 @@ impl Config {
         artist: &str,
         album: &str,
     ) -> String {
-        self.filename_format
+        Self::format_filename_with_template(
+            &self.filename_format,
+            track_number,
+            title,
+            artist,
+            album,
+        )
+    }
+
+    /// Format a track filename using an explicit template (same placeholders as `filename_format`).
+    pub fn format_filename_with_template(
+        template: &str,
+        track_number: usize,
+        title: &str,
+        artist: &str,
+        album: &str,
+    ) -> String {
+        template
             .replace("%n", &format!("{:02}", track_number))
             .replace("%t", title)
             .replace("%a", artist)
@@ -238,8 +256,8 @@ impl Config {
     }
 }
 
-/// Display current configuration
-pub fn show_config() -> Result<()> {
+/// Print current configuration (read-only).
+pub fn print_config_summary() -> Result<()> {
     let config = Config::load()?;
     let config_path = Config::config_path()?;
 
@@ -247,183 +265,293 @@ pub fn show_config() -> Result<()> {
     println!();
     println!("Current settings:");
     println!(
-        "  default_output_dir     = {:?}",
+        "  default_output_dir          = {:?}",
         config
             .default_output_dir
-            .unwrap_or_else(|| "Music directory (default)".to_string())
+            .clone()
+            .unwrap_or_else(|| "(system Music directory)".to_string())
     );
     println!("  download_cover        = {}", config.download_cover);
-    println!("  filename_format       = \"{}\"", config.filename_format);
-    println!("  directory_format      = \"{}\"", config.directory_format);
-    println!("  audio_quality         = {} kbps", config.audio_quality);
-    println!("  overwrite_existing    = {}", config.overwrite_existing);
-    println!("  max_retries           = {}", config.max_retries);
-    println!("  create_playlist       = {}", config.create_playlist);
-    println!("  playlist_behavior     = {:?}", config.playlist_behavior);
     println!(
-        "  cookies_from_browser  = {:?}",
-        config.cookies_from_browser.as_deref().unwrap_or("None")
+        "  filename_format             = \"{}\"",
+        config.filename_format
     );
     println!(
-        "  dependency_auto_install = {:?}",
+        "  directory_format            = \"{}\"",
+        config.directory_format
+    );
+    println!(
+        "  audio_quality               = {} kbps",
+        config.audio_quality
+    );
+    println!(
+        "  overwrite_existing          = {}",
+        config.overwrite_existing
+    );
+    println!("  max_retries                 = {}", config.max_retries);
+    println!("  create_playlist             = {}", config.create_playlist);
+    println!(
+        "  playlist_behavior           = {:?}",
+        config.playlist_behavior
+    );
+    println!(
+        "  cookies_from_browser        = {:?}",
+        config.cookies_from_browser.as_deref().unwrap_or("(none)")
+    );
+    println!(
+        "  download_timeout            = {} s (0 = no timeout)",
+        config.download_timeout
+    );
+    println!(
+        "  dependency_auto_install     = {:?}",
         config.dependency_auto_install
     );
-    println!("  ytdlp_auto_update        = {}", config.ytdlp_auto_update);
     println!(
-        "  ytdlp_update_interval_days = {}",
+        "  ytdlp_auto_update           = {}",
+        config.ytdlp_auto_update
+    );
+    println!(
+        "  ytdlp_update_interval_days  = {}",
         config.ytdlp_update_interval_days
     );
     println!();
-    println!("Available placeholders:");
-    println!("  Filename: %n (track number), %t (title), %a (artist), %A (album)");
-    println!("  Directory: %a (artist), %A (album)");
+    println!("Placeholders: filename %n %t %a %A — directory %a %A");
 
     Ok(())
 }
 
-/// Set a configuration value
-pub fn set_config(key: &str, value: &str) -> Result<()> {
-    let mut config = Config::load()?;
+fn read_line_trimmed() -> String {
+    let mut line = String::new();
+    io::stdin().read_line(&mut line).ok();
+    line.trim().to_string()
+}
 
-    match key {
-        "default_output_dir" => {
-            config.default_output_dir = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
-            println!("✓ Set default_output_dir to: {}", value);
-        }
-        "download_cover" => {
-            config.download_cover = value.parse::<bool>().map_err(|_| {
-                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
-            })?;
-            println!("✓ Set download_cover to: {}", config.download_cover);
-        }
-        "filename_format" => {
-            config.filename_format = value.to_string();
-            println!("✓ Set filename_format to: \"{}\"", value);
-        }
-        "directory_format" => {
-            config.directory_format = value.to_string();
-            println!("✓ Set directory_format to: \"{}\"", value);
-        }
-        "audio_quality" => {
-            let quality = value.parse::<u32>().map_err(|_| {
-                YtcsError::ConfigError("Value must be a number (128, 192, or 320)".to_string())
-            })?;
-            if quality != 128 && quality != 192 && quality != 320 {
+fn prompt_line(label: &str, help: &str, display_default: &str) -> String {
+    println!("{}", label);
+    println!("  {}", help);
+    print!("  [default: {}] > ", display_default);
+    io::stdout().flush().ok();
+    read_line_trimmed()
+}
+
+fn parse_bool_input(s: &str, current: bool) -> Result<bool> {
+    if s.is_empty() {
+        return Ok(current);
+    }
+    match s.to_lowercase().as_str() {
+        "y" | "yes" | "true" | "1" => Ok(true),
+        "n" | "no" | "false" | "0" => Ok(false),
+        _ => Err(YtcsError::ConfigError(
+            "Enter y/n, or leave empty to keep the current value".to_string(),
+        )),
+    }
+}
+
+fn parse_audio_quality(s: &str, current: u32) -> Result<u32> {
+    if s.is_empty() {
+        return Ok(current);
+    }
+    let q: u32 = s.parse().map_err(|_| {
+        YtcsError::ConfigError("Audio quality must be 128, 192, or 320".to_string())
+    })?;
+    if q != 128 && q != 192 && q != 320 {
+        return Err(YtcsError::ConfigError(
+            "Audio quality must be 128, 192, or 320 kbps".to_string(),
+        ));
+    }
+    Ok(q)
+}
+
+/// Interactive wizard: each setting shows its current value; Enter keeps it.
+pub fn run_interactive_config_wizard() -> Result<()> {
+    let mut config = Config::load()?;
+    let path = Config::config_path()?;
+
+    println!();
+    println!("ytcs — configuration wizard");
+    println!("Config file: {}", path.display());
+    println!("Press Enter at any prompt to keep the current value.");
+    println!();
+
+    // default_output_dir
+    let dir_disp = config
+        .default_output_dir
+        .clone()
+        .unwrap_or_else(|| "(none — use system Music folder)".to_string());
+    let input = prompt_line(
+        "Default output directory",
+        "Path for albums, or 'none' to use the system Music folder.",
+        &dir_disp,
+    );
+    if input.is_empty() {
+        // keep
+    } else if input.eq_ignore_ascii_case("none") || input == "-" {
+        config.default_output_dir = None;
+    } else {
+        config.default_output_dir = Some(input);
+    }
+
+    let dc = config.download_cover;
+    let input = prompt_line(
+        "Download cover art",
+        "y/n — fetch and embed album thumbnail when available.",
+        &format!("{}", dc),
+    );
+    config.download_cover = parse_bool_input(&input, dc)?;
+
+    let ff = config.filename_format.clone();
+    let input = prompt_line(
+        "Track filename format",
+        "Placeholders: %n track number, %t title, %a artist, %A album.",
+        &ff,
+    );
+    if !input.is_empty() {
+        config.filename_format = input;
+    }
+
+    let df = config.directory_format.clone();
+    let input = prompt_line(
+        "Album folder name format",
+        "Placeholders: %a artist, %A album.",
+        &df,
+    );
+    if !input.is_empty() {
+        config.directory_format = input;
+    }
+
+    let aq = config.audio_quality;
+    let input = prompt_line(
+        "MP3 bitrate (kbps)",
+        "Allowed: 128, 192, or 320.",
+        &format!("{}", aq),
+    );
+    config.audio_quality = parse_audio_quality(&input, aq)?;
+
+    let oe = config.overwrite_existing;
+    let input = prompt_line(
+        "Overwrite existing files",
+        "y/n — reserved for future use when re-downloading.",
+        &format!("{}", oe),
+    );
+    config.overwrite_existing = parse_bool_input(&input, oe)?;
+
+    let mr = config.max_retries;
+    let input = prompt_line(
+        "Download retries",
+        "Number of retries for yt-dlp network operations.",
+        &format!("{}", mr),
+    );
+    if !input.is_empty() {
+        config.max_retries = input.parse().map_err(|_| {
+            YtcsError::ConfigError("max_retries must be a positive integer".to_string())
+        })?;
+    }
+
+    let cp = config.create_playlist;
+    let input = prompt_line(
+        "Create .m3u playlist file",
+        "y/n — reserved for future use.",
+        &format!("{}", cp),
+    );
+    config.create_playlist = parse_bool_input(&input, cp)?;
+
+    println!("Playlist behavior when a playlist URL is used");
+    println!("  1 = ask  2 = video_only (default)  3 = playlist_only");
+    print!("  [default: {:?}] > ", config.playlist_behavior);
+    io::stdout().flush().ok();
+    let pb_in = read_line_trimmed();
+    if !pb_in.is_empty() {
+        config.playlist_behavior = match pb_in.as_str() {
+            "1" => PlaylistBehavior::Ask,
+            "2" => PlaylistBehavior::VideoOnly,
+            "3" => PlaylistBehavior::PlaylistOnly,
+            _ => {
                 return Err(YtcsError::ConfigError(
-                    "Audio quality must be 128, 192, or 320 kbps".to_string(),
+                    "Enter 1, 2, or 3 (or leave empty to keep)".to_string(),
                 ));
             }
-            config.audio_quality = quality;
-            println!("✓ Set audio_quality to: {} kbps", quality);
-        }
-        "overwrite_existing" => {
-            config.overwrite_existing = value.parse::<bool>().map_err(|_| {
-                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
-            })?;
-            println!("✓ Set overwrite_existing to: {}", config.overwrite_existing);
-        }
-        "max_retries" => {
-            config.max_retries = value.parse::<u32>().map_err(|_| {
-                YtcsError::ConfigError("Value must be a positive number".to_string())
-            })?;
-            println!("✓ Set max_retries to: {}", config.max_retries);
-        }
-        "create_playlist" => {
-            config.create_playlist = value.parse::<bool>().map_err(|_| {
-                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
-            })?;
-            println!("✓ Set create_playlist to: {}", config.create_playlist);
-        }
-        "playlist_behavior" => {
-            let behavior = match value {
-                "ask" => PlaylistBehavior::Ask,
-                "video_only" => PlaylistBehavior::VideoOnly,
-                "playlist_only" => PlaylistBehavior::PlaylistOnly,
-                _ => {
-                    return Err(YtcsError::ConfigError(
-                        "Value must be 'ask', 'video_only', or 'playlist_only'".to_string(),
-                    ));
-                }
-            };
-            config.playlist_behavior = behavior;
-            println!("✓ Set playlist_behavior to: {:?}", config.playlist_behavior);
-        }
-        "cookies_from_browser" => {
-            let valid_browsers = [
-                "chrome", "firefox", "safari", "edge", "chromium", "brave", "opera", "vivaldi",
-            ];
-            if value.is_empty() {
-                config.cookies_from_browser = None;
-                println!("✓ Disabled cookies_from_browser");
-            } else if valid_browsers.contains(&value.to_lowercase().as_str()) {
-                config.cookies_from_browser = Some(value.to_lowercase());
-                println!("✓ Set cookies_from_browser to: {}", value);
-            } else {
-                return Err(YtcsError::ConfigError(format!(
-                    "Invalid browser '{}'. Valid options: {}",
-                    value,
-                    valid_browsers.join(", ")
-                )));
-            }
-        }
-        "dependency_auto_install" => {
-            let behavior = match value {
-                "prompt" => AutoInstallBehavior::Prompt,
-                "always" => AutoInstallBehavior::Always,
-                "never" => AutoInstallBehavior::Never,
-                _ => {
-                    return Err(YtcsError::ConfigError(
-                        "Value must be 'prompt', 'always', or 'never'".to_string(),
-                    ));
-                }
-            };
-            println!("✓ Set dependency_auto_install to: {:?}", behavior);
-            config.dependency_auto_install = behavior;
-        }
-        "ytdlp_auto_update" => {
-            config.ytdlp_auto_update = value.parse::<bool>().map_err(|_| {
-                YtcsError::ConfigError("Value must be 'true' or 'false'".to_string())
-            })?;
-            println!("✓ Set ytdlp_auto_update to: {}", config.ytdlp_auto_update);
-        }
-        "ytdlp_update_interval_days" => {
-            config.ytdlp_update_interval_days = value.parse::<u64>().map_err(|_| {
-                YtcsError::ConfigError("Value must be a positive number (days)".to_string())
-            })?;
-            println!(
-                "✓ Set ytdlp_update_interval_days to: {}",
-                config.ytdlp_update_interval_days
-            );
-        }
-        _ => {
+        };
+    }
+
+    let cb_disp = config
+        .cookies_from_browser
+        .clone()
+        .unwrap_or_else(|| "(none)".to_string());
+    let input = prompt_line(
+        "Cookies from browser",
+        "chrome, firefox, edge, … — or 'none' to disable (see also ~/.config/ytcs/cookies.txt).",
+        &cb_disp,
+    );
+    if !input.is_empty() {
+        let valid = [
+            "chrome", "firefox", "safari", "edge", "chromium", "brave", "opera", "vivaldi",
+        ];
+        if input.eq_ignore_ascii_case("none") || input == "-" {
+            config.cookies_from_browser = None;
+        } else if valid.contains(&input.to_lowercase().as_str()) {
+            config.cookies_from_browser = Some(input.to_lowercase());
+        } else {
             return Err(YtcsError::ConfigError(format!(
-                "Unknown config key: {}",
-                key
+                "Unknown browser. Use one of: {}",
+                valid.join(", ")
             )));
         }
     }
 
-    config.save()?;
-    println!(
-        "✓ Configuration saved to: {}",
-        Config::config_path()?.display()
+    let dt = config.download_timeout;
+    let input = prompt_line(
+        "Download timeout (seconds)",
+        "0 = no socket timeout for yt-dlp.",
+        &format!("{}", dt),
     );
+    if !input.is_empty() {
+        config.download_timeout = input.parse().map_err(|_| {
+            YtcsError::ConfigError("download_timeout must be a non-negative integer".to_string())
+        })?;
+    }
 
-    Ok(())
-}
+    println!("Dependency auto-install (yt-dlp / ffmpeg)");
+    println!("  1 = prompt  2 = always  3 = never");
+    print!("  [default: {:?}] > ", config.dependency_auto_install);
+    io::stdout().flush().ok();
+    let dep_in = read_line_trimmed();
+    if !dep_in.is_empty() {
+        config.dependency_auto_install = match dep_in.as_str() {
+            "1" => AutoInstallBehavior::Prompt,
+            "2" => AutoInstallBehavior::Always,
+            "3" => AutoInstallBehavior::Never,
+            _ => {
+                return Err(YtcsError::ConfigError(
+                    "Enter 1, 2, or 3 (or leave empty to keep)".to_string(),
+                ));
+            }
+        };
+    }
 
-/// Reset configuration to defaults
-pub fn reset_config() -> Result<()> {
-    let config = Config::default();
-    config.save()?;
-    println!("✓ Configuration reset to defaults");
-    println!(
-        "✓ Configuration saved to: {}",
-        Config::config_path()?.display()
+    let yu = config.ytdlp_auto_update;
+    let input = prompt_line(
+        "Auto-update yt-dlp on download failure",
+        "y/n — offer to update yt-dlp when a failure looks like an outdated extractor.",
+        &format!("{}", yu),
     );
+    config.ytdlp_auto_update = parse_bool_input(&input, yu)?;
+
+    let yid = config.ytdlp_update_interval_days;
+    let input = prompt_line(
+        "Minimum days between yt-dlp update checks",
+        "0 = no minimum interval (reserved for future use).",
+        &format!("{}", yid),
+    );
+    if !input.is_empty() {
+        config.ytdlp_update_interval_days = input.parse().map_err(|_| {
+            YtcsError::ConfigError(
+                "ytdlp_update_interval_days must be a non-negative integer".to_string(),
+            )
+        })?;
+    }
+
+    config.save()?;
+    println!();
+    println!("✓ Configuration saved to {}", path.display());
     Ok(())
 }

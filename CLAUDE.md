@@ -19,7 +19,9 @@ cargo test test_name
 
 # Run the CLI (after building)
 cargo run -- --help
+cargo run -- "https://www.youtube.com/watch?v=VIDEO_ID"
 ./target/release/ytcs <URL>
+./target/release/ytcs config
 
 # Lint with Clippy
 cargo clippy
@@ -34,13 +36,13 @@ This is a Rust CLI tool (`ytcs`) that downloads YouTube videos, extracts audio a
 
 ### Core Pipeline (main.rs)
 
-The main entry point orchestrates the download and processing:
+The main entry point orchestrates the download and processing (`ytcs <URL>`) or configuration (`ytcs config` / `ytcs config --show`):
 
-1. **Dependency check** - Verifies yt-dlp and ffmpeg are installed
+1. **Dependency check** - Verifies yt-dlp and ffmpeg are installed (behavior from `dependency_auto_install` in config)
 2. **URL cleaning** - Extracts video ID, removes playlist parameters
 3. **Video info fetch** - Gets metadata via yt-dlp
-4. **Output directory setup** - Creates target folder based on artist/album
-5. **Download assets** - Downloads thumbnail and audio
+4. **Output directory setup** - Creates target folder using `directory_format` and config output base (CLI `-o` overrides)
+5. **Download assets** - Downloads thumbnail (if `download_cover`) and audio (cookies, bitrate, timeouts from config)
 6. **Chapter detection** - 3-step fallback: YouTube chapters → description parsing → silence detection
 7. **Track splitting** - Uses ffmpeg to split and add metadata
 
@@ -51,7 +53,7 @@ The main entry point orchestrates the download and processing:
 - **`chapters.rs`** - Core `Chapter` struct with `start_time`, `end_time`, `title`. Parses JSON chapters from yt-dlp.
 - **`chapters_from_description.rs`** - Parses chapter timestamps from video descriptions (multiple formats: "00:00 - Title", "1. Title (0:00)")
 - **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection for precise split points. Uses ffmpeg's silencedetect to find optimal boundaries within ±5 second windows.
-- **`config.rs`** - TOML-based persistent config at `~/.config/ytcs/config.toml`. Supports format strings like `%n` (track number), `%t` (title), `%a` (artist), `%A` (album).
+- **`config.rs`** - TOML config at `~/.config/ytcs/config.toml`, edited via `ytcs config` (interactive wizard) or manually. `print_config_summary` / `run_interactive_config_wizard`. Format strings `%n`, `%t`, `%a`, `%A`.
 - **`error.rs`** - `YtcsError` enum covering all error types with `thiserror`.
 - **`temp_file.rs`** - RAII wrapper for automatic cleanup of temporary files.
 - **`cookie_helper.rs`** - YouTube authentication via browser cookies (for member-only/private videos).
@@ -104,14 +106,11 @@ Tests are in `tests/` directory. Key test files:
 
 ### Configuration
 
-Config file location: `~/.config/ytcs/config.toml`
+Config file: `~/.config/ytcs/config.toml` (created on first `Config::load()` or first `ytcs config`).
 
-Key settings:
-- `default_output_dir` - Default: `~/Music`
-- `filename_format` - Default: `"%n - %t"` (track number - title)
-- `directory_format` - Default: `"%a - %A"` (artist - album)
-- `download_cover` - Default: `true`
-- `cookies_from_browser` - Browser for auto cookie extraction (chrome, firefox, etc.)
+Edit with **`ytcs config`** (prompts for each field; Enter keeps current). **`ytcs config --show`** prints the file path and all values.
+
+Key settings include: `default_output_dir`, `filename_format`, `directory_format`, `audio_quality` (128/192/320), `download_cover`, `cookies_from_browser`, `download_timeout`, `max_retries`, `dependency_auto_install`, `ytdlp_auto_update`.
 
 ### Debugging
 

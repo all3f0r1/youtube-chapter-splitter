@@ -4,38 +4,29 @@ To download member-only videos or private videos from YouTube, you need to provi
 
 ## Method 1: Automatic Browser Cookie Extraction (Recommended)
 
-The easiest way to authenticate is to let ytcs extract cookies directly from your browser:
+Run the configuration wizard and set **Cookies from browser** to your browser name (e.g. `chrome`):
 
 ```bash
-# Configure ytcs to use cookies from your browser
-ytcs set cookies_from_browser chrome
+ytcs config
 ```
 
-**Supported browsers:**
-- `chrome` - Google Chrome
-- `firefox` - Mozilla Firefox
-- `safari` - Safari (macOS only)
-- `edge` - Microsoft Edge
-- `chromium` - Chromium
-- `brave` - Brave Browser
-- `opera` - Opera
-- `vivaldi` - Vivaldi
+**Supported browsers:** `chrome`, `firefox`, `safari`, `edge`, `chromium`, `brave`, `opera`, `vivaldi`
 
 **Requirements:**
+
 - You must be logged in to YouTube in the specified browser
 - The browser must be installed on your system
 - yt-dlp will automatically extract and use your session cookies
 
-**To disable:**
+To disable browser cookies, run `ytcs config` again and enter `none` for that setting (or clear it). You can confirm current values with:
+
 ```bash
-ytcs set cookies_from_browser ""
+ytcs config --show
 ```
 
 ## Method 2: Manual Cookie File Export
 
 If automatic extraction doesn't work or you prefer manual control, you can export cookies to a file.
-
-### Setup Instructions
 
 ### 1. Export Your YouTube Cookies
 
@@ -45,6 +36,7 @@ You can use a browser extension to export your YouTube cookies in Netscape forma
 - **Firefox**: [cookies.txt](https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)
 
 #### Steps:
+
 1. Install the browser extension
 2. Log in to YouTube in your browser
 3. Navigate to any YouTube page (e.g., https://www.youtube.com)
@@ -59,12 +51,14 @@ Move the exported `cookies.txt` file to:
 ```
 
 On Linux/macOS:
+
 ```bash
 mkdir -p ~/.config/ytcs
 mv ~/Downloads/cookies.txt ~/.config/ytcs/cookies.txt
 ```
 
 On Windows:
+
 ```powershell
 mkdir $env:USERPROFILE\.config\ytcs
 move $env:USERPROFILE\Downloads\cookies.txt $env:USERPROFILE\.config\ytcs\cookies.txt
@@ -72,7 +66,7 @@ move $env:USERPROFILE\Downloads\cookies.txt $env:USERPROFILE\.config\ytcs\cookie
 
 ### 3. Verify Setup
 
-Once the cookies file is in place, `ytcs` will automatically use it for all YouTube downloads. You should now be able to download:
+Once the cookies file is in place, `ytcs` will automatically use it for all YouTube downloads (when browser cookies are not set). You should now be able to download:
 
 - Member-only videos
 - Private videos (that you have access to)

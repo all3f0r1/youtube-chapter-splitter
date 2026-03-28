@@ -55,14 +55,23 @@ cargo install --path .
 
 ### Usage
 
-**Simple syntax:**
+**Download and split:**
 
 ```bash
 ytcs <YOUTUBE_URL> [OPTIONS]
 ```
 
-**Options:**
-- `-o, --output <DIR>` - Output directory (default: ~/Music)
+**Configuration (interactive wizard; Enter keeps each current value):**
+
+```bash
+ytcs config
+ytcs config --show    # print ~/.config/ytcs/config.toml values and exit
+```
+
+Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/config.toml`). The wizard is created on first `ytcs config` or first download.
+
+**Options (download command):**
+- `-o, --output <DIR>` - Output directory (overrides `default_output_dir` in config)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
 
@@ -140,15 +149,11 @@ ytcs v0.15.0
 
 ## 🛠️ Advanced Features
 
-### Default Output Directory
+### Configuration file
 
-The application automatically saves to your system's Music directory:
+Run `ytcs config` to set output folder, MP3 bitrate (128/192/320), cover download, filename/folder templates (`%n`, `%t`, `%a`, `%A`), cookies browser, download timeouts, retries, dependency install behavior, and yt-dlp auto-update options.
 
-- **Linux**: `~/Music` (e.g., `/home/username/Music`)
-- **macOS**: `~/Music` (e.g., `/Users/username/Music`)
-- **Windows**: `%USERPROFILE%\Music` (e.g., `C:\Users\username\Music`)
-
-You can override this with the `-o` flag.
+Without a custom `default_output_dir`, albums go to the system Music folder (`~/Music` on Linux/macOS, `%USERPROFILE%\Music` on Windows). The `-o` flag still overrides that for a single run.
 
 ### Folder Name Cleaning
 

@@ -20,12 +20,15 @@
 //!
 //!     // Download audio with real-time progress
 //!     let output_path = PathBuf::from("temp_audio");
+//!     use youtube_chapter_splitter::yt_dlp_progress::YtdlpDownloadOpts;
+//!
 //!     let audio_file = yt_dlp_progress::download_audio_with_progress(
 //!         url,
 //!         &output_path,
-//!         None, // cookies_from_browser
-//!         None, // progress bar (auto-created)
-//!         None, // shared progress for TUI
+//!         None,
+//!         YtdlpDownloadOpts::default(),
+//!         None,
+//!         None,
 //!     )?;
 //!
 //!     // Split by chapters
@@ -37,7 +40,8 @@
 //!         "Artist Name",
 //!         "Album Name",
 //!         None,
-//!         None, // progress_callback
+//!         "%n - %t",
+//!         None,
 //!     )?;
 //!
 //!     Ok(())

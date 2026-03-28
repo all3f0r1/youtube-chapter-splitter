@@ -31,9 +31,9 @@ pub fn parse_ytdlp_error(
         let message =
             "This video requires authentication (member-only or private content)".to_string();
         let suggestion = if cookie_helper::cookies_available(cookies_from_browser) {
-            Some("Your cookies may have expired. Try:\n  1. Export fresh cookies from your browser\n  2. Update ~/.config/ytcs/cookies.txt\n  3. Or reconfigure: ytcs set cookies_from_browser <browser>".to_string())
+            Some("Your cookies may have expired. Try:\n  1. Export fresh cookies from your browser\n  2. Update ~/.config/ytcs/cookies.txt\n  3. Or run: ytcs config (set Cookies from browser)".to_string())
         } else {
-            Some("You need to authenticate. Choose one option:\n  1. Export cookies: See COOKIES_SETUP.md for instructions\n  2. Or configure browser: ytcs set cookies_from_browser chrome".to_string())
+            Some("You need to authenticate. Choose one option:\n  1. Export cookies: see COOKIES_SETUP.md\n  2. Or run: ytcs config (set Cookies from browser)".to_string())
         };
         return (message, suggestion);
     }
@@ -44,7 +44,7 @@ pub fn parse_ytdlp_error(
         let suggestion = if cookie_helper::cookies_available(cookies_from_browser) {
             Some("Your cookies may not have the required age verification. Try logging in to YouTube in your browser and exporting fresh cookies.".to_string())
         } else {
-            Some("You need to authenticate with an age-verified account:\n  1. Log in to YouTube in your browser\n  2. Export cookies (see COOKIES_SETUP.md)\n  3. Or configure: ytcs set cookies_from_browser chrome".to_string())
+            Some("You need to authenticate with an age-verified account:\n  1. Log in to YouTube in your browser\n  2. Export cookies (see COOKIES_SETUP.md)\n  3. Or run: ytcs config (set Cookies from browser)".to_string())
         };
         return (message, suggestion);
     }
