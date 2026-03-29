@@ -269,6 +269,19 @@ pub fn parse_artist_album_with_source(
     }
 }
 
+/// Replaces characters that are invalid in path components on Windows and problematic on Unix.
+///
+/// Maps `/ \ : * ? " < > |` to `_`. Use when building directory or file names from user/metadata
+/// strings; keep original strings for display and ID3 tags.
+pub fn sanitize_filesystem_chars(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect()
+}
+
 /// Cleans a chapter title for use as a filename.
 ///
 /// This function removes track numbering prefixes and replaces
@@ -300,17 +313,7 @@ pub fn parse_artist_album_with_source(
 pub fn sanitize_title(title: &str) -> String {
     // Remove track numbers at the beginning
     let title = RE_TRACK_PREFIX.replace(title, "");
-
-    // Replace invalid characters
-    let sanitized: String = title
-        .chars()
-        .map(|c| match c {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
-            _ => c,
-        })
-        .collect();
-
-    // Apply title case
+    let sanitized = sanitize_filesystem_chars(title.as_ref());
     to_title_case(&sanitized)
 }
 
@@ -376,6 +379,22 @@ mod tests {
     fn test_format_duration_short() {
         assert_eq!(format_duration_short(343.0), "5m 43s");
         assert_eq!(format_duration_short(90.0), "1m 30s");
+    }
+
+    #[test]
+    fn test_sanitize_filesystem_chars_colon() {
+        assert_eq!(
+            sanitize_filesystem_chars("Best Of Clair Obscur: Expedition 33"),
+            "Best Of Clair Obscur_ Expedition 33"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filesystem_chars_forbidden_set() {
+        assert_eq!(
+            sanitize_filesystem_chars(r#"a/b\c:d*e?f"g<h>i|j"#),
+            "a_b_c_d_e_f_g_h_i_j"
+        );
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //! This module handles application configuration stored in a TOML file.
 
 use crate::error::{Result, YtcsError};
+use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
@@ -241,18 +242,23 @@ impl Config {
         artist: &str,
         album: &str,
     ) -> String {
+        let safe_t = utils::sanitize_filesystem_chars(title);
+        let safe_a = utils::sanitize_filesystem_chars(artist);
+        let safe_al = utils::sanitize_filesystem_chars(album);
         template
             .replace("%n", &format!("{:02}", track_number))
-            .replace("%t", title)
-            .replace("%a", artist)
-            .replace("%A", album)
+            .replace("%t", &safe_t)
+            .replace("%a", &safe_a)
+            .replace("%A", &safe_al)
     }
 
     /// Format directory name according to template
     pub fn format_directory(&self, artist: &str, album: &str) -> String {
+        let safe_a = utils::sanitize_filesystem_chars(artist);
+        let safe_al = utils::sanitize_filesystem_chars(album);
         self.directory_format
-            .replace("%a", artist)
-            .replace("%A", album)
+            .replace("%a", &safe_a)
+            .replace("%A", &safe_al)
     }
 }
 

@@ -99,6 +99,31 @@ fn test_config_format_directory() {
 }
 
 #[test]
+fn test_config_format_directory_windows_forbidden_chars() {
+    let config = Config::default();
+
+    let result = config.format_directory(
+        "Unknown Artist",
+        "Best Of Clair Obscur: Expedition 33 Soundtrack",
+    );
+    assert_eq!(
+        result,
+        "Unknown Artist - Best Of Clair Obscur_ Expedition 33 Soundtrack"
+    );
+}
+
+#[test]
+fn test_config_format_filename_sanitizes_artist_album_placeholders() {
+    let config = Config {
+        filename_format: "%a - %n - %t (%A)".to_string(),
+        ..Default::default()
+    };
+
+    let result = config.format_filename(1, "Track", "Artist: Name", "Album/Title");
+    assert_eq!(result, "Artist_ Name - 01 - Track (Album_Title)");
+}
+
+#[test]
 fn test_config_format_directory_custom() {
     let config = Config {
         directory_format: "%a/%A".to_string(),
