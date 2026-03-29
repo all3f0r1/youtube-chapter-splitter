@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.6] - 2026-03-29
+
+### Added
+- `sanitize_filesystem_chars` function to replace invalid characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) in filenames and directory names with safe equivalents
+
+### Changed
+- `Config::format_filename` and `Config::format_directory` now apply filesystem character sanitization to ensure safe output on all platforms
+
+### Fixed
+- Filenames and directory names derived from video titles no longer contain characters that are invalid on Windows/Linux/macOS filesystems
+
 ## [0.15.5] - 2026-03-27
 
 ### Added
