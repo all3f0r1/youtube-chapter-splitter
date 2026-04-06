@@ -1,22 +1,22 @@
 # YouTube Chapter Splitter (ytcs)
 
-A simple and powerful Rust CLI tool to download YouTube videos, extract audio to MP3, and automatically split them into individual tracks based on chapters.
+A simple and powerful Rust CLI tool to download YouTube videos, extract audio as **MP3, Opus, or M4A**, and automatically split them into individual tracks based on chapters.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.6-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.7-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
-- 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps)
+- 🎵 **Download YouTube audio** as MP3, Opus, or M4A at configurable bitrate (`audio_format` + `audio_quality` in config)
 - 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
 - 📑 **Chapter detection** — YouTube JSON chapters, then timestamps in the video description, then silence detection
-- 🎯 **Optional silence refinement** — snap chapter cuts to quiet gaps (`refine_chapters` in config or `--refine-chapters` on the CLI)
+- 🎯 **Optional silence refinement** — `refine_chapters` plus tunable window / dB / min-silence in config (or `--refine-chapters` on the CLI)
 - ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
 - 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
 - 📁 **Smart default output** to ~/Music directory (cross-platform)
 - 🎯 **Force artist/album names** with CLI options
-- 📋 **Playlist URLs** — `playlist_behavior` in config: single video (strip `list=`), full playlist, or ask each time
+- 📋 **Playlist URLs** — `playlist_behavior` in config: single video (strip `list=`), full playlist, or ask each time; optional `playlist_prefix_index` for `01-`… folder prefixes
 - 📝 **`.m3u` playlist** — optional `create_playlist` in config writes `playlist.m3u` after splitting
 - 🔁 **`overwrite_existing`** — config option controls replacing existing track files
 - ⚡ **Dependency checking** with automatic installation prompts
@@ -78,6 +78,10 @@ Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/c
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
 - `--refine-chapters` - Enable silence-based chapter refinement for this run (also available as `refine_chapters` in config)
+- `--dry-run` - Show target output folder and chapter plan only (no download or split)
+- `-q`, `--quiet` - Suppress tree/progress output (still prints each album output path on its own line)
+- `--no-cover` - Skip thumbnail download for this run (overrides `download_cover`)
+- `--skip-download` - Use existing `temp_audio.<ext>` in the album folder if non-empty instead of yt-dlp
 
 **Examples:**
 

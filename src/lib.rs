@@ -41,6 +41,11 @@
 //!         "Album Name",
 //!         None,
 //!         "%n - %t",
+//!         youtube_chapter_splitter::AudioFormat::Mp3,
+//!         192,
+//!         None,
+//!         None,
+//!         None,
 //!         true,
 //!         None,
 //!     )?;
@@ -80,7 +85,7 @@ pub mod ytdlp_error_parser;
 pub mod ytdlp_helper;
 
 pub use chapters::Chapter;
-pub use config::Config;
+pub use config::{AudioFormat, Config};
 pub use downloader::VideoInfo;
 pub use error::{MissingToolsError, Result, YtcsError};
 pub use ui::MetadataSource;

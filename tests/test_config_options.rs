@@ -1,4 +1,4 @@
-use youtube_chapter_splitter::config::Config;
+use youtube_chapter_splitter::config::{AudioFormat, Config};
 
 #[test]
 fn test_config_default_values() {
@@ -9,6 +9,8 @@ fn test_config_default_values() {
     assert_eq!(config.max_retries, 3);
     assert!(!config.create_playlist);
     assert!(!config.refine_chapters);
+    assert_eq!(config.audio_format, AudioFormat::Mp3);
+    assert!(!config.playlist_prefix_index);
     assert!(config.download_cover);
 }
 
@@ -145,6 +147,7 @@ fn test_config_serialization() {
     assert!(toml_str.contains("max_retries"));
     assert!(toml_str.contains("create_playlist"));
     assert!(toml_str.contains("refine_chapters"));
+    assert!(toml_str.contains("audio_format"));
 }
 
 #[test]

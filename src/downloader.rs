@@ -18,6 +18,12 @@ pub struct VideoInfo {
     pub video_id: String,
     /// Video description from yt-dlp (for chapter timestamps when JSON chapters are empty).
     pub description: Option<String>,
+    /// Upload date from yt-dlp (`upload_date`, often YYYYMMDD).
+    pub upload_date: Option<String>,
+    /// Comma-separated categories / tags when present.
+    pub genre: Option<String>,
+    /// Canonical watch URL for this video.
+    pub webpage_url: Option<String>,
 }
 
 /// Checks for required system dependencies.
@@ -173,6 +179,23 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         .as_str()
         .map(std::string::ToString::to_string);
 
+    let upload_date = data["upload_date"].as_str().map(str::to_string);
+
+    let genre = data["categories"].as_array().and_then(|arr| {
+        let parts: Vec<&str> = arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(", "))
+        }
+    });
+
+    let webpage_url = data["webpage_url"].as_str().map(str::to_string);
+
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
             parse_chapters_from_json(&json_str).unwrap_or_else(|_| Vec::new())
@@ -189,6 +212,9 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         chapters,
         video_id,
         description,
+        upload_date,
+        genre,
+        webpage_url,
     })
 }
 

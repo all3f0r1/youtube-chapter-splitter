@@ -20,6 +20,7 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct YtdlpDownloadOpts {
     pub audio_quality_kbps: u32,
+    pub audio_format: crate::config::AudioFormat,
     pub socket_timeout_secs: u64,
     pub retries: u32,
     pub ytdlp_auto_update_on_failure: bool,
@@ -29,6 +30,7 @@ impl Default for YtdlpDownloadOpts {
     fn default() -> Self {
         Self {
             audio_quality_kbps: 192,
+            audio_format: crate::config::AudioFormat::Mp3,
             socket_timeout_secs: 300,
             retries: 3,
             ytdlp_auto_update_on_failure: true,
@@ -40,6 +42,7 @@ impl From<&crate::config::Config> for YtdlpDownloadOpts {
     fn from(c: &crate::config::Config) -> Self {
         Self {
             audio_quality_kbps: c.audio_quality,
+            audio_format: c.audio_format,
             socket_timeout_secs: c.download_timeout,
             retries: c.max_retries,
             ytdlp_auto_update_on_failure: c.ytdlp_auto_update,
@@ -448,7 +451,7 @@ fn try_download_with_format(
         .arg(opts.retries.to_string())
         .arg("-x")
         .arg("--audio-format")
-        .arg("mp3")
+        .arg(opts.audio_format.yt_dlp_name())
         .arg("--audio-quality")
         .arg(format!("{}K", opts.audio_quality_kbps))
         .arg("-o")
@@ -558,7 +561,7 @@ fn try_download_with_format(
     }
 
     let mut final_path = output_path.to_path_buf();
-    final_path.set_extension("mp3");
+    final_path.set_extension(opts.audio_format.extension());
     Ok(final_path)
 }
 

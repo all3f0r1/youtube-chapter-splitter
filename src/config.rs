@@ -9,6 +9,30 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+/// Output container / codec for yt-dlp extraction and per-chapter ffmpeg encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AudioFormat {
+    #[default]
+    Mp3,
+    Opus,
+    M4a,
+}
+
+impl AudioFormat {
+    pub fn extension(self) -> &'static str {
+        match self {
+            AudioFormat::Mp3 => "mp3",
+            AudioFormat::Opus => "opus",
+            AudioFormat::M4a => "m4a",
+        }
+    }
+
+    pub fn yt_dlp_name(self) -> &'static str {
+        self.extension()
+    }
+}
+
 /// Playlist detection behavior
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +90,10 @@ pub struct Config {
     #[serde(default = "default_audio_quality")]
     pub audio_quality: u32,
 
+    /// Output format for downloaded audio and split tracks
+    #[serde(default)]
+    pub audio_format: AudioFormat,
+
     /// Overwrite existing files
     #[serde(default)]
     pub overwrite_existing: bool,
@@ -81,6 +109,22 @@ pub struct Config {
     /// Adjust chapter boundaries using silence detection (extra ffmpeg pass)
     #[serde(default)]
     pub refine_chapters: bool,
+
+    /// Search window (seconds, ±) for silence refinement around chapter edges
+    #[serde(default = "default_refine_silence_window")]
+    pub refine_silence_window: f64,
+
+    /// Noise threshold in dB for silence refinement
+    #[serde(default = "default_refine_noise_db")]
+    pub refine_noise_db: f64,
+
+    /// Minimum silence duration (seconds) for refinement pass
+    #[serde(default = "default_refine_min_silence")]
+    pub refine_min_silence: f64,
+
+    /// Prefix album folder with `01-`, `02-`, … when processing multiple playlist entries
+    #[serde(default)]
+    pub playlist_prefix_index: bool,
 
     /// Playlist detection behavior (default: VideoOnly for v1.0)
     #[serde(default)]
@@ -126,6 +170,18 @@ fn default_audio_quality() -> u32 {
     192
 }
 
+fn default_refine_silence_window() -> f64 {
+    5.0
+}
+
+fn default_refine_noise_db() -> f64 {
+    -35.0
+}
+
+fn default_refine_min_silence() -> f64 {
+    1.5
+}
+
 fn default_max_retries() -> u32 {
     3
 }
@@ -154,10 +210,15 @@ impl Default for Config {
             filename_format: "%n - %t".to_string(),
             directory_format: "%a - %A".to_string(),
             audio_quality: 192,
+            audio_format: AudioFormat::Mp3,
             overwrite_existing: false,
             max_retries: 3,
             create_playlist: false,
             refine_chapters: false,
+            refine_silence_window: 5.0,
+            refine_noise_db: -35.0,
+            refine_min_silence: 1.5,
+            playlist_prefix_index: false,
             playlist_behavior: PlaylistBehavior::VideoOnly, // Changed from Ask for v1.0
             cookies_from_browser: None,
             download_timeout: 300,
@@ -295,6 +356,7 @@ pub fn print_config_summary() -> Result<()> {
         "  audio_quality               = {} kbps",
         config.audio_quality
     );
+    println!("  audio_format                = {:?}", config.audio_format);
     println!(
         "  overwrite_existing          = {}",
         config.overwrite_existing
@@ -302,6 +364,19 @@ pub fn print_config_summary() -> Result<()> {
     println!("  max_retries                 = {}", config.max_retries);
     println!("  create_playlist             = {}", config.create_playlist);
     println!("  refine_chapters             = {}", config.refine_chapters);
+    println!(
+        "  refine_silence_window       = {} s",
+        config.refine_silence_window
+    );
+    println!("  refine_noise_db             = {}", config.refine_noise_db);
+    println!(
+        "  refine_min_silence          = {} s",
+        config.refine_min_silence
+    );
+    println!(
+        "  playlist_prefix_index       = {}",
+        config.playlist_prefix_index
+    );
     println!(
         "  playlist_behavior           = {:?}",
         config.playlist_behavior
@@ -439,6 +514,24 @@ pub fn run_interactive_config_wizard() -> Result<()> {
     );
     config.audio_quality = parse_audio_quality(&input, aq)?;
 
+    println!("Audio output format");
+    println!("  1 = mp3 (default)  2 = opus  3 = m4a");
+    print!("  [default: {:?}] > ", config.audio_format);
+    io::stdout().flush().ok();
+    let af_in = read_line_trimmed();
+    if !af_in.is_empty() {
+        config.audio_format = match af_in.as_str() {
+            "1" => AudioFormat::Mp3,
+            "2" => AudioFormat::Opus,
+            "3" => AudioFormat::M4a,
+            _ => {
+                return Err(YtcsError::ConfigError(
+                    "Enter 1, 2, or 3 (or leave empty to keep)".to_string(),
+                ));
+            }
+        };
+    }
+
     let oe = config.overwrite_existing;
     let input = prompt_line(
         "Overwrite existing files",
@@ -475,6 +568,42 @@ pub fn run_interactive_config_wizard() -> Result<()> {
     );
     config.refine_chapters = parse_bool_input(&input, rc)?;
 
+    let rw = config.refine_silence_window;
+    let input = prompt_line(
+        "Refine silence search window (seconds)",
+        "± seconds around each chapter edge to look for a quiet cut.",
+        &format!("{}", rw),
+    );
+    if !input.is_empty() {
+        config.refine_silence_window = input.parse().map_err(|_| {
+            YtcsError::ConfigError("refine_silence_window must be a number".to_string())
+        })?;
+    }
+
+    let rnd = config.refine_noise_db;
+    let input = prompt_line(
+        "Refine silence noise threshold (dB)",
+        "Typical: -30 to -50 (more negative = stricter silence).",
+        &format!("{}", rnd),
+    );
+    if !input.is_empty() {
+        config.refine_noise_db = input
+            .parse()
+            .map_err(|_| YtcsError::ConfigError("refine_noise_db must be a number".to_string()))?;
+    }
+
+    let rms = config.refine_min_silence;
+    let input = prompt_line(
+        "Refine minimum silence duration (seconds)",
+        "Minimum length of a gap to treat as silence for refinement.",
+        &format!("{}", rms),
+    );
+    if !input.is_empty() {
+        config.refine_min_silence = input.parse().map_err(|_| {
+            YtcsError::ConfigError("refine_min_silence must be a number".to_string())
+        })?;
+    }
+
     println!("Playlist behavior when a playlist URL is used");
     println!("  1 = ask  2 = video_only (default)  3 = playlist_only");
     print!("  [default: {:?}] > ", config.playlist_behavior);
@@ -492,6 +621,14 @@ pub fn run_interactive_config_wizard() -> Result<()> {
             }
         };
     }
+
+    let ppi = config.playlist_prefix_index;
+    let input = prompt_line(
+        "Prefix folder with playlist index (01-, 02-, …)",
+        "y/n — when downloading multiple videos from a playlist, avoid folder name clashes.",
+        &format!("{}", ppi),
+    );
+    config.playlist_prefix_index = parse_bool_input(&input, ppi)?;
 
     let cb_disp = config
         .cookies_from_browser

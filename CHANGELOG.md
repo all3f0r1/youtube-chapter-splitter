@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.7] - 2026-04-06
+
+### Added
+- Config `audio_format`: **mp3** (default), **opus**, or **m4a** for yt-dlp extraction and ffmpeg per-track encoding; `audio_quality` kbps applies to all three.
+- Config `refine_silence_window`, `refine_noise_db`, `refine_min_silence` for silence-based chapter refinement (wizard + `ytcs config --show`).
+- Config `playlist_prefix_index`: prefix album folders with `01-`, `02-`, … when processing multiple playlist videos.
+- CLI: `--dry-run` (output path + chapter plan without download), `-q` / `--quiet` (minimal UI; still prints output folder path per album), `--no-cover`, `--skip-download` (reuse non-empty `temp_audio.<ext>` in the album folder).
+- `VideoInfo`: `upload_date`, `genre` (from categories), `webpage_url`; embedded in split tracks as `date`, `genre`, `comment` via ffmpeg when present.
+- `utils::upload_date_to_id3_date` (YYYYMMDD → YYYY-MM-DD).
+- `log::info` lines for playlist resolution and refinement; `ui::set_output_quiet` / `is_output_quiet`.
+
+### Changed
+- Temporary download path is `temp_audio.<ext>` matching `audio_format`.
+- `YtdlpDownloadOpts` includes `audio_format`.
+
 ## [0.15.6] - 2026-03-29
 
 ### Added

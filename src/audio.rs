@@ -4,6 +4,7 @@
 //! and adding ID3 metadata with album cover art.
 
 use crate::chapters::Chapter;
+use crate::config::AudioFormat;
 use crate::error::{Result, YtcsError};
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
@@ -40,7 +41,10 @@ pub type TrackProgressCallback =
 /// * `album` - The album name
 /// * `cover_path` - Optional path to the cover image
 /// * `filename_format` - Template with `%n`, `%t`, `%a`, `%A` (same as config `filename_format`)
+/// * `audio_format` - Output codec/container per track
+/// * `audio_bitrate_kbps` - Target bitrate for lossy encodes
 /// * `overwrite_existing` - If false, fail when a target track file already exists
+/// * `extra_date` / `extra_genre` / `extra_comment` - Optional ffmpeg metadata (e.g. ID3)
 /// * `progress_callback` - Optional callback for track-by-track progress
 ///
 /// # Returns
@@ -59,6 +63,11 @@ pub fn split_audio_by_chapters(
     album: &str,
     cover_path: Option<&Path>,
     filename_format: &str,
+    audio_format: AudioFormat,
+    audio_bitrate_kbps: u32,
+    extra_date: Option<&str>,
+    extra_genre: Option<&str>,
+    extra_comment: Option<&str>,
     overwrite_existing: bool,
     progress_callback: Option<TrackProgressCallback>,
 ) -> Result<Vec<PathBuf>> {
@@ -83,7 +92,7 @@ pub fn split_audio_by_chapters(
             artist,
             album,
         );
-        let output_filename = format!("{}.mp3", base_name);
+        let output_filename = format!("{}.{}", base_name, audio_format.extension());
         let output_path = output_dir.join(&output_filename);
 
         if output_path.exists() && !overwrite_existing {
@@ -102,20 +111,43 @@ pub fn split_audio_by_chapters(
             .arg("-ss")
             .arg(chapter.start_time.to_string())
             .arg("-t")
-            .arg(duration.to_string())
-            .arg("-c:a")
-            .arg("libmp3lame")
-            .arg("-q:a")
-            .arg("0")
-            .arg("-metadata")
+            .arg(duration.to_string());
+
+        match audio_format {
+            AudioFormat::Mp3 => {
+                cmd.arg("-c:a").arg("libmp3lame");
+                cmd.arg("-b:a").arg(format!("{}k", audio_bitrate_kbps));
+            }
+            AudioFormat::Opus => {
+                cmd.arg("-c:a").arg("libopus");
+                cmd.arg("-b:a").arg(format!("{}k", audio_bitrate_kbps));
+            }
+            AudioFormat::M4a => {
+                cmd.arg("-c:a").arg("aac");
+                cmd.arg("-b:a").arg(format!("{}k", audio_bitrate_kbps));
+            }
+        }
+
+        cmd.arg("-metadata")
             .arg(format!("title={}", chapter.title))
             .arg("-metadata")
             .arg(format!("artist={}", artist))
             .arg("-metadata")
             .arg(format!("album={}", album))
             .arg("-metadata")
-            .arg(format!("track={}/{}", track_number, chapters.len()))
-            .arg(if overwrite_existing { "-y" } else { "-n" })
+            .arg(format!("track={}/{}", track_number, chapters.len()));
+
+        if let Some(d) = extra_date {
+            cmd.arg("-metadata").arg(format!("date={}", d));
+        }
+        if let Some(g) = extra_genre {
+            cmd.arg("-metadata").arg(format!("genre={}", g));
+        }
+        if let Some(c) = extra_comment {
+            cmd.arg("-metadata").arg(format!("comment={}", c));
+        }
+
+        cmd.arg(if overwrite_existing { "-y" } else { "-n" })
             .arg(&output_path);
 
         let output = cmd
@@ -256,7 +288,9 @@ pub fn detect_silence_chapters(
     silence_threshold: f64,
     min_silence_duration: f64,
 ) -> Result<Vec<Chapter>> {
-    println!("Detecting silence to identify tracks...");
+    if !crate::ui::is_output_quiet() {
+        println!("Detecting silence to identify tracks...");
+    }
 
     let output = Command::new("ffmpeg")
         .arg("-i")
@@ -321,7 +355,9 @@ pub fn detect_silence_chapters(
         duration,
     ));
 
-    println!("✓ {} tracks detected", chapters.len());
+    if !crate::ui::is_output_quiet() {
+        println!("✓ {} tracks detected", chapters.len());
+    }
     Ok(chapters)
 }
 
