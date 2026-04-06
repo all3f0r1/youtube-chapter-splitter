@@ -9,6 +9,22 @@
 
 use colored::*;
 use std::io::{self, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static OUTPUT_QUIET: AtomicBool = AtomicBool::new(false);
+
+/// When true, suppresses normal progress / tree output (errors still print to stderr elsewhere).
+pub fn set_output_quiet(quiet: bool) {
+    OUTPUT_QUIET.store(quiet, Ordering::Relaxed);
+}
+
+pub fn is_output_quiet() -> bool {
+    OUTPUT_QUIET.load(Ordering::Relaxed)
+}
+
+fn skip_ui_output() -> bool {
+    is_output_quiet()
+}
 
 /// Source of metadata (artist/album)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,11 +54,17 @@ impl MetadataSource {
 
 /// Print a blank line for explicit section separation
 pub fn print_blank_line() {
+    if skip_ui_output() {
+        return;
+    }
     println!();
 }
 
 /// Display minimal header (version only)
 pub fn print_header() {
+    if skip_ui_output() {
+        return;
+    }
     println!(
         "{}",
         format!("ytcs v{}", env!("CARGO_PKG_VERSION")).dimmed()
@@ -52,21 +74,33 @@ pub fn print_header() {
 
 /// Display section header with tree arrow (bold only, no color)
 pub fn print_section_header(title: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!("{} {}", "▶".bold(), title.bold());
 }
 
 /// Display a tree item line with aligned label (non-last)
 pub fn print_tree_item(label: &str, value: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!("  ├─ {:<10} {}", label.bright_black().bold(), value);
 }
 
 /// Display the last tree item line with aligned label
 pub fn print_tree_item_last(label: &str, value: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!("  └─ {:<10} {}", label.bright_black().bold(), value);
 }
 
 /// Display a tree item with extra info (non-last)
 pub fn print_tree_item_with_extra(label: &str, value: &str, extra: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!(
         "  ├─ {:<10} {} ({})",
         label.bright_black().bold(),
@@ -77,6 +111,9 @@ pub fn print_tree_item_with_extra(label: &str, value: &str, extra: &str) {
 
 /// Display the last tree item with extra info
 pub fn print_tree_item_last_with_extra(label: &str, value: &str, extra: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!(
         "  └─ {:<10} {} ({})",
         label.bright_black().bold(),
@@ -95,6 +132,9 @@ pub fn print_video_metadata_tree(
     artist_source: MetadataSource,
     album_source: MetadataSource,
 ) {
+    if skip_ui_output() {
+        return;
+    }
     // Main title line (using artist - album as display)
     let display_title = format!("{} - {}", artist, album);
     println!("{} {}", "▶".bold(), display_title.bold());
@@ -150,6 +190,9 @@ pub fn prompt_metadata(
 /// Print a single track during splitting (progressive output)
 /// Aligns durations vertically by padding the track number
 pub fn print_track_progress(index: usize, total: usize, title: &str, duration: &str) {
+    if skip_ui_output() {
+        return;
+    }
     let is_last = index == total;
     let prefix = if is_last { "  └─" } else { "  ├─" };
 
@@ -163,6 +206,9 @@ pub fn print_track_progress(index: usize, total: usize, title: &str, duration: &
 
 /// Display artwork download section in tree style
 pub fn print_artwork_section(filename: &str) {
+    if skip_ui_output() {
+        return;
+    }
     println!();
     print_section_header("Downloading artwork");
     if !filename.is_empty() {
@@ -175,29 +221,45 @@ pub fn print_artwork_section(filename: &str) {
 
 /// Display audio download section header
 pub fn print_audio_section_header() {
+    if skip_ui_output() {
+        return;
+    }
     println!();
     print_section_header("Downloading audio");
 }
 
 /// Display audio download complete (no blank line before)
 pub fn print_audio_complete(filename: &str) {
+    if skip_ui_output() {
+        return;
+    }
     // No blank line before, just print the saved path
     println!("  └─ Saved {}", filename);
 }
 
 /// Display splitting section header
 pub fn print_splitting_section_header(tracks_count: usize) {
+    if skip_ui_output() {
+        return;
+    }
     println!();
     print_section_header(&format!("Splitting into {} tracks", tracks_count));
 }
 
 /// Display splitting completion message
 pub fn print_splitting_complete() {
+    if skip_ui_output() {
+        return;
+    }
     println!("{} Splitting achieved", "✓".bold());
 }
 
 /// Display final success with output directory
 pub fn print_final_result(output_dir: &std::path::Path) {
+    if skip_ui_output() {
+        println!("{}", output_dir.display());
+        return;
+    }
     println!();
     println!("{} {}", "✓".bold(), output_dir.display());
     println!();

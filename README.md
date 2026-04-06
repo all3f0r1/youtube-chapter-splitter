@@ -1,23 +1,26 @@
 # YouTube Chapter Splitter (ytcs)
 
-A simple and powerful Rust CLI tool to download YouTube videos, extract audio to MP3, and automatically split them into individual tracks based on chapters.
+A simple and powerful Rust CLI tool to download YouTube videos, extract audio as **MP3, Opus, or M4A**, and automatically split them into individual tracks based on chapters.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.5-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.7-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
-- 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps)
+- 🎵 **Download YouTube audio** as MP3, Opus, or M4A at configurable bitrate (`audio_format` + `audio_quality` in config)
 - 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
-- 📑 **Automatic chapter detection** from YouTube video metadata
-- 🔇 **Silence detection fallback** for videos without chapters
+- 📑 **Chapter detection** — YouTube JSON chapters, then timestamps in the video description, then silence detection
+- 🎯 **Silence refinement** — on by default (`refine_chapters`); tunable window / dB / min-silence in config; `--refine-chapters` forces it on for a run if you turned it off in config
 - ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
 - 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
 - 📁 **Smart default output** to ~/Music directory (cross-platform)
 - 🎯 **Force artist/album names** with CLI options
+- 📋 **Playlist URLs** — `playlist_behavior` in config: single video (strip `list=`), full playlist, or ask each time; optional `playlist_prefix_index` for `01-`… folder prefixes
+- 📝 **`.m3u` playlist** — optional `create_playlist` in config writes `playlist.m3u` after splitting
+- 🔁 **`overwrite_existing`** — config option controls replacing existing track files
 - ⚡ **Dependency checking** with automatic installation prompts
-- 🧹 **URL cleaning** - automatically removes playlist and extra parameters
+- 🧹 **Canonical watch URLs** — `youtu.be` and `watch?v=` are normalized via the video ID
 - 🪶 **Lightweight binary** (6.3 MB) with minimal dependencies
 
 ## 🚀 Quick Start
@@ -74,6 +77,11 @@ Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/c
 - `-o, --output <DIR>` - Output directory (overrides `default_output_dir` in config)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
+- `--refine-chapters` - Force silence-based chapter refinement for this run (default in config is on; set `refine_chapters = false` to skip the extra ffmpeg pass)
+- `--dry-run` - Show target output folder and chapter plan only (no download or split)
+- `-q`, `--quiet` - Suppress tree/progress output (still prints each album output path on its own line)
+- `--no-cover` - Skip thumbnail download for this run (overrides `download_cover`)
+- `--skip-download` - Use existing `temp_audio.<ext>` in the album folder if non-empty instead of yt-dlp
 
 **Examples:**
 
@@ -87,9 +95,11 @@ ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
 # Force artist and album names
 ytcs "https://www.youtube.com/watch?v=..." -a "Pink Floyd" -A "Dark Side of the Moon"
 
-# URL cleaning works automatically (removes &list=, &start_radio=, etc.)
+# With default playlist_behavior (video_only), only the current video is used even if list= is present
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA&list=RD28vf7QxgCzA&start_radio=1"
 ```
+
+Use `ytcs config` and set **playlist behavior** to `playlist_only` (or `ask`) to download every entry from a playlist URL. Plain `youtube.com/playlist?list=…` links require `playlist_only` or answering **y** when prompted.
 
 **Important:** Always put URLs in quotes to avoid shell interpretation of special characters:
 ```bash

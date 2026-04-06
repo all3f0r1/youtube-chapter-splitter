@@ -4,8 +4,10 @@ use youtube_chapter_splitter::playlist::*;
 #[test]
 fn test_is_playlist_url_with_playlist() {
     let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
-    // Always returns None (video only mode)
-    assert!(is_playlist_url(url).is_none());
+    assert_eq!(
+        is_playlist_url(url).as_deref(),
+        Some("PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf")
+    );
 }
 
 #[test]
@@ -17,8 +19,10 @@ fn test_is_playlist_url_without_playlist() {
 #[test]
 fn test_is_playlist_url_playlist_only() {
     let url = "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf";
-    // Always returns None (video only mode)
-    assert!(is_playlist_url(url).is_none());
+    assert_eq!(
+        is_playlist_url(url).as_deref(),
+        Some("PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf")
+    );
 }
 
 #[test]

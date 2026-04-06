@@ -66,6 +66,12 @@ fn main() -> youtube_chapter_splitter::Result<()> {
         &album,
         cover_path.as_deref(),
         "%n - %t",
+        youtube_chapter_splitter::AudioFormat::Mp3,
+        192,
+        None,
+        None,
+        None,
+        true,
         None,
     )?;
 

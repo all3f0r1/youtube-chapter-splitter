@@ -317,6 +317,20 @@ pub fn sanitize_title(title: &str) -> String {
     to_title_case(&sanitized)
 }
 
+/// Converts yt-dlp `upload_date` (YYYYMMDD) to `YYYY-MM-DD` for tag `date` fields.
+pub fn upload_date_to_id3_date(upload_date: &str) -> Option<String> {
+    if upload_date.len() == 8 && upload_date.chars().all(|c| c.is_ascii_digit()) {
+        Some(format!(
+            "{}-{}-{}",
+            &upload_date[0..4],
+            &upload_date[4..6],
+            &upload_date[6..8]
+        ))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,6 +380,15 @@ mod tests {
             ),
             "Aurion - A Fire That Doesn't Burn"
         );
+    }
+
+    #[test]
+    fn test_upload_date_to_id3_date() {
+        assert_eq!(
+            upload_date_to_id3_date("20240315").as_deref(),
+            Some("2024-03-15")
+        );
+        assert!(upload_date_to_id3_date("bad").is_none());
     }
 
     #[test]

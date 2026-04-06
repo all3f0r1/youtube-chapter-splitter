@@ -38,13 +38,13 @@ This is a Rust CLI tool (`ytcs`) that downloads YouTube videos, extracts audio a
 
 The main entry point orchestrates the download and processing (`ytcs <URL>`) or configuration (`ytcs config` / `ytcs config --show`):
 
-1. **Dependency check** - Verifies yt-dlp and ffmpeg are installed (behavior from `dependency_auto_install` in config)
-2. **URL cleaning** - Extracts video ID, removes playlist parameters
-3. **Video info fetch** - Gets metadata via yt-dlp
+1. **Dependency check** - Verifies yt-dlp and ffmpeg are installed (behavior from `dependency_auto_install` in config). Missing tools are reported as `YtcsError::MissingTools` (`MissingToolsError` with `missing_ytdlp` / `missing_ffmpeg` flags).
+2. **URL resolution** - `playlist::is_playlist_url` + `playlist_behavior` (`VideoOnly` / `Ask` / `PlaylistOnly`): single canonical `watch?v=` URL or a list of URLs from `get_playlist_info`. Plain playlist-only pages need `PlaylistOnly` or user confirmation when `Ask`.
+3. **Video info fetch** - Gets metadata via yt-dlp (`VideoInfo` includes optional `description` for description-based chapters)
 4. **Output directory setup** - Creates target folder using `directory_format` and config output base (CLI `-o` overrides)
-5. **Download assets** - Downloads thumbnail (if `download_cover`) and audio (cookies, bitrate, timeouts from config)
-6. **Chapter detection** - 3-step fallback: YouTube chapters → description parsing → silence detection
-7. **Track splitting** - Uses ffmpeg to split and add metadata
+5. **Download assets** - Thumbnail if `download_cover` (unless `--no-cover`); audio via yt-dlp using `audio_format` (mp3/opus/m4a), `audio_quality`, cookies, timeouts. Optional `--skip-download` reuses `temp_audio.<ext>`.
+6. **Chapter detection** - YouTube JSON chapters → `chapters_from_description` (if at least 2 markers) → `detect_silence_chapters`. If chapters came from JSON or description, `chapter_refinement::refine_chapters_with_silence` runs by default (`refine_chapters` true); disable in config or rely on silence-only path skipping refinement. Uses `refine_silence_window`, `refine_noise_db`, `refine_min_silence` (defaults ±5s, -35 dB, 1.2s).
+7. **Track splitting** - ffmpeg encodes per `audio_format` and `audio_quality`; embeds date/genre/comment when `VideoInfo` provides them. Honors `overwrite_existing`. If `create_playlist`, writes `playlist.m3u` via `audio::write_m3u_playlist`. CLI: `--dry-run`, `-q`/`--quiet` via `ui::set_output_quiet`.
 
 ### Key Modules
 
@@ -52,12 +52,12 @@ The main entry point orchestrates the download and processing (`ytcs <URL>`) or 
 - **`audio.rs`** - Uses `ffmpeg` for splitting audio and `lofty` for ID3 metadata/cover art embedding. Handles WebP→JPEG conversion for thumbnails.
 - **`chapters.rs`** - Core `Chapter` struct with `start_time`, `end_time`, `title`. Parses JSON chapters from yt-dlp.
 - **`chapters_from_description.rs`** - Parses chapter timestamps from video descriptions (multiple formats: "00:00 - Title", "1. Title (0:00)")
-- **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection for precise split points. Uses ffmpeg's silencedetect to find optimal boundaries within ±5 second windows.
+- **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection; window/threshold/duration come from config (defaults ±5s, -35 dB, 1.2s min silence).
 - **`config.rs`** - TOML config at `~/.config/ytcs/config.toml`, edited via `ytcs config` (interactive wizard) or manually. `print_config_summary` / `run_interactive_config_wizard`. Format strings `%n`, `%t`, `%a`, `%A`.
-- **`error.rs`** - `YtcsError` enum covering all error types with `thiserror`.
+- **`error.rs`** - `YtcsError` enum with `thiserror`; structured `MissingToolsError` for dependency install flows.
 - **`temp_file.rs`** - RAII wrapper for automatic cleanup of temporary files.
 - **`cookie_helper.rs`** - YouTube authentication via browser cookies (for member-only/private videos).
-- **`playlist.rs`** - Playlist URL detection and video enumeration. Note: Currently defaults to "video only" mode.
+- **`playlist.rs`** - `is_playlist_url`, `get_playlist_info`, `remove_playlist_param`; behavior driven by config `playlist_behavior`.
 - **`progress.rs`** - Progress bar utilities using `indicatif`.
 - **`yt_dlp_progress.rs`** - Real-time download progress parsing from yt-dlp stderr output.
 - **`ytdlp_error_parser.rs`** - Parses yt-dlp error messages for user-friendly reporting.
@@ -65,7 +65,7 @@ The main entry point orchestrates the download and processing (`ytcs <URL>`) or 
 - **`yt_dlp_update.rs`** - Auto-update functionality.
 - **`dependency/`** - Dependency detection and installation modules.
 - **`error_handler.rs`** - Centralized error handling for user-facing error messages.
-- **`ui.rs`** - Minimalist CLI output utilities with "Pragmatic • Direct • Classy" design philosophy.
+- **`ui.rs`** - Minimalist CLI output; `set_output_quiet` / `is_output_quiet` for `-q` mode.
 
 ### RAII Pattern for Temporary Files
 
@@ -110,7 +110,7 @@ Config file: `~/.config/ytcs/config.toml` (created on first `Config::load()` or 
 
 Edit with **`ytcs config`** (prompts for each field; Enter keeps current). **`ytcs config --show`** prints the file path and all values.
 
-Key settings include: `default_output_dir`, `filename_format`, `directory_format`, `audio_quality` (128/192/320), `download_cover`, `cookies_from_browser`, `download_timeout`, `max_retries`, `dependency_auto_install`, `ytdlp_auto_update`.
+Key settings include: `default_output_dir`, `filename_format`, `directory_format`, `audio_quality` (128/192/320), `audio_format` (mp3/opus/m4a), `download_cover`, `overwrite_existing`, `create_playlist`, `refine_chapters`, `refine_silence_window`, `refine_noise_db`, `refine_min_silence`, `playlist_prefix_index`, `playlist_behavior`, `cookies_from_browser`, `download_timeout`, `max_retries`, `dependency_auto_install`, `ytdlp_auto_update`.
 
 ### Debugging
 

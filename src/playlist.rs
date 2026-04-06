@@ -2,7 +2,7 @@
 //!
 //! This module detects if a URL is a playlist and extracts videos.
 //!
-//! **Note**: By default, all URLs are treated as single videos (mode "video only").
+//! Playlist handling is driven by config `playlist_behavior` (`VideoOnly`, `Ask`, `PlaylistOnly`).
 
 use crate::cookie_helper;
 use crate::error::{Result, YtcsError};
@@ -39,22 +39,30 @@ pub struct PlaylistInfo {
     pub videos: Vec<PlaylistVideo>,
 }
 
-/// Check if a URL contains a playlist
+/// Returns the playlist `list` id when the URL references a YouTube playlist.
 ///
-/// **IMPORTANT**: Always returns None to treat all URLs as single videos.
-/// This is the default behavior - playlist downloads are not supported in TUI mode.
-/// To download a playlist, users should use individual video URLs.
-///
-/// # Arguments
-///
-/// * `url` - The URL to check (not used, always returns None)
-///
-/// # Returns
-///
-/// Always `None` - all URLs are treated as single videos
-pub fn is_playlist_url(_url: &str) -> Option<String> {
-    // Always return None - treat all URLs as single videos
-    // This implements the "video only" default behavior
+/// Detects `list=` on watch URLs and `/playlist?list=` playlist-only URLs.
+/// Plain `watch?v=` URLs without `list=` return `None`.
+pub fn is_playlist_url(url: &str) -> Option<String> {
+    let lower = url.to_lowercase();
+    if lower.contains("youtube.com/playlist") || lower.contains("music.youtube.com/playlist") {
+        return extract_list_query_param(url);
+    }
+    if lower.contains("list=") {
+        return extract_list_query_param(url);
+    }
+    None
+}
+
+fn extract_list_query_param(url: &str) -> Option<String> {
+    for segment in url.split(['?', '&']) {
+        if let Some(rest) = segment.strip_prefix("list=")
+            && !rest.is_empty()
+        {
+            let id = rest.split('&').next().unwrap_or(rest);
+            return Some(id.to_string());
+        }
+    }
     None
 }
 
@@ -209,26 +217,32 @@ mod tests {
 
     #[test]
     fn test_is_playlist_url() {
-        // All URLs are now treated as single videos (video only behavior)
-        assert!(is_playlist_url(
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
-        )
-        .is_none());
-        assert!(
+        assert_eq!(
+            is_playlist_url(
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
+            )
+            .as_deref(),
+            Some("PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf")
+        );
+        assert_eq!(
             is_playlist_url(
                 "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf"
             )
-            .is_none()
+            .as_deref(),
+            Some("PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf")
         );
         assert!(is_playlist_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ").is_none());
-        // All playlist URLs are treated as single videos
-        assert!(
+        assert_eq!(
             is_playlist_url(
                 "https://www.youtube.com/watch?v=Kx0wf6xqzWg&list=RDKx0wf6xqzWg&start_radio=1"
             )
-            .is_none()
+            .as_deref(),
+            Some("RDKx0wf6xqzWg")
         );
-        assert!(is_playlist_url("https://www.youtube.com/watch?v=abc&list=RDMM12345").is_none());
+        assert_eq!(
+            is_playlist_url("https://www.youtube.com/watch?v=abc&list=RDMM12345").as_deref(),
+            Some("RDMM12345")
+        );
     }
 
     #[test]

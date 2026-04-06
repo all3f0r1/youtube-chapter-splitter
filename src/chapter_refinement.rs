@@ -26,7 +26,7 @@
 //!     &audio_file,
 //!     5.0,  // window of ±5 seconds
 //!     -35.0, // silence threshold
-//!     1.5,  // minimum silence duration
+//!     1.2,  // minimum silence duration
 //! )?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
