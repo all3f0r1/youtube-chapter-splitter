@@ -66,6 +66,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
         &album,
         cover_path.as_deref(),
         "%n - %t",
+        true,
         None,
     )?;
 

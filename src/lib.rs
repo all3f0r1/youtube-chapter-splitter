@@ -41,6 +41,7 @@
 //!         "Album Name",
 //!         None,
 //!         "%n - %t",
+//!         true,
 //!         None,
 //!     )?;
 //!
@@ -81,5 +82,5 @@ pub mod ytdlp_helper;
 pub use chapters::Chapter;
 pub use config::Config;
 pub use downloader::VideoInfo;
-pub use error::{Result, YtcsError};
+pub use error::{MissingToolsError, Result, YtcsError};
 pub use ui::MetadataSource;

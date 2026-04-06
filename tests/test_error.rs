@@ -1,4 +1,4 @@
-use youtube_chapter_splitter::YtcsError;
+use youtube_chapter_splitter::{MissingToolsError, YtcsError};
 
 #[test]
 fn test_error_display() {
@@ -27,7 +27,10 @@ fn test_error_types() {
         YtcsError::AudioError("test".to_string()),
         YtcsError::ChapterError("test".to_string()),
         YtcsError::InvalidUrl("test".to_string()),
-        YtcsError::MissingTool("test".to_string()),
+        YtcsError::MissingTools(MissingToolsError {
+            missing_ytdlp: true,
+            missing_ffmpeg: true,
+        }),
         YtcsError::Other("test".to_string()),
     ];
 
@@ -52,4 +55,30 @@ fn test_result_error() {
     }
 
     assert!(returns_error().is_err());
+}
+
+#[test]
+fn test_missing_tools_error_tools_to_install() {
+    assert!(MissingToolsError {
+        missing_ytdlp: true,
+        missing_ffmpeg: false,
+    }
+    .tools_to_install()
+    .contains(&"yt-dlp"));
+    assert_eq!(
+        MissingToolsError {
+            missing_ytdlp: false,
+            missing_ffmpeg: true,
+        }
+        .tools_to_install(),
+        vec!["ffmpeg"]
+    );
+    assert_eq!(
+        MissingToolsError {
+            missing_ytdlp: true,
+            missing_ffmpeg: true,
+        }
+        .tools_to_install(),
+        vec!["yt-dlp", "ffmpeg"]
+    );
 }

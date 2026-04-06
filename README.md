@@ -4,20 +4,23 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio to
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.5-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.6-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
 - 🎵 **Download YouTube audio** in high-quality MP3 format (192 kbps)
 - 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
-- 📑 **Automatic chapter detection** from YouTube video metadata
-- 🔇 **Silence detection fallback** for videos without chapters
+- 📑 **Chapter detection** — YouTube JSON chapters, then timestamps in the video description, then silence detection
+- 🎯 **Optional silence refinement** — snap chapter cuts to quiet gaps (`refine_chapters` in config or `--refine-chapters` on the CLI)
 - ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
 - 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
 - 📁 **Smart default output** to ~/Music directory (cross-platform)
 - 🎯 **Force artist/album names** with CLI options
+- 📋 **Playlist URLs** — `playlist_behavior` in config: single video (strip `list=`), full playlist, or ask each time
+- 📝 **`.m3u` playlist** — optional `create_playlist` in config writes `playlist.m3u` after splitting
+- 🔁 **`overwrite_existing`** — config option controls replacing existing track files
 - ⚡ **Dependency checking** with automatic installation prompts
-- 🧹 **URL cleaning** - automatically removes playlist and extra parameters
+- 🧹 **Canonical watch URLs** — `youtu.be` and `watch?v=` are normalized via the video ID
 - 🪶 **Lightweight binary** (6.3 MB) with minimal dependencies
 
 ## 🚀 Quick Start
@@ -74,6 +77,7 @@ Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/c
 - `-o, --output <DIR>` - Output directory (overrides `default_output_dir` in config)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
+- `--refine-chapters` - Enable silence-based chapter refinement for this run (also available as `refine_chapters` in config)
 
 **Examples:**
 
@@ -87,9 +91,11 @@ ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA" --output ~/Downloads
 # Force artist and album names
 ytcs "https://www.youtube.com/watch?v=..." -a "Pink Floyd" -A "Dark Side of the Moon"
 
-# URL cleaning works automatically (removes &list=, &start_radio=, etc.)
+# With default playlist_behavior (video_only), only the current video is used even if list= is present
 ytcs "https://www.youtube.com/watch?v=28vf7QxgCzA&list=RD28vf7QxgCzA&start_radio=1"
 ```
+
+Use `ytcs config` and set **playlist behavior** to `playlist_only` (or `ask`) to download every entry from a playlist URL. Plain `youtube.com/playlist?list=…` links require `playlist_only` or answering **y** when prompted.
 
 **Important:** Always put URLs in quotes to avoid shell interpretation of special characters:
 ```bash

@@ -92,6 +92,7 @@ mod integration_e2e_tests {
             &album,
             cover_path.as_deref(),
             "%n - %t",
+            true,
             None,
         )
         .unwrap();

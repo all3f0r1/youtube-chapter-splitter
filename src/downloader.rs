@@ -4,7 +4,7 @@
 //! and extract their metadata (title, duration, chapters).
 
 use crate::chapters::{Chapter, parse_chapters_from_json};
-use crate::error::{Result, YtcsError};
+use crate::error::{MissingToolsError, Result, YtcsError};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -16,12 +16,8 @@ pub struct VideoInfo {
     pub duration: f64,
     pub chapters: Vec<Chapter>,
     pub video_id: String,
-}
-
-/// Information about a missing system dependency.
-pub struct MissingDependency {
-    pub tool: String,
-    pub install_command: String,
+    /// Video description from yt-dlp (for chapter timestamps when JSON chapters are empty).
+    pub description: Option<String>,
 }
 
 /// Checks for required system dependencies.
@@ -34,36 +30,14 @@ pub struct MissingDependency {
 ///
 /// Returns an error if `yt-dlp` or `ffmpeg` are missing
 pub fn check_dependencies() -> Result<()> {
-    let mut missing = Vec::new();
+    let missing_ytdlp = Command::new("yt-dlp").arg("--version").output().is_err();
+    let missing_ffmpeg = Command::new("ffmpeg").arg("-version").output().is_err();
 
-    // Check yt-dlp
-    if Command::new("yt-dlp").arg("--version").output().is_err() {
-        missing.push(MissingDependency {
-            tool: "yt-dlp".to_string(),
-            install_command: "pip install yt-dlp".to_string(),
-        });
-    }
-
-    // Check ffmpeg
-    if Command::new("ffmpeg").arg("-version").output().is_err() {
-        missing.push(MissingDependency {
-            tool: "ffmpeg".to_string(),
-            install_command: if cfg!(target_os = "linux") {
-                "sudo apt install ffmpeg".to_string()
-            } else if cfg!(target_os = "macos") {
-                "brew install ffmpeg".to_string()
-            } else {
-                "Download from https://ffmpeg.org/download.html".to_string()
-            },
-        });
-    }
-
-    if !missing.is_empty() {
-        let mut error_msg = String::from("Missing dependencies:\n");
-        for dep in &missing {
-            error_msg.push_str(&format!("  - {}: {}\n", dep.tool, dep.install_command));
-        }
-        return Err(YtcsError::MissingTool(error_msg));
+    if missing_ytdlp || missing_ffmpeg {
+        return Err(YtcsError::MissingTools(MissingToolsError {
+            missing_ytdlp,
+            missing_ffmpeg,
+        }));
     }
 
     Ok(())
@@ -195,6 +169,10 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 
     let video_id = data["id"].as_str().unwrap_or("").to_string();
 
+    let description = data["description"]
+        .as_str()
+        .map(std::string::ToString::to_string);
+
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
             parse_chapters_from_json(&json_str).unwrap_or_else(|_| Vec::new())
@@ -210,6 +188,7 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         duration,
         chapters,
         video_id,
+        description,
     })
 }
 

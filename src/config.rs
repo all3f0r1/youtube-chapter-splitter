@@ -78,6 +78,10 @@ pub struct Config {
     #[serde(default)]
     pub create_playlist: bool,
 
+    /// Adjust chapter boundaries using silence detection (extra ffmpeg pass)
+    #[serde(default)]
+    pub refine_chapters: bool,
+
     /// Playlist detection behavior (default: VideoOnly for v1.0)
     #[serde(default)]
     pub playlist_behavior: PlaylistBehavior,
@@ -153,6 +157,7 @@ impl Default for Config {
             overwrite_existing: false,
             max_retries: 3,
             create_playlist: false,
+            refine_chapters: false,
             playlist_behavior: PlaylistBehavior::VideoOnly, // Changed from Ask for v1.0
             cookies_from_browser: None,
             download_timeout: 300,
@@ -296,6 +301,7 @@ pub fn print_config_summary() -> Result<()> {
     );
     println!("  max_retries                 = {}", config.max_retries);
     println!("  create_playlist             = {}", config.create_playlist);
+    println!("  refine_chapters             = {}", config.refine_chapters);
     println!(
         "  playlist_behavior           = {:?}",
         config.playlist_behavior
@@ -436,7 +442,7 @@ pub fn run_interactive_config_wizard() -> Result<()> {
     let oe = config.overwrite_existing;
     let input = prompt_line(
         "Overwrite existing files",
-        "y/n — reserved for future use when re-downloading.",
+        "y/n — replace existing track MP3s in the output folder when re-running.",
         &format!("{}", oe),
     );
     config.overwrite_existing = parse_bool_input(&input, oe)?;
@@ -456,10 +462,18 @@ pub fn run_interactive_config_wizard() -> Result<()> {
     let cp = config.create_playlist;
     let input = prompt_line(
         "Create .m3u playlist file",
-        "y/n — reserved for future use.",
+        "y/n — write playlist.m3u in the album folder after splitting.",
         &format!("{}", cp),
     );
     config.create_playlist = parse_bool_input(&input, cp)?;
+
+    let rc = config.refine_chapters;
+    let input = prompt_line(
+        "Refine chapter boundaries with silence detection",
+        "y/n — extra ffmpeg pass to snap cuts to quiet gaps (YouTube timestamps can be slightly off).",
+        &format!("{}", rc),
+    );
+    config.refine_chapters = parse_bool_input(&input, rc)?;
 
     println!("Playlist behavior when a playlist URL is used");
     println!("  1 = ask  2 = video_only (default)  3 = playlist_only");

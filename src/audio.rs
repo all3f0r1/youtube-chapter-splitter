@@ -12,7 +12,7 @@ use lofty::probe::Probe;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -40,6 +40,7 @@ pub type TrackProgressCallback =
 /// * `album` - The album name
 /// * `cover_path` - Optional path to the cover image
 /// * `filename_format` - Template with `%n`, `%t`, `%a`, `%A` (same as config `filename_format`)
+/// * `overwrite_existing` - If false, fail when a target track file already exists
 /// * `progress_callback` - Optional callback for track-by-track progress
 ///
 /// # Returns
@@ -58,6 +59,7 @@ pub fn split_audio_by_chapters(
     album: &str,
     cover_path: Option<&Path>,
     filename_format: &str,
+    overwrite_existing: bool,
     progress_callback: Option<TrackProgressCallback>,
 ) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(output_dir)?;
@@ -84,6 +86,13 @@ pub fn split_audio_by_chapters(
         let output_filename = format!("{}.mp3", base_name);
         let output_path = output_dir.join(&output_filename);
 
+        if output_path.exists() && !overwrite_existing {
+            return Err(YtcsError::AudioError(format!(
+                "File already exists (set overwrite_existing = true in config to replace): {}",
+                output_path.display()
+            )));
+        }
+
         let duration = chapter.duration();
 
         // Split audio with ffmpeg (without cover art)
@@ -106,7 +115,7 @@ pub fn split_audio_by_chapters(
             .arg(format!("album={}", album))
             .arg("-metadata")
             .arg(format!("track={}/{}", track_number, chapters.len()))
-            .arg("-y")
+            .arg(if overwrite_existing { "-y" } else { "-n" })
             .arg(&output_path);
 
         let output = cmd
@@ -142,6 +151,20 @@ pub fn split_audio_by_chapters(
     }
 
     Ok(output_files)
+}
+
+/// Writes a simple M3U playlist listing `track_paths` with paths relative to `output_dir`.
+pub fn write_m3u_playlist(output_dir: &Path, track_paths: &[PathBuf]) -> Result<PathBuf> {
+    let m3u_path = output_dir.join("playlist.m3u");
+    let mut file = File::create(&m3u_path)
+        .map_err(|e| YtcsError::AudioError(format!("Failed to create playlist: {}", e)))?;
+    writeln!(file, "#EXTM3U").map_err(YtcsError::IoError)?;
+    for p in track_paths {
+        let rel = p.strip_prefix(output_dir).unwrap_or(p.as_path());
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        writeln!(file, "{}", rel).map_err(YtcsError::IoError)?;
+    }
+    Ok(m3u_path)
 }
 
 /// Loads a cover image from a file.
