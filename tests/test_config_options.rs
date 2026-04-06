@@ -8,7 +8,7 @@ fn test_config_default_values() {
     assert!(!config.overwrite_existing);
     assert_eq!(config.max_retries, 3);
     assert!(!config.create_playlist);
-    assert!(!config.refine_chapters);
+    assert!(config.refine_chapters);
     assert_eq!(config.audio_format, AudioFormat::Mp3);
     assert!(!config.playlist_prefix_index);
     assert!(config.download_cover);

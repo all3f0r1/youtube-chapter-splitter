@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Temporary download path is `temp_audio.<ext>` matching `audio_format`.
 - `YtdlpDownloadOpts` includes `audio_format`.
+- Default `refine_chapters` is **on**; default `refine_min_silence` is **1.2** s (was 1.5 s).
 
 ## [0.15.6] - 2026-03-29
 

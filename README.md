@@ -11,7 +11,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio as
 - 🎵 **Download YouTube audio** as MP3, Opus, or M4A at configurable bitrate (`audio_format` + `audio_quality` in config)
 - 🖼️ **Download album artwork** automatically with embedded cover art in MP3 tags
 - 📑 **Chapter detection** — YouTube JSON chapters, then timestamps in the video description, then silence detection
-- 🎯 **Optional silence refinement** — `refine_chapters` plus tunable window / dB / min-silence in config (or `--refine-chapters` on the CLI)
+- 🎯 **Silence refinement** — on by default (`refine_chapters`); tunable window / dB / min-silence in config; `--refine-chapters` forces it on for a run if you turned it off in config
 - ✂️ **Smart audio splitting** with complete ID3 metadata tags (title, artist, album, track number, cover art)
 - 🎨 **Clean folder names** with intelligent formatting (removes brackets, pipes, capitalizes)
 - 📁 **Smart default output** to ~/Music directory (cross-platform)
@@ -77,7 +77,7 @@ Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/c
 - `-o, --output <DIR>` - Output directory (overrides `default_output_dir` in config)
 - `-a, --artist <ARTIST>` - Force artist name (overrides auto-detection)
 - `-A, --album <ALBUM>` - Force album name (overrides auto-detection)
-- `--refine-chapters` - Enable silence-based chapter refinement for this run (also available as `refine_chapters` in config)
+- `--refine-chapters` - Force silence-based chapter refinement for this run (default in config is on; set `refine_chapters = false` to skip the extra ffmpeg pass)
 - `--dry-run` - Show target output folder and chapter plan only (no download or split)
 - `-q`, `--quiet` - Suppress tree/progress output (still prints each album output path on its own line)
 - `--no-cover` - Skip thumbnail download for this run (overrides `download_cover`)

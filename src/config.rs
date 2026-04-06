@@ -107,7 +107,7 @@ pub struct Config {
     pub create_playlist: bool,
 
     /// Adjust chapter boundaries using silence detection (extra ffmpeg pass)
-    #[serde(default)]
+    #[serde(default = "default_refine_chapters")]
     pub refine_chapters: bool,
 
     /// Search window (seconds, ±) for silence refinement around chapter edges
@@ -178,8 +178,12 @@ fn default_refine_noise_db() -> f64 {
     -35.0
 }
 
+fn default_refine_chapters() -> bool {
+    true
+}
+
 fn default_refine_min_silence() -> f64 {
-    1.5
+    1.2
 }
 
 fn default_max_retries() -> u32 {
@@ -214,10 +218,10 @@ impl Default for Config {
             overwrite_existing: false,
             max_retries: 3,
             create_playlist: false,
-            refine_chapters: false,
+            refine_chapters: true,
             refine_silence_window: 5.0,
             refine_noise_db: -35.0,
-            refine_min_silence: 1.5,
+            refine_min_silence: 1.2,
             playlist_prefix_index: false,
             playlist_behavior: PlaylistBehavior::VideoOnly, // Changed from Ask for v1.0
             cookies_from_browser: None,

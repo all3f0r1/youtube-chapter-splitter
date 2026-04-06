@@ -43,7 +43,7 @@ The main entry point orchestrates the download and processing (`ytcs <URL>`) or 
 3. **Video info fetch** - Gets metadata via yt-dlp (`VideoInfo` includes optional `description` for description-based chapters)
 4. **Output directory setup** - Creates target folder using `directory_format` and config output base (CLI `-o` overrides)
 5. **Download assets** - Thumbnail if `download_cover` (unless `--no-cover`); audio via yt-dlp using `audio_format` (mp3/opus/m4a), `audio_quality`, cookies, timeouts. Optional `--skip-download` reuses `temp_audio.<ext>`.
-6. **Chapter detection** - YouTube JSON chapters → `chapters_from_description` (if at least 2 markers) → `detect_silence_chapters`. If chapters came from JSON or description, optional `chapter_refinement::refine_chapters_with_silence` when `refine_chapters` or `--refine-chapters` (uses `refine_silence_window`, `refine_noise_db`, `refine_min_silence`; skipped for silence-only chapters).
+6. **Chapter detection** - YouTube JSON chapters → `chapters_from_description` (if at least 2 markers) → `detect_silence_chapters`. If chapters came from JSON or description, `chapter_refinement::refine_chapters_with_silence` runs by default (`refine_chapters` true); disable in config or rely on silence-only path skipping refinement. Uses `refine_silence_window`, `refine_noise_db`, `refine_min_silence` (defaults ±5s, -35 dB, 1.2s).
 7. **Track splitting** - ffmpeg encodes per `audio_format` and `audio_quality`; embeds date/genre/comment when `VideoInfo` provides them. Honors `overwrite_existing`. If `create_playlist`, writes `playlist.m3u` via `audio::write_m3u_playlist`. CLI: `--dry-run`, `-q`/`--quiet` via `ui::set_output_quiet`.
 
 ### Key Modules
@@ -52,7 +52,7 @@ The main entry point orchestrates the download and processing (`ytcs <URL>`) or 
 - **`audio.rs`** - Uses `ffmpeg` for splitting audio and `lofty` for ID3 metadata/cover art embedding. Handles WebP→JPEG conversion for thumbnails.
 - **`chapters.rs`** - Core `Chapter` struct with `start_time`, `end_time`, `title`. Parses JSON chapters from yt-dlp.
 - **`chapters_from_description.rs`** - Parses chapter timestamps from video descriptions (multiple formats: "00:00 - Title", "1. Title (0:00)")
-- **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection; window/threshold/duration come from config (defaults ±5s, -35 dB, 1.5s min silence).
+- **`chapter_refinement.rs`** - Adjusts chapter markers using silence detection; window/threshold/duration come from config (defaults ±5s, -35 dB, 1.2s min silence).
 - **`config.rs`** - TOML config at `~/.config/ytcs/config.toml`, edited via `ytcs config` (interactive wizard) or manually. `print_config_summary` / `run_interactive_config_wizard`. Format strings `%n`, `%t`, `%a`, `%A`.
 - **`error.rs`** - `YtcsError` enum with `thiserror`; structured `MissingToolsError` for dependency install flows.
 - **`temp_file.rs`** - RAII wrapper for automatic cleanup of temporary files.

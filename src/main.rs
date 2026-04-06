@@ -32,7 +32,7 @@ struct Cli {
     #[arg(short = 'A', long)]
     album: Option<String>,
 
-    /// Snap chapter cuts to silence (extra ffmpeg pass; combined with `refine_chapters` in config)
+    /// Snap chapter cuts to silence (extra ffmpeg pass; default on in config; forces refinement if config has it off)
     #[arg(long)]
     refine_chapters: bool,
 
