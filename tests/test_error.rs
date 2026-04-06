@@ -59,12 +59,14 @@ fn test_result_error() {
 
 #[test]
 fn test_missing_tools_error_tools_to_install() {
-    assert!(MissingToolsError {
-        missing_ytdlp: true,
-        missing_ffmpeg: false,
-    }
-    .tools_to_install()
-    .contains(&"yt-dlp"));
+    assert!(
+        MissingToolsError {
+            missing_ytdlp: true,
+            missing_ffmpeg: false,
+        }
+        .tools_to_install()
+        .contains(&"yt-dlp")
+    );
     assert_eq!(
         MissingToolsError {
             missing_ytdlp: false,
