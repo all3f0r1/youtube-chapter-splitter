@@ -24,6 +24,8 @@ pub struct VideoInfo {
     pub genre: Option<String>,
     /// Canonical watch URL for this video.
     pub webpage_url: Option<String>,
+    /// Best thumbnail URL from yt-dlp (`thumbnail` field), when present.
+    pub thumbnail: Option<String>,
 }
 
 /// Checks for required system dependencies.
@@ -196,6 +198,12 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
 
     let webpage_url = data["webpage_url"].as_str().map(str::to_string);
 
+    let thumbnail = data["thumbnail"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+
     let chapters = if let Some(chapters_array) = data["chapters"].as_array() {
         if !chapters_array.is_empty() {
             parse_chapters_from_json(&json_str).unwrap_or_else(|_| Vec::new())
@@ -215,6 +223,7 @@ pub fn get_video_info(url: &str) -> Result<VideoInfo> {
         upload_date,
         genre,
         webpage_url,
+        thumbnail,
     })
 }
 
@@ -287,54 +296,135 @@ pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
     Ok(final_path)
 }
 
-/// Downloads the thumbnail of a YouTube video.
-///
-/// Attempts to download the thumbnail in multiple qualities (maxres, hq, mq)
-/// with timeout and automatic retry.
-///
-/// # Arguments
-///
-/// * `url` - The YouTube video URL
-/// * `output_dir` - The output directory for the thumbnail
-///
-/// # Returns
-///
-/// The path of the downloaded thumbnail file
+/// Browser-like User-Agent for thumbnail CDN requests (some networks block generic clients).
+const THUMBNAIL_HTTP_USER_AGENT: &str = concat!(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ",
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+);
+
+fn thumbnail_candidate_urls(info: &VideoInfo, page_url: &str) -> Result<Vec<String>> {
+    let video_id = if !info.video_id.is_empty() {
+        info.video_id.clone()
+    } else {
+        extract_video_id(page_url)?
+    };
+
+    let mut urls = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+    let mut push_unique = |u: String| {
+        if seen.insert(u.clone()) {
+            urls.push(u);
+        }
+    };
+
+    if let Some(ref t) = info.thumbnail {
+        let t = t.trim();
+        if t.starts_with("http://") || t.starts_with("https://") {
+            push_unique(t.to_string());
+        }
+    }
+
+    for base in [
+        "https://i.ytimg.com/vi",
+        "https://img.youtube.com/vi",
+    ] {
+        for name in ["maxresdefault", "hqdefault", "mqdefault"] {
+            push_unique(format!("{}/{}/{}.jpg", base, video_id, name));
+        }
+    }
+
+    Ok(urls)
+}
+
+/// First nonempty `cover.{jpg,jpeg,webp,png}` in `output_dir`, if any.
+pub fn album_cover_path(output_dir: &Path) -> Option<PathBuf> {
+    for ext in ["jpg", "jpeg", "webp", "png"] {
+        let p = output_dir.join(format!("cover.{ext}"));
+        if p.is_file()
+            && std::fs::metadata(&p)
+                .map(|m| m.len() > 0)
+                .unwrap_or(false)
+        {
+            return Some(p);
+        }
+    }
+    None
+}
+
+fn download_thumbnail_ytdlp(
+    page_url: &str,
+    output_dir: &Path,
+    cookies_from_browser: Option<&str>,
+) -> Result<PathBuf> {
+    let out_template = output_dir.join("cover.%(ext)s");
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("--no-playlist")
+        .arg("--skip-download")
+        .arg("--write-thumbnail")
+        .arg("--convert-thumbnails")
+        .arg("jpg")
+        .arg("-o")
+        .arg(&out_template)
+        .arg(page_url);
+    crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+
+    let output = cmd.output().map_err(|e| {
+        YtcsError::DownloadError(format!("Failed to run yt-dlp for thumbnail: {}", e))
+    })?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(YtcsError::DownloadError(format!(
+            "yt-dlp could not fetch thumbnail: {}",
+            err.trim()
+        )));
+    }
+
+    album_cover_path(output_dir).ok_or_else(|| {
+        YtcsError::DownloadError(
+            "yt-dlp finished but no cover image was written".to_string(),
+        )
+    })
+}
+
+/// Downloads the thumbnail using metadata from [`get_video_info`] (preferred: yt-dlp `thumbnail` URL + CDN fallbacks, then `yt-dlp --write-thumbnail`).
 ///
 /// # Errors
 ///
 /// Returns an error if no thumbnail could be downloaded
-pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std::path::PathBuf> {
-    // Get video ID
-    let video_id = extract_video_id(url)?;
-
-    // YouTube thumbnail URLs (try different qualities)
-    let thumbnail_urls = vec![
-        format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id),
-        format!("https://img.youtube.com/vi/{}/hqdefault.jpg", video_id),
-        format!("https://img.youtube.com/vi/{}/mqdefault.jpg", video_id),
-    ];
+pub fn download_thumbnail_from_info(
+    info: &VideoInfo,
+    page_url: &str,
+    output_dir: &Path,
+    cookies_from_browser: Option<&str>,
+) -> Result<PathBuf> {
+    let thumbnail_urls = thumbnail_candidate_urls(info, page_url)?;
 
     let output_path = output_dir.join("cover.jpg");
 
-    // Create an agent with timeout
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(30))
         .build();
 
-    // Try each thumbnail URL with retry
     for thumb_url in thumbnail_urls {
-        // Retry up to 3 times
         for attempt in 1..=3 {
-            match agent.get(&thumb_url).call() {
+            match agent
+                .get(&thumb_url)
+                .set("User-Agent", THUMBNAIL_HTTP_USER_AGENT)
+                .call()
+            {
                 Ok(response) if response.status() == 200 => {
                     let mut reader = response.into_reader();
                     let mut bytes = Vec::new();
                     std::io::Read::read_to_end(&mut reader, &mut bytes).map_err(|e| {
                         YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e))
                     })?;
-
-                    std::fs::write(&output_path, bytes)?;
+                    if bytes.is_empty() {
+                        break;
+                    }
+                    std::fs::write(&output_path, &bytes).map_err(|e| {
+                        YtcsError::DownloadError(format!("Failed to write thumbnail: {}", e))
+                    })?;
                     return Ok(output_path);
                 }
                 Err(e) if attempt < 3 => {
@@ -347,7 +437,24 @@ pub fn download_thumbnail(url: &str, output_dir: &std::path::Path) -> Result<std
         }
     }
 
-    Err(YtcsError::DownloadError(
-        "Could not download thumbnail from any source".to_string(),
-    ))
+    download_thumbnail_ytdlp(page_url, output_dir, cookies_from_browser)
+}
+
+/// Downloads the thumbnail using only the page URL (no `yt-dlp` thumbnail field; uses CDN fallbacks only).
+///
+/// Prefer [`download_thumbnail_from_info`] when [`VideoInfo`] is already available from [`get_video_info`].
+pub fn download_thumbnail(url: &str, output_dir: &Path) -> Result<PathBuf> {
+    let video_id = extract_video_id(url)?;
+    let info = VideoInfo {
+        title: String::new(),
+        duration: 0.0,
+        chapters: Vec::new(),
+        video_id,
+        description: None,
+        upload_date: None,
+        genre: None,
+        webpage_url: None,
+        thumbnail: None,
+    };
+    download_thumbnail_from_info(&info, url, output_dir, None)
 }
