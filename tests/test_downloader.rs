@@ -1,4 +1,5 @@
-use youtube_chapter_splitter::downloader::extract_video_id;
+use youtube_chapter_splitter::downloader::{download_thumbnail, extract_video_id};
+use std::fs;
 
 #[test]
 fn test_extract_video_id_standard() {
@@ -39,4 +40,20 @@ fn test_video_id_length() {
     let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
     let id = extract_video_id(url).unwrap();
     assert_eq!(id.len(), 11);
+}
+
+/// Network: exercises `download_thumbnail` (CDN fallbacks, no extra yt-dlp call).
+#[test]
+#[ignore]
+fn download_thumbnail_reachability() {
+    let dir = std::env::temp_dir().join("ytcs_thumb_reach_test");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let r = download_thumbnail(
+        "https://www.youtube.com/watch?v=Yl-1cFRQ7Es",
+        &dir,
+    );
+    assert!(r.is_ok(), "{:?}", r);
+    assert!(r.unwrap().exists());
+    let _ = fs::remove_dir_all(&dir);
 }

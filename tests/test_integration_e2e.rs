@@ -69,7 +69,8 @@ mod integration_e2e_tests {
         assert!(audio_file.exists(), "Audio file should exist");
 
         // 5. Télécharger la miniature
-        let cover_result = downloader::download_thumbnail(url, &test_dir);
+        let cover_result =
+            downloader::download_thumbnail_from_info(&video_info, url, &test_dir, None);
         let cover_path = cover_result.ok();
 
         // 6. Découper l'audio

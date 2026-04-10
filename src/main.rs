@@ -311,7 +311,12 @@ fn process_single_video(
 
     let want_cover = app_config.download_cover && !cli.no_cover;
     if want_cover {
-        match downloader::download_thumbnail(&clean_url, &output_dir) {
+        match downloader::download_thumbnail_from_info(
+            &video_info,
+            &clean_url,
+            &output_dir,
+            app_config.cookies_from_browser.as_deref(),
+        ) {
             Ok(thumb_path) => {
                 ui::print_artwork_section(thumb_path.to_str().unwrap_or("cover.jpg"));
             }
@@ -390,7 +395,7 @@ fn process_single_video(
         )?;
     }
 
-    let cover_path = output_dir.join("cover.jpg");
+    let cover_path = downloader::album_cover_path(&output_dir);
     ui::print_splitting_section_header(chapters_to_use.len());
 
     let extra_date = video_info
@@ -409,8 +414,8 @@ fn process_single_video(
         &output_dir,
         &artist,
         &album,
-        if want_cover && cover_path.exists() {
-            Some(&cover_path)
+        if want_cover {
+            cover_path.as_deref()
         } else {
             None
         },
