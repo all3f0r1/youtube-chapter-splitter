@@ -40,7 +40,7 @@ mod integration_e2e_tests {
         }
 
         // 2. Obtenir les informations vidéo
-        let video_info = downloader::get_video_info(url).unwrap();
+        let video_info = downloader::get_video_info(url, None).unwrap();
         assert!(
             !video_info.title.is_empty(),
             "Video title should not be empty"
@@ -200,7 +200,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let video_info = downloader::get_video_info(url).unwrap();
+        let video_info = downloader::get_video_info(url, None).unwrap();
 
         // Vérifications de base
         assert!(!video_info.title.is_empty());
@@ -254,7 +254,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let result = downloader::get_video_info(url);
+        let result = downloader::get_video_info(url, None);
         assert!(result.is_err(), "Should fail for invalid video ID");
     }
 
@@ -270,7 +270,7 @@ mod integration_e2e_tests {
             return;
         }
 
-        let result = downloader::get_video_info(url);
+        let result = downloader::get_video_info(url, None);
         // Devrait échouer car la vidéo est privée
         if result.is_err() {
             // C'est le comportement attendu

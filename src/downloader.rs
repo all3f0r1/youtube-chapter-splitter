@@ -5,6 +5,7 @@
 
 use crate::chapters::{Chapter, parse_chapters_from_json};
 use crate::error::{MissingToolsError, Result, YtcsError};
+use crate::ytdlp_error_parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -141,6 +142,7 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 /// # Arguments
 ///
 /// * `url` - The YouTube video URL
+/// * `cookies_from_browser` - Optional browser name for cookie extraction
 ///
 /// # Returns
 ///
@@ -149,20 +151,25 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error if yt-dlp fails or if metadata is invalid
-pub fn get_video_info(url: &str) -> Result<VideoInfo> {
-    let output = Command::new("yt-dlp")
-        .arg("--dump-json")
-        .arg("--no-playlist")
-        .arg(url)
+pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("--dump-json").arg("--no-playlist");
+    crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
+    cmd.arg(url);
+
+    let output = cmd
         .output()
         .map_err(|e| YtcsError::DownloadError(format!("Failed to execute yt-dlp: {}", e)))?;
 
     if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(YtcsError::DownloadError(format!(
-            "yt-dlp failed: {}",
-            error
-        )));
+        let raw_error = String::from_utf8_lossy(&output.stderr);
+        let (error_msg, suggestion) =
+            ytdlp_error_parser::parse_ytdlp_error(&raw_error, cookies_from_browser);
+        let full_error = match suggestion {
+            Some(sug) => format!("{}\n\n{}", error_msg, sug),
+            None => error_msg,
+        };
+        return Err(YtcsError::DownloadError(full_error));
     }
 
     let json_str = String::from_utf8_lossy(&output.stdout);

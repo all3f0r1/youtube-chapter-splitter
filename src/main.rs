@@ -184,7 +184,7 @@ struct BatchCtx {
 
 fn run_dry_run(urls: &[String], cli: &Cli, cfg: &config::Config) -> Result<()> {
     for (i, url) in urls.iter().enumerate() {
-        let vi = downloader::get_video_info(url)?;
+        let vi = downloader::get_video_info(url, cfg.cookies_from_browser.as_deref())?;
         let ((artist, album), _, _) = utils::parse_artist_album_with_source(&vi.title);
         let mut folder_name = cfg.format_directory(&artist, &album);
         if urls.len() > 1 && cfg.playlist_prefix_index {
@@ -231,7 +231,7 @@ fn process_single_video(
     let clean_url = video_url.to_string();
 
     ui::print_section_header("Fetching video information");
-    let video_info = downloader::get_video_info(&clean_url)?;
+    let video_info = downloader::get_video_info(&clean_url, app_config.cookies_from_browser.as_deref())?;
 
     let (mut artist, mut album, mut artist_source, mut album_source) = if let (Some(a), Some(al)) =
         (&cli.artist, &cli.album)
@@ -446,7 +446,14 @@ fn process_single_video(
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{} {}", "✗".red().bold(), format!("{}", e).red());
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(Commands::Config { show }) = &cli.command {

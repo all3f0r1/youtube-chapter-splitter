@@ -12,7 +12,7 @@ fn main() -> youtube_chapter_splitter::Result<()> {
 
     // Obtenir les informations
     println!("Récupération des informations...");
-    let video_info = downloader::get_video_info(url)?;
+    let video_info = downloader::get_video_info(url, None)?;
     println!("Titre: {}", video_info.title);
     println!("Chapitres: {}", video_info.chapters.len());
 

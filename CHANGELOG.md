@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.8] - 2026-04-17
+
+### Fixed
+- `get_video_info` now threads `cookies_from_browser` through to `yt-dlp`, so the metadata fetch step honors the cookies config (previously only the audio download did).
+- Friendlier error output: top-level errors are rendered with `Display` (one-line red message) instead of `Debug` (`Error: DownloadError(…)`).
+
+### Added
+- `ytdlp_error_parser` recognizes YouTube's bot-detection ("Sign in to confirm you're not a bot") and HTTP 429 rate-limit responses, and prints actionable cookie-setup guidance (including how to target LibreWolf / custom Firefox profiles).
+
 ## [0.15.7] - 2026-04-06
 
 ### Added

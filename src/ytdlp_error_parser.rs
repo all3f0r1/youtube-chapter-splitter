@@ -21,6 +21,24 @@ pub fn parse_ytdlp_error(
 ) -> (String, Option<String>) {
     let error_lower = raw_error.to_lowercase();
 
+    // Check for YouTube bot-detection / rate limiting
+    // ("Sign in to confirm you're not a bot" or HTTP 429 Too Many Requests)
+    if error_lower.contains("not a bot")
+        || error_lower.contains("confirm you're not")
+        || error_lower.contains("http error 429")
+        || error_lower.contains("too many requests")
+    {
+        let message =
+            "YouTube is rate-limiting this IP and asks for a signed-in session to continue."
+                .to_string();
+        let suggestion = if cookie_helper::cookies_available(cookies_from_browser) {
+            Some("Your configured cookies were rejected or are stale. Try:\n  1. Log in to YouTube in your browser, then retry\n  2. Re-export cookies to ~/.config/ytcs/cookies.txt\n  3. Wait a few minutes — the rate limit clears on its own".to_string())
+        } else {
+            Some("Configure cookies so yt-dlp can authenticate:\n  • ytcs config → 'Cookies from browser' (chrome, firefox, brave, …)\n  • For LibreWolf / custom profile: use 'firefox:/path/to/profile'\n  • Or export a cookies.txt to ~/.config/ytcs/cookies.txt".to_string())
+        };
+        return (message, suggestion);
+    }
+
     // Check for authentication/membership errors
     if error_lower.contains("members-only")
         || error_lower.contains("this video is only available")
@@ -162,6 +180,22 @@ mod tests {
         let error = "ERROR: HTTP Error 500: Internal Server Error";
         let (msg, suggestion) = parse_ytdlp_error(error, None);
         assert!(msg.contains("Network error"));
+        assert!(suggestion.is_some());
+    }
+
+    #[test]
+    fn test_bot_detection_error() {
+        let error = "ERROR: [youtube] 0cLebDx4CJc: Sign in to confirm you're not a bot.";
+        let (msg, suggestion) = parse_ytdlp_error(error, None);
+        assert!(msg.contains("rate-limiting"));
+        assert!(suggestion.is_some());
+    }
+
+    #[test]
+    fn test_rate_limit_error() {
+        let error = "WARNING: HTTP Error 429: Too Many Requests";
+        let (msg, suggestion) = parse_ytdlp_error(error, None);
+        assert!(msg.contains("rate-limiting"));
         assert!(suggestion.is_some());
     }
 
