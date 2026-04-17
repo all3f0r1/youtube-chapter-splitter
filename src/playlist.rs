@@ -84,7 +84,7 @@ pub fn get_playlist_info(url: &str, cookies_from_browser: Option<&str>) -> Resul
     let mut cmd = Command::new("yt-dlp");
     cmd.args(["--dump-json", "--flat-playlist", "--no-warnings"]);
 
-    // Add cookie arguments
+    crate::ytdlp_helper::add_ejs_args(&mut cmd);
     cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let output = cmd

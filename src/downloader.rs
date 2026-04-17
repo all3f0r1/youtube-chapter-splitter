@@ -174,6 +174,7 @@ pub fn extract_video_id(url: &str) -> Result<String> {
 pub fn get_video_info(url: &str, cookies_from_browser: Option<&str>) -> Result<VideoInfo> {
     let mut cmd = Command::new("yt-dlp");
     cmd.arg("--dump-json").arg("--no-playlist");
+    crate::ytdlp_helper::add_ejs_args(&mut cmd);
     crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
     cmd.arg(url);
 
@@ -285,15 +286,17 @@ pub fn download_audio(url: &str, output_path: &Path) -> Result<PathBuf> {
     // Launch yt-dlp in the background
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-    let output = Command::new("yt-dlp")
-        .arg("-x")
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("-x")
         .arg("--audio-format")
         .arg("mp3")
         .arg("--audio-quality")
         .arg("0")
         .arg("-o")
         .arg(output_path.to_str().unwrap())
-        .arg("--no-playlist")
+        .arg("--no-playlist");
+    crate::ytdlp_helper::add_ejs_args(&mut cmd);
+    let output = cmd
         .arg(url)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -393,6 +396,7 @@ fn download_thumbnail_ytdlp(
         .arg("-o")
         .arg(&out_template)
         .arg(page_url);
+    crate::ytdlp_helper::add_ejs_args(&mut cmd);
     crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let output = cmd.output().map_err(|e| {

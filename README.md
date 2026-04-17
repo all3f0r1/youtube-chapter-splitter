@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio as
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.9-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.10-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -27,16 +27,30 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio as
 
 ### Prerequisites
 
-The application will check for dependencies at startup and offer to install them:
+The application checks the three external tools below at startup and offers to install the missing ones (behavior controlled by the `dependency_auto_install` config key: `prompt` / `always` / `never`).
 
-- **yt-dlp**: `pip install yt-dlp`
-- **ffmpeg**: 
+- **yt-dlp** — YouTube metadata + download backend.
+  ```bash
+  pip install yt-dlp
+  ```
+
+- **ffmpeg** — audio extraction, splitting, and silence detection.
   - Linux: `sudo apt install ffmpeg`
   - macOS: `brew install ffmpeg`
-  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-- **deno** (JS runtime required by yt-dlp to solve YouTube's `n` challenge; without it, audio formats are unavailable):
-  - Linux / macOS: `curl -fsSL https://deno.land/install.sh | sh` (then add `~/.deno/bin` to `PATH`)
+  - Windows: download from [ffmpeg.org](https://ffmpeg.org/download.html)
+
+- **deno** — JavaScript runtime required by yt-dlp to solve YouTube's `n` challenge. Without deno, yt-dlp only exposes image formats and audio download fails with *"Requested format is not available"*.
+  - Linux / macOS: `curl -fsSL https://deno.land/install.sh | sh`, then add `~/.deno/bin` to `PATH`:
+    ```bash
+    echo 'export PATH="$HOME/.deno/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+    ```
   - Windows: `irm https://deno.land/install.ps1 | iex`
+
+On first run `ytcs` also asks yt-dlp to fetch the **EJS challenge-solver script** from GitHub (passed via `--remote-components ejs:github`). No manual step is needed; the script is cached by yt-dlp after the first successful run.
+
+> **Authentication (optional but often required).** YouTube frequently gates requests coming from CLI clients with *"Sign in to confirm you're not a bot"* / HTTP 429. To pass a signed-in session:
+> - run `ytcs config` and set **Cookies from browser** to `chrome`, `firefox`, `brave`, … (for LibreWolf or a custom profile: `firefox:/path/to/profile`), **or**
+> - export cookies to `~/.config/ytcs/cookies.txt` (e.g. with the *cookies.txt* browser extension).
 
 ### Installation
 

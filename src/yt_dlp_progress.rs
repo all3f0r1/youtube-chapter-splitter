@@ -466,7 +466,7 @@ fn try_download_with_format(
             .arg(opts.socket_timeout_secs.to_string());
     }
 
-    // Add cookie arguments
+    crate::ytdlp_helper::add_ejs_args(&mut cmd);
     crate::cookie_helper::add_cookie_args(&mut cmd, cookies_from_browser);
 
     let mut child = cmd

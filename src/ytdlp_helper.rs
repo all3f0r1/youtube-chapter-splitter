@@ -57,6 +57,17 @@ pub fn save_update_time() -> Result<()> {
     Ok(())
 }
 
+/// Add yt-dlp flags required for YouTube extraction since the `n` challenge
+/// became mandatory (late 2025 / 2026): tells yt-dlp to fetch the EJS solver
+/// script from GitHub (cached on first use). Must be combined with a JS
+/// runtime — see `MissingToolsError::missing_deno`.
+///
+/// Skip this for housekeeping calls (`--version`, `--update`) where no
+/// extraction happens.
+pub fn add_ejs_args(cmd: &mut Command) {
+    cmd.arg("--remote-components").arg("ejs:github");
+}
+
 /// Check if an update should be attempted based on time elapsed
 pub fn should_check_for_update(interval_days: u64) -> bool {
     if interval_days == 0 {

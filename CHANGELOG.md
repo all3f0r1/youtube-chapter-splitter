@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.10] - 2026-04-17
+
+### Fixed
+- yt-dlp's deno-based `n` challenge solver is a remote component that must be explicitly requested. All yt-dlp invocations (`get_video_info`, `download_audio`, `download_thumbnail_ytdlp`, `get_playlist_info`, `try_download_with_format`) now pass `--remote-components ejs:github` via the new `ytdlp_helper::add_ejs_args` helper, so the EJS solver script is fetched on first use and audio downloads succeed once deno is installed.
+
+### Changed
+- README: Prerequisites section now documents yt-dlp, ffmpeg and deno as required dependencies (including `~/.deno/bin` PATH hint) and adds an authentication/cookies guidance block covering LibreWolf and custom Firefox profiles.
+
 ## [0.15.9] - 2026-04-17
 
 ### Added
