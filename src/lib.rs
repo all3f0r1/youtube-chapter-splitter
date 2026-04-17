@@ -16,7 +16,7 @@
 //!     let url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 //!
 //!     // Fetch video information
-//!     let video_info = downloader::get_video_info(url)?;
+//!     let video_info = downloader::get_video_info(url, None)?;
 //!
 //!     // Download audio with real-time progress
 //!     let output_path = PathBuf::from("temp_audio");
