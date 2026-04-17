@@ -21,6 +21,26 @@ pub fn parse_ytdlp_error(
 ) -> (String, Option<String>) {
     let error_lower = raw_error.to_lowercase();
 
+    // Check for missing JS runtime (YouTube's `n` challenge)
+    // yt-dlp needs deno (or another JS runtime) to resolve audio formats.
+    if error_lower.contains("n challenge")
+        || error_lower.contains("javascript runtime")
+        || (error_lower.contains("requested format is not available")
+            && error_lower.contains("only images are available"))
+    {
+        return (
+            "yt-dlp cannot resolve audio formats: no JavaScript runtime found.".to_string(),
+            Some(
+                "YouTube now requires a JS runtime to solve its `n` challenge.\n  \
+                 Install deno (recommended):\n    \
+                 curl -fsSL https://deno.land/install.sh | sh\n  \
+                 Then add to PATH:\n    \
+                 echo 'export PATH=\"$HOME/.deno/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+                    .to_string(),
+            ),
+        );
+    }
+
     // Check for YouTube bot-detection / rate limiting
     // ("Sign in to confirm you're not a bot" or HTTP 429 Too Many Requests)
     if error_lower.contains("not a bot")
@@ -196,6 +216,22 @@ mod tests {
         let error = "WARNING: HTTP Error 429: Too Many Requests";
         let (msg, suggestion) = parse_ytdlp_error(error, None);
         assert!(msg.contains("rate-limiting"));
+        assert!(suggestion.is_some());
+    }
+
+    #[test]
+    fn test_js_runtime_missing_error() {
+        let error = "WARNING: [youtube] n challenge solving failed: Some formats may be missing. Ensure you have a supported JavaScript runtime";
+        let (msg, suggestion) = parse_ytdlp_error(error, None);
+        assert!(msg.contains("JavaScript runtime"));
+        assert!(suggestion.unwrap().contains("deno"));
+    }
+
+    #[test]
+    fn test_only_images_available_error() {
+        let error = "WARNING: Only images are available for download\nERROR: Requested format is not available";
+        let (msg, suggestion) = parse_ytdlp_error(error, None);
+        assert!(msg.contains("JavaScript runtime"));
         assert!(suggestion.is_some());
     }
 

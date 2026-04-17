@@ -5,11 +5,15 @@
 use std::fmt;
 use thiserror::Error;
 
-/// Missing `yt-dlp` and/or `ffmpeg` after a dependency check.
+/// Missing `yt-dlp`, `ffmpeg`, and/or `deno` after a dependency check.
+///
+/// `deno` is a JS runtime yt-dlp now requires to solve YouTube's `n` challenge
+/// (otherwise audio formats are not available; only images are returned).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MissingToolsError {
     pub missing_ytdlp: bool,
     pub missing_ffmpeg: bool,
+    pub missing_deno: bool,
 }
 
 impl MissingToolsError {
@@ -21,6 +25,9 @@ impl MissingToolsError {
         }
         if self.missing_ffmpeg {
             v.push("ffmpeg");
+        }
+        if self.missing_deno {
+            v.push("deno");
         }
         v
     }
@@ -34,6 +41,16 @@ impl MissingToolsError {
             "Download from https://ffmpeg.org/download.html"
         }
     }
+
+    fn deno_install_hint() -> &'static str {
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+            "curl -fsSL https://deno.land/install.sh | sh"
+        } else if cfg!(target_os = "windows") {
+            "irm https://deno.land/install.ps1 | iex"
+        } else {
+            "See https://deno.land/#installation"
+        }
+    }
 }
 
 impl fmt::Display for MissingToolsError {
@@ -44,6 +61,13 @@ impl fmt::Display for MissingToolsError {
         }
         if self.missing_ffmpeg {
             writeln!(f, "  - ffmpeg: {}", Self::ffmpeg_install_hint())?;
+        }
+        if self.missing_deno {
+            writeln!(
+                f,
+                "  - deno (JS runtime for yt-dlp's `n` challenge): {}",
+                Self::deno_install_hint()
+            )?;
         }
         Ok(())
     }

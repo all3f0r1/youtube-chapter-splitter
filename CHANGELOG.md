@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.9] - 2026-04-17
+
+### Added
+- `deno` is now a checked (and auto-installable) dependency alongside `yt-dlp` and `ffmpeg`. YouTube requires a JS runtime to solve the `n` challenge; without it yt-dlp only returns image formats and audio download fails. `install_dependency("deno")` runs the official installer on Linux/macOS and prints a PATH hint for `~/.deno/bin`.
+- `ytdlp_error_parser` detects "n challenge solving failed" / missing JS runtime / "Only images are available" errors and suggests installing deno.
+
+### Changed
+- `MissingToolsError` gained a `missing_deno` field (breaking change for direct struct construction; all in-tree tests and call sites updated).
+
 ## [0.15.8] - 2026-04-17
 
 ### Fixed

@@ -4,7 +4,7 @@ A simple and powerful Rust CLI tool to download YouTube videos, extract audio as
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.8-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Version](https://img.shields.io/badge/version-0.15.9-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -34,6 +34,9 @@ The application will check for dependencies at startup and offer to install them
   - Linux: `sudo apt install ffmpeg`
   - macOS: `brew install ffmpeg`
   - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+- **deno** (JS runtime required by yt-dlp to solve YouTube's `n` challenge; without it, audio formats are unavailable):
+  - Linux / macOS: `curl -fsSL https://deno.land/install.sh | sh` (then add `~/.deno/bin` to `PATH`)
+  - Windows: `irm https://deno.land/install.ps1 | iex`
 
 ### Installation
 

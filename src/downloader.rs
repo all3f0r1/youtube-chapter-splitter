@@ -37,15 +37,20 @@ pub struct VideoInfo {
 ///
 /// # Errors
 ///
-/// Returns an error if `yt-dlp` or `ffmpeg` are missing
+/// Returns an error if `yt-dlp`, `ffmpeg`, or `deno` are missing.
+///
+/// `deno` is a JS runtime yt-dlp uses to solve YouTube's `n` challenge; without
+/// it, audio formats are unavailable and downloads fail.
 pub fn check_dependencies() -> Result<()> {
     let missing_ytdlp = Command::new("yt-dlp").arg("--version").output().is_err();
     let missing_ffmpeg = Command::new("ffmpeg").arg("-version").output().is_err();
+    let missing_deno = Command::new("deno").arg("--version").output().is_err();
 
-    if missing_ytdlp || missing_ffmpeg {
+    if missing_ytdlp || missing_ffmpeg || missing_deno {
         return Err(YtcsError::MissingTools(MissingToolsError {
             missing_ytdlp,
             missing_ffmpeg,
+            missing_deno,
         }));
     }
 
@@ -56,7 +61,7 @@ pub fn check_dependencies() -> Result<()> {
 ///
 /// # Arguments
 ///
-/// * `tool` - The name of the tool to install ("yt-dlp" or "ffmpeg")
+/// * `tool` - The name of the tool to install ("yt-dlp", "ffmpeg", or "deno")
 ///
 /// # Errors
 ///
@@ -75,6 +80,15 @@ pub fn install_dependency(tool: &str) -> Result<()> {
                 ));
             }
         }
+        "deno" => {
+            if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+                "curl -fsSL https://deno.land/install.sh | sh -s -- -y"
+            } else {
+                return Err(YtcsError::Other(
+                    "Install deno manually: see https://deno.land/#installation".to_string(),
+                ));
+            }
+        }
         _ => return Err(YtcsError::Other(format!("Unknown tool: {}", tool))),
     };
 
@@ -88,6 +102,12 @@ pub fn install_dependency(tool: &str) -> Result<()> {
     match output {
         Ok(out) if out.status.success() => {
             println!("✓ {} installed successfully", tool);
+            if tool == "deno" {
+                println!(
+                    "  Note: deno is installed in ~/.deno/bin — add it to PATH:\n    \
+                     echo 'export PATH=\"$HOME/.deno/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+                );
+            }
             Ok(())
         }
         Ok(out) => {

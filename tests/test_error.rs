@@ -30,6 +30,7 @@ fn test_error_types() {
         YtcsError::MissingTools(MissingToolsError {
             missing_ytdlp: true,
             missing_ffmpeg: true,
+            missing_deno: true,
         }),
         YtcsError::Other("test".to_string()),
     ];
@@ -63,6 +64,7 @@ fn test_missing_tools_error_tools_to_install() {
         MissingToolsError {
             missing_ytdlp: true,
             missing_ffmpeg: false,
+            missing_deno: false,
         }
         .tools_to_install()
         .contains(&"yt-dlp")
@@ -71,6 +73,7 @@ fn test_missing_tools_error_tools_to_install() {
         MissingToolsError {
             missing_ytdlp: false,
             missing_ffmpeg: true,
+            missing_deno: false,
         }
         .tools_to_install(),
         vec!["ffmpeg"]
@@ -79,8 +82,18 @@ fn test_missing_tools_error_tools_to_install() {
         MissingToolsError {
             missing_ytdlp: true,
             missing_ffmpeg: true,
+            missing_deno: false,
         }
         .tools_to_install(),
         vec!["yt-dlp", "ffmpeg"]
+    );
+    assert_eq!(
+        MissingToolsError {
+            missing_ytdlp: false,
+            missing_ffmpeg: false,
+            missing_deno: true,
+        }
+        .tools_to_install(),
+        vec!["deno"]
     );
 }
