@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.11] - 2026-04-29
+
+### Fixed
+- Thumbnail CDN fetch now retries on transient HTTP 5xx responses and body-read errors (previously only `ureq` transport errors retried, so a single 503 forced the slower yt-dlp fallback subprocess).
+- Thumbnail body reads are capped at 8 MiB via `Read::take` to prevent OOM from a hostile or misbehaving CDN streaming an unbounded response within the request timeout.
+- Per-request timeout for direct CDN thumbnail fetches lowered from 30 s → 10 s; worst-case latency before falling back to yt-dlp drops from ~6 min to ~2 min for unreachable candidate URLs.
+- User-facing artwork failure message no longer leaks yt-dlp stderr (which can include cookie temp-file paths, signed CDN URLs carrying `sig=` / `pot=` tokens, and absolute home directory paths) to stdout. Full diagnostic detail stays in `log::warn!` — run with `RUST_LOG=warn` to view.
+- `print_artwork_failed` collapses multi-line reasons to a single line and char-truncates at 200 chars (UTF-8 safe), so a multi-line yt-dlp stderr can no longer break the tree layout glyphs.
+
+### Added
+- `YtcsError::ThumbnailFailed { http: String, ytdlp: String }` variant: preserves both failure reasons structurally instead of flattening them with `format!("{} | http: {}", …)`. The `Display` impl renders them clearly without the previous doubled `Download error: Download error:` prefix.
+- `redact_url_query` helper strips query-string parameters from logged thumbnail URLs at all log sites (signed CDN URLs may carry short-lived auth tokens).
+- `ui::print_artwork_disabled` and `ui::print_artwork_saved`: explicit per-state functions replace the empty-string sentinel previously passed to `print_artwork_section("")`.
+- Inline unit tests for `redact_url_query`.
+
+### Changed
+- `download_thumbnail_from_info` refactored: per-URL fetch logic extracted to `try_fetch_thumbnail_body` returning a `FetchOutcome` enum (`Body` / `Permanent` / `Retryable`). Outer loop is now a 3-arm match instead of four duplicated `break` sites.
+- Per-attempt failure logs demoted from `warn!` to `debug!` (transient retries are not user-actionable); the actionable `warn!` is reserved for the final fallback boundary.
+
 ## [0.15.10] - 2026-04-17
 
 ### Fixed
