@@ -1,5 +1,5 @@
-use youtube_chapter_splitter::downloader::{download_thumbnail, extract_video_id};
 use std::fs;
+use youtube_chapter_splitter::downloader::{download_thumbnail, extract_video_id};
 
 #[test]
 fn test_extract_video_id_standard() {
@@ -49,10 +49,7 @@ fn download_thumbnail_reachability() {
     let dir = std::env::temp_dir().join("ytcs_thumb_reach_test");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
-    let r = download_thumbnail(
-        "https://www.youtube.com/watch?v=Yl-1cFRQ7Es",
-        &dir,
-    );
+    let r = download_thumbnail("https://www.youtube.com/watch?v=Yl-1cFRQ7Es", &dir);
     assert!(r.is_ok(), "{:?}", r);
     assert!(r.unwrap().exists());
     let _ = fs::remove_dir_all(&dir);

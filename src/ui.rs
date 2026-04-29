@@ -204,19 +204,48 @@ pub fn print_track_progress(index: usize, total: usize, title: &str, duration: &
     io::stdout().flush().ok();
 }
 
-/// Display artwork download section in tree style
-pub fn print_artwork_section(filename: &str) {
+/// Display artwork section after a successful download.
+pub fn print_artwork_saved(filename: &str) {
     if skip_ui_output() {
         return;
     }
     println!();
     print_section_header("Downloading artwork");
-    if !filename.is_empty() {
-        // Remove extra spaces: "Saved /path" instead of "Saved     /path"
-        println!("  └─ Saved {}", filename);
-    } else {
-        print_tree_item_last("Status", "not available");
+    println!("  └─ Saved {}", filename);
+}
+
+/// Display artwork section when cover download was disabled (config or `--no-cover`).
+pub fn print_artwork_disabled() {
+    if skip_ui_output() {
+        return;
     }
+    println!();
+    print_section_header("Downloading artwork");
+    print_tree_item_last("Status", "not available");
+}
+
+/// Display artwork download failure with a single-line reason.
+///
+/// `reason` is sanitized to one line — yt-dlp stderr is often multi-line and would
+/// break the tree layout (`print_tree_item_last` uses single-line `{:<10}` padding).
+pub fn print_artwork_failed(reason: &str) {
+    if skip_ui_output() {
+        return;
+    }
+    let one_line = reason
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or(reason)
+        .trim();
+    let truncated: String = if one_line.chars().count() > 200 {
+        let head: String = one_line.chars().take(200).collect();
+        format!("{}…", head)
+    } else {
+        one_line.to_string()
+    };
+    println!();
+    print_section_header("Downloading artwork");
+    print_tree_item_last("Failed", &truncated);
 }
 
 /// Display audio download section header

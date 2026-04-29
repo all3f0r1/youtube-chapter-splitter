@@ -84,6 +84,10 @@ pub enum YtcsError {
     #[error("Download error: {0}")]
     DownloadError(String),
 
+    /// Both the direct CDN fetch and the yt-dlp fallback failed when retrieving a thumbnail.
+    #[error("Thumbnail download failed (cdn: {http}; yt-dlp: {ytdlp})")]
+    ThumbnailFailed { http: String, ytdlp: String },
+
     /// Error occurred during audio processing (splitting, conversion, etc.).
     #[error("Audio processing error: {0}")]
     AudioError(String),

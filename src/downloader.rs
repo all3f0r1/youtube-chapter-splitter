@@ -332,6 +332,56 @@ const THUMBNAIL_HTTP_USER_AGENT: &str = concat!(
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 );
 
+/// Hard cap on thumbnail body size to prevent OOM from a misbehaving/hostile CDN.
+const MAX_THUMBNAIL_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Per-request timeout for direct CDN thumbnail fetches. Real thumbnails are <500 KB.
+const THUMBNAIL_HTTP_TIMEOUT_SECS: u64 = 10;
+
+/// Strip query parameters from a URL for safe logging (signed CDN URLs may carry tokens).
+fn redact_url_query(url: &str) -> &str {
+    url.split('?').next().unwrap_or(url)
+}
+
+/// Outcome of a single CDN fetch attempt.
+enum FetchOutcome {
+    /// 200 OK with a non-empty body within the size cap.
+    Body(Vec<u8>),
+    /// 4xx, empty body — no point retrying or trying further attempts on this URL.
+    Permanent(String),
+    /// 5xx, transport error, body read error — retry up to the per-URL attempt budget.
+    Retryable(String),
+}
+
+fn try_fetch_thumbnail_body(agent: &ureq::Agent, url: &str) -> FetchOutcome {
+    match agent
+        .get(url)
+        .set("User-Agent", THUMBNAIL_HTTP_USER_AGENT)
+        .call()
+    {
+        Ok(response) => {
+            let status = response.status();
+            if (500..600).contains(&status) {
+                return FetchOutcome::Retryable(format!("HTTP {}", status));
+            }
+            if status != 200 {
+                return FetchOutcome::Permanent(format!("HTTP {}", status));
+            }
+            let mut reader = response.into_reader();
+            let mut limited = std::io::Read::take(&mut reader, MAX_THUMBNAIL_BYTES);
+            let mut bytes = Vec::new();
+            if let Err(e) = std::io::Read::read_to_end(&mut limited, &mut bytes) {
+                return FetchOutcome::Retryable(format!("read body failed: {}", e));
+            }
+            if bytes.is_empty() {
+                return FetchOutcome::Permanent("empty body".to_string());
+            }
+            FetchOutcome::Body(bytes)
+        }
+        Err(e) => FetchOutcome::Retryable(format!("transport error: {}", e)),
+    }
+}
+
 fn thumbnail_candidate_urls(info: &VideoInfo, page_url: &str) -> Result<Vec<String>> {
     let video_id = if !info.video_id.is_empty() {
         info.video_id.clone()
@@ -354,10 +404,7 @@ fn thumbnail_candidate_urls(info: &VideoInfo, page_url: &str) -> Result<Vec<Stri
         }
     }
 
-    for base in [
-        "https://i.ytimg.com/vi",
-        "https://img.youtube.com/vi",
-    ] {
+    for base in ["https://i.ytimg.com/vi", "https://img.youtube.com/vi"] {
         for name in ["maxresdefault", "hqdefault", "mqdefault"] {
             push_unique(format!("{}/{}/{}.jpg", base, video_id, name));
         }
@@ -370,17 +417,18 @@ fn thumbnail_candidate_urls(info: &VideoInfo, page_url: &str) -> Result<Vec<Stri
 pub fn album_cover_path(output_dir: &Path) -> Option<PathBuf> {
     for ext in ["jpg", "jpeg", "webp", "png"] {
         let p = output_dir.join(format!("cover.{ext}"));
-        if p.is_file()
-            && std::fs::metadata(&p)
-                .map(|m| m.len() > 0)
-                .unwrap_or(false)
-        {
+        if p.is_file() && std::fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
             return Some(p);
         }
     }
     None
 }
 
+/// Fallback path: invoke `yt-dlp --write-thumbnail` to produce `cover.jpg` in `output_dir`.
+///
+/// Used when direct CDN fetches fail. Returns the path to the written cover, or a
+/// `DownloadError` whose message is yt-dlp's stderr (caller must avoid leaking it
+/// directly to user-facing UI — keep it in `log` instead).
 fn download_thumbnail_ytdlp(
     page_url: &str,
     output_dir: &Path,
@@ -405,6 +453,7 @@ fn download_thumbnail_ytdlp(
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
+        log::debug!("yt-dlp thumbnail fallback failed: {}", err.trim());
         return Err(YtcsError::DownloadError(format!(
             "yt-dlp could not fetch thumbnail: {}",
             err.trim()
@@ -412,9 +461,12 @@ fn download_thumbnail_ytdlp(
     }
 
     album_cover_path(output_dir).ok_or_else(|| {
-        YtcsError::DownloadError(
-            "yt-dlp finished but no cover image was written".to_string(),
-        )
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::debug!(
+            "yt-dlp thumbnail fallback exited 0 but no cover file present. stderr: {}",
+            stderr.trim()
+        );
+        YtcsError::DownloadError("yt-dlp finished but no cover image was written".to_string())
     })
 }
 
@@ -422,7 +474,9 @@ fn download_thumbnail_ytdlp(
 ///
 /// # Errors
 ///
-/// Returns an error if no thumbnail could be downloaded
+/// Returns [`YtcsError::ThumbnailFailed`] when both the direct CDN path and the yt-dlp
+/// fallback fail. The error carries both failure reasons so callers can present a
+/// single concise message and log full detail at debug level.
 pub fn download_thumbnail_from_info(
     info: &VideoInfo,
     page_url: &str,
@@ -434,41 +488,57 @@ pub fn download_thumbnail_from_info(
     let output_path = output_dir.join("cover.jpg");
 
     let agent = ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(THUMBNAIL_HTTP_TIMEOUT_SECS))
         .build();
 
+    let mut last_http_error: Option<String> = None;
+
     for thumb_url in thumbnail_urls {
+        let safe_url = redact_url_query(&thumb_url);
         for attempt in 1..=3 {
-            match agent
-                .get(&thumb_url)
-                .set("User-Agent", THUMBNAIL_HTTP_USER_AGENT)
-                .call()
-            {
-                Ok(response) if response.status() == 200 => {
-                    let mut reader = response.into_reader();
-                    let mut bytes = Vec::new();
-                    std::io::Read::read_to_end(&mut reader, &mut bytes).map_err(|e| {
-                        YtcsError::DownloadError(format!("Failed to read thumbnail: {}", e))
-                    })?;
-                    if bytes.is_empty() {
-                        break;
-                    }
+            match try_fetch_thumbnail_body(&agent, &thumb_url) {
+                FetchOutcome::Body(bytes) => {
                     std::fs::write(&output_path, &bytes).map_err(|e| {
                         YtcsError::DownloadError(format!("Failed to write thumbnail: {}", e))
                     })?;
+                    log::debug!("Thumbnail saved from {} ({} bytes)", safe_url, bytes.len());
                     return Ok(output_path);
                 }
-                Err(e) if attempt < 3 => {
-                    eprintln!("Attempt {}/3 failed for {}: {}", attempt, thumb_url, e);
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                    continue;
+                FetchOutcome::Permanent(reason) => {
+                    let msg = format!("{} ({})", reason, safe_url);
+                    log::debug!("Thumbnail attempt {}/3 (no retry): {}", attempt, msg);
+                    last_http_error = Some(msg);
+                    break;
                 }
-                _ => break,
+                FetchOutcome::Retryable(reason) => {
+                    let msg = format!("{} ({})", reason, safe_url);
+                    log::debug!("Thumbnail attempt {}/3 (retryable): {}", attempt, msg);
+                    last_http_error = Some(msg);
+                    if attempt < 3 {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        continue;
+                    }
+                    break;
+                }
             }
         }
     }
 
-    download_thumbnail_ytdlp(page_url, output_dir, cookies_from_browser)
+    log::debug!(
+        "Direct CDN thumbnail fetch failed (last error: {}); falling back to yt-dlp",
+        last_http_error.as_deref().unwrap_or("none")
+    );
+    download_thumbnail_ytdlp(page_url, output_dir, cookies_from_browser).map_err(|ytdlp_err| {
+        let ytdlp_msg = match ytdlp_err {
+            YtcsError::DownloadError(s) => s,
+            other => other.to_string(),
+        };
+        let http_msg = last_http_error.unwrap_or_else(|| "no candidate URLs".to_string());
+        YtcsError::ThumbnailFailed {
+            http: http_msg,
+            ytdlp: ytdlp_msg,
+        }
+    })
 }
 
 /// Downloads the thumbnail using only the page URL (no `yt-dlp` thumbnail field; uses CDN fallbacks only).
@@ -488,4 +558,31 @@ pub fn download_thumbnail(url: &str, output_dir: &Path) -> Result<PathBuf> {
         thumbnail: None,
     };
     download_thumbnail_from_info(&info, url, output_dir, None)
+}
+
+#[cfg(test)]
+mod thumbnail_helpers_tests {
+    use super::*;
+
+    #[test]
+    fn redact_strips_query_string() {
+        assert_eq!(
+            redact_url_query("https://i.ytimg.com/vi/abc/maxresdefault.jpg?sig=SECRET&pot=TOKEN"),
+            "https://i.ytimg.com/vi/abc/maxresdefault.jpg"
+        );
+    }
+
+    #[test]
+    fn redact_passes_through_when_no_query() {
+        let url = "https://i.ytimg.com/vi/abc/hqdefault.jpg";
+        assert_eq!(redact_url_query(url), url);
+    }
+
+    #[test]
+    fn redact_handles_empty_query() {
+        assert_eq!(
+            redact_url_query("https://example.com/x?"),
+            "https://example.com/x"
+        );
+    }
 }

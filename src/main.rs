@@ -231,7 +231,8 @@ fn process_single_video(
     let clean_url = video_url.to_string();
 
     ui::print_section_header("Fetching video information");
-    let video_info = downloader::get_video_info(&clean_url, app_config.cookies_from_browser.as_deref())?;
+    let video_info =
+        downloader::get_video_info(&clean_url, app_config.cookies_from_browser.as_deref())?;
 
     let (mut artist, mut album, mut artist_source, mut album_source) = if let (Some(a), Some(al)) =
         (&cli.artist, &cli.album)
@@ -297,7 +298,8 @@ fn process_single_video(
 
     let mut folder_name = app_config.format_directory(&artist, &album);
     if let Some(b) = &batch
-        && b.total > 1 && app_config.playlist_prefix_index
+        && b.total > 1
+        && app_config.playlist_prefix_index
     {
         folder_name = format!("{:02} - {}", b.index + 1, folder_name);
     }
@@ -318,14 +320,17 @@ fn process_single_video(
             app_config.cookies_from_browser.as_deref(),
         ) {
             Ok(thumb_path) => {
-                ui::print_artwork_section(thumb_path.to_str().unwrap_or("cover.jpg"));
+                ui::print_artwork_saved(thumb_path.to_str().unwrap_or("cover.jpg"));
             }
-            Err(_) => {
-                ui::print_artwork_section("");
+            Err(e) => {
+                log::warn!("Thumbnail download failed: {}", e);
+                ui::print_artwork_failed(
+                    "could not retrieve cover (run with RUST_LOG=warn for details)",
+                );
             }
         }
     } else {
-        ui::print_artwork_section("");
+        ui::print_artwork_disabled();
     }
 
     ui::print_audio_section_header();
