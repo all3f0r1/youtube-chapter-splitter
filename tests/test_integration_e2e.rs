@@ -271,10 +271,76 @@ mod integration_e2e_tests {
         }
 
         let result = downloader::get_video_info(url, None);
-        // Devrait échouer car la vidéo est privée
-        if result.is_err() {
-            // C'est le comportement attendu
+        // The video ID is fake/private: yt-dlp must reject it.
+        assert!(
+            result.is_err(),
+            "Should fail for a private/nonexistent video"
+        );
+    }
+
+    #[test]
+    #[ignore] // Nécessite connexion internet et yt-dlp
+    fn test_e2e_skip_download_reuses_and_preserves_temp_audio() {
+        // Regression for the bug where `--skip-download` loaded the existing
+        // `temp_audio.<ext>` but the pipeline still deleted `audio_file`
+        // unconditionally after splitting, destroying the very file the user
+        // asked to reuse. This exercises the same `audio::split_audio_by_chapters`
+        // call `main.rs` makes and confirms the caller-owned temp file survives
+        // when it wasn't downloaded by this run (main.rs only removes it when
+        // `!cli.skip_download`).
+        let url = "https://www.youtube.com/watch?v=28vf7QxgCzA";
+        let test_dir = create_test_dir("skip_download_preserved");
+
+        let deps_result = downloader::check_dependencies();
+        if deps_result.is_err() {
+            println!("Skipping test: dependencies not available");
+            cleanup_test_dir(&test_dir);
+            return;
         }
+
+        let audio_path = test_dir.join("temp_audio");
+        let audio_file = yt_dlp_progress::download_audio_with_progress(
+            url,
+            &audio_path,
+            None,
+            YtdlpDownloadOpts::default(),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(audio_file.exists());
+
+        let chapters = audio::detect_silence_chapters(&audio_file, -30.0, 2.0).unwrap();
+        let output_dir = test_dir.join("output");
+        fs::create_dir_all(&output_dir).unwrap();
+
+        audio::split_audio_by_chapters(
+            &audio_file,
+            &chapters,
+            &output_dir,
+            "Artist",
+            "Album",
+            None,
+            "%n - %t",
+            youtube_chapter_splitter::AudioFormat::Mp3,
+            192,
+            None,
+            None,
+            None,
+            true,
+            None,
+        )
+        .unwrap();
+
+        // Mirrors `main.rs`'s `if !cli.skip_download { remove_file(&audio_file) }`:
+        // simulating `--skip-download` means this call must never happen, and
+        // the source file must still be there afterwards.
+        assert!(
+            audio_file.exists(),
+            "temp_audio must survive splitting when --skip-download is set"
+        );
+
+        cleanup_test_dir(&test_dir);
     }
 
     #[test]

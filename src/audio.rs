@@ -6,12 +6,14 @@
 use crate::chapters::Chapter;
 use crate::config::AudioFormat;
 use crate::error::{Result, YtcsError};
+use crate::temp_file::TempFile;
 use lofty::config::WriteOptions;
 use lofty::picture::{Picture, PictureType};
 use lofty::prelude::*;
 use lofty::probe::Probe;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -73,15 +75,13 @@ pub fn split_audio_by_chapters(
 ) -> Result<Vec<PathBuf>> {
     std::fs::create_dir_all(output_dir)?;
 
-    // Load cover image once if it exists
-    let cover_data = if let Some(cover) = cover_path {
-        load_cover_image(cover)?
-    } else {
-        None
-    };
-
-    let mut output_files = Vec::new();
-
+    // Resolve every final output path up front so a filename-template collision
+    // or an existing-file conflict is reported before any ffmpeg process runs,
+    // instead of failing midway through the split with earlier tracks already
+    // written and no easy way to resume (overwrite_existing = false would then
+    // reject a re-run on the very first, already-finished track).
+    let mut output_paths = Vec::with_capacity(chapters.len());
+    let mut seen_paths = HashSet::with_capacity(chapters.len());
     for (index, chapter) in chapters.iter().enumerate() {
         let track_number = index + 1;
         let sanitized_title = chapter.sanitize_title();
@@ -95,6 +95,13 @@ pub fn split_audio_by_chapters(
         let output_filename = format!("{}.{}", base_name, audio_format.extension());
         let output_path = output_dir.join(&output_filename);
 
+        if !seen_paths.insert(output_path.clone()) {
+            return Err(YtcsError::AudioError(format!(
+                "filename_format produces the same output file for multiple chapters: {}",
+                output_path.display()
+            )));
+        }
+
         if output_path.exists() && !overwrite_existing {
             return Err(YtcsError::AudioError(format!(
                 "File already exists (set overwrite_existing = true in config to replace): {}",
@@ -102,9 +109,33 @@ pub fn split_audio_by_chapters(
             )));
         }
 
+        output_paths.push(output_path);
+    }
+
+    // Load cover image once if it exists
+    let cover_data = if let Some(cover) = cover_path {
+        load_cover_image(cover)?
+    } else {
+        None
+    };
+
+    let mut output_files = Vec::new();
+
+    for (index, chapter) in chapters.iter().enumerate() {
+        let track_number = index + 1;
+        let output_path = &output_paths[index];
+        // The extension must be the real one (mp3/opus/m4a): ffmpeg picks its
+        // output muxer from the filename extension, so a generic ".part"
+        // suffix here would make ffmpeg fail to guess the container format.
+        let temp_filename = format!(".ytcs-tmp-{:03}.{}", track_number, audio_format.extension());
+        let temp_path = output_dir.join(temp_filename);
+        let mut temp_file = TempFile::new(&temp_path);
+
         let duration = chapter.duration();
 
-        // Split audio with ffmpeg (without cover art)
+        // Split audio with ffmpeg into a scratch file first; the final filename
+        // is only ever touched by the rename below, so a failure here (or in the
+        // cover-art step) never leaves a partially-encoded file at the destination.
         let mut cmd = Command::new("ffmpeg");
         cmd.arg("-i")
             .arg(input_file)
@@ -147,8 +178,9 @@ pub fn split_audio_by_chapters(
             cmd.arg("-metadata").arg(format!("comment={}", c));
         }
 
-        cmd.arg(if overwrite_existing { "-y" } else { "-n" })
-            .arg(&output_path);
+        // The temp path is ours alone (freshly derived from the final name), so
+        // always overwrite it regardless of the user's overwrite_existing setting.
+        cmd.arg("-y").arg(temp_file.path());
 
         let output = cmd
             .output()
@@ -161,10 +193,22 @@ pub fn split_audio_by_chapters(
 
         // Add album cover art with lofty if it exists
         if let Some(ref cover) = cover_data {
-            add_cover_to_file(&output_path, cover)?;
+            add_cover_to_file(temp_file.path(), cover)?;
         }
 
-        output_files.push(output_path);
+        std::fs::rename(temp_file.path(), output_path).map_err(|e| {
+            YtcsError::AudioError(format!(
+                "Failed to move finished track into place ({} -> {}): {}",
+                temp_file.path().display(),
+                output_path.display(),
+                e
+            ))
+        })?;
+        // The file was just moved to its final name; nothing left for the
+        // temp-file guard to clean up.
+        temp_file.keep();
+
+        output_files.push(output_path.clone());
 
         // Call progress callback if provided
         if let Some(callback) = progress_callback {
@@ -305,6 +349,11 @@ pub fn detect_silence_chapters(
         .arg("-")
         .output()
         .map_err(|e| YtcsError::AudioError(format!("Failed to execute ffmpeg: {}", e)))?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(YtcsError::AudioError(format!("ffmpeg failed: {}", error)));
+    }
 
     let stderr = String::from_utf8_lossy(&output.stderr);
 

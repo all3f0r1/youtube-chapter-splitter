@@ -3,8 +3,8 @@
 A simple and powerful Rust CLI tool to download YouTube videos, extract audio as **MP3, Opus, or M4A**, and automatically split them into individual tracks based on chapters.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.15.10-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+[![Version](https://img.shields.io/badge/version-0.15.12-blue.svg)](https://github.com/all3f0r1/youtube-chapter-splitter/releases)
 
 ## ✨ Features
 
@@ -99,6 +99,7 @@ Settings are stored in `~/.config/ytcs/config.toml` (or `$XDG_CONFIG_HOME/ytcs/c
 - `-q`, `--quiet` - Suppress tree/progress output (still prints each album output path on its own line)
 - `--no-cover` - Skip thumbnail download for this run (overrides `download_cover`)
 - `--skip-download` - Use existing `temp_audio.<ext>` in the album folder if non-empty instead of yt-dlp
+- `--non-interactive` - Never read from stdin; fail instead of prompting for a playlist choice, missing artist/album, dependency install, or a yt-dlp update (see [Exit codes](#exit-codes))
 
 **Examples:**
 
@@ -124,10 +125,17 @@ ytcs "URL"  # ✅ Correct
 ytcs URL    # ❌ May cause issues with & characters
 ```
 
+### Exit codes
+
+For scripting/CI, `ytcs` uses distinct exit codes:
+- `0` — success.
+- `1` — any other error (download failure, ffmpeg error, invalid config, …).
+- `2` — the run needed interactive input but `--non-interactive` was set (ambiguous playlist URL with `playlist_behavior = ask`, undetectable artist/album, a missing dependency with `dependency_auto_install = prompt`, or a yt-dlp update prompt). The error message says which config setting or flag to change.
+
 ## 📊 Example Output
 
 ```
-ytcs v0.15.5
+ytcs v0.15.12
 
 ▶ Fetching video information
 ▶ Marigold - Oblivion Gate
@@ -230,30 +238,46 @@ ytcs "URL" -A "Houses of the Holy"
 
 ### Silence Detection
 
-If no chapters are found, the tool automatically detects silence periods:
-- Threshold: -30 dB
-- Minimum duration: 2.0 seconds
-- Uses ffmpeg's `silencedetect` filter
+Two separate silence-detection passes exist:
+- **Fallback track detection** (no YouTube chapters and no usable description timestamps): fixed -30 dB threshold, 2.0s minimum duration, via ffmpeg's `silencedetect` filter.
+- **Boundary refinement** (`refine_chapters` in config, on by default when chapters/description timestamps *are* available): snaps each cut to the nearest detected silence within `refine_silence_window` seconds, using `refine_noise_db` / `refine_min_silence` as the detection thresholds.
 
 ## 📁 Project Structure
 
 ```
 youtube-chapter-splitter/
 ├── src/
-│   ├── main.rs          # CLI application
-│   ├── lib.rs           # Library exports
-│   ├── error.rs         # Error handling
-│   ├── chapters.rs      # Chapter parsing and manipulation
-│   ├── downloader.rs    # YouTube downloading and thumbnail
-│   ├── audio.rs         # Audio processing with ffmpeg
-│   └── utils.rs         # Utility functions (formatting, cleaning)
+│   ├── main.rs                       # CLI application (arg parsing, orchestration)
+│   ├── lib.rs                        # Library exports
+│   ├── error.rs                      # YtcsError, MissingToolsError
+│   ├── error_handler.rs              # Centralized user-facing error reporting
+│   ├── config.rs                     # config.toml load/save/validate + wizard
+│   ├── chapters.rs                   # Chapter struct, JSON chapter parsing
+│   ├── chapters_from_description.rs  # Chapter timestamps parsed from descriptions
+│   ├── chapter_refinement.rs         # Silence-based chapter boundary refinement
+│   ├── downloader.rs                 # yt-dlp metadata/download, thumbnail fetch
+│   ├── audio.rs                      # ffmpeg splitting, ID3 tagging, silence detection
+│   ├── playlist.rs                   # Playlist URL detection and expansion
+│   ├── cookie_helper.rs              # Browser-cookie authentication
+│   ├── temp_file.rs                  # RAII temporary-file cleanup
+│   ├── progress.rs                   # Progress bar utilities
+│   ├── yt_dlp_progress.rs            # Real-time yt-dlp download progress parsing
+│   ├── yt_dlp_update.rs              # yt-dlp update helpers
+│   ├── ytdlp_helper.rs               # yt-dlp version check / auto-update
+│   ├── ytdlp_error_parser.rs         # Friendly yt-dlp error messages
+│   ├── dependency/                   # Dependency detection and installation
+│   ├── ui.rs                         # Terminal output (tree view, progress, prompts)
+│   └── utils.rs                      # Formatting, filename/title sanitization
+├── tests/                            # Integration tests (one file per concern)
 ├── examples/
-│   ├── basic_usage.rs           # Programmatic usage example
-│   └── chapters_example.json    # Sample chapters file
-├── Cargo.toml           # Dependencies and configuration
-├── README.md            # This file
-├── LICENSE              # MIT License
-└── .gitignore           # Git ignore rules
+│   ├── basic_usage.rs                # Programmatic usage example
+│   └── chapters_example.json         # Sample chapters file
+├── .github/workflows/                # CI (test/fmt/clippy/build) and release
+├── Cargo.toml                        # Dependencies and configuration
+├── CHANGELOG.md                      # Version history
+├── README.md                         # This file
+├── LICENSE                           # MIT License
+└── .gitignore                        # Git ignore rules
 ```
 
 ## 🧪 Testing
@@ -312,13 +336,13 @@ A: By default, files are saved to your Music directory (`~/Music` on Linux/macOS
 A: We use ffmpeg for audio encoding and splitting (industry standard), but we use the Rust library `lofty` for adding metadata and album artwork. This hybrid approach gives us the best of both worlds: ffmpeg's robust audio processing and Rust's safe, efficient metadata handling.
 
 **Q: Can I use this for playlists?**  
-A: Currently, the tool processes one video at a time. Playlist support may be added in the future.
+A: Yes. Set **playlist behavior** in `ytcs config` to `playlist_only` to always expand a playlist URL into every video, or `ask` to be prompted each time (with `--non-interactive`, `ask` fails instead of prompting — pick `playlist_only` or `video_only` for scripted use). The default, `video_only`, downloads just the current video and strips the `list=` parameter. `playlist_prefix_index` prefixes each album folder with `01-`, `02-`, … to avoid name clashes across a batch.
 
 **Q: What if a video has no chapters?**  
-A: The tool automatically falls back to silence detection to identify track boundaries.
+A: The tool tries chapter timestamps in the video description next, then falls back to silence detection to identify track boundaries.
 
 **Q: Can I customize silence detection parameters?**  
-A: Currently, the parameters are fixed (-30 dB threshold, 2.0s minimum duration). Custom parameters may be added in future versions.
+A: Yes, via `ytcs config`: `refine_silence_window`, `refine_noise_db`, and `refine_min_silence` control the silence-refinement pass (defaults: ±5s window, -35 dB, 1.2s minimum). The initial fallback detection (when there are no chapters or description timestamps at all) uses fixed -30 dB / 2.0s.
 
 **Q: How do I avoid the [1], [2] background job messages?**  
 A: Always put the URL in quotes: `ytcs "URL"` instead of `ytcs URL`. The `&` character in URLs is interpreted by the shell as a background job operator.
@@ -328,13 +352,13 @@ A: Yes! The album artwork is automatically embedded in each MP3 file using the `
 
 ## 📈 Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+See [CHANGELOG.md](CHANGELOG.md) for the full, per-version history — the highlights below are only a snapshot and will drift out of date, so treat CHANGELOG.md as the source of truth.
 
-### v0.15.5 (Latest)
-- **`ytcs config`**: Interactive configuration wizard and `ytcs config --show`; downloads honor `~/.config/ytcs/config.toml`
-- **Parsing**: Album titles no longer keep trailing ` - Full Album - …` promo segments
-- **Splitting UI**: Track list without overlapping progress bars
-- **UI** (from v0.15.0): Tree-style output, metadata prompts, aligned track lines
+- **v0.15.12**: Chapter-refinement boundaries can no longer gap/overlap, `--skip-download` no longer deletes the reused file, per-track splitting is atomic (validated + temp-file + rename), and a new `--non-interactive` flag with dedicated exit codes.
+- **v0.15.11**: Hardened thumbnail download (retry on transient 5xx, response-size cap, no sensitive URLs/paths in user-facing errors).
+- **v0.15.10 / v0.15.9**: `deno` is now a checked, auto-installable dependency; yt-dlp's EJS `n`-challenge solver is fetched automatically (required for YouTube audio downloads).
+- **v0.15.7**: Configurable output format (`mp3` / `opus` / `m4a`), silence-refinement tuning, `playlist_prefix_index`, `--dry-run` / `--quiet` / `--no-cover` / `--skip-download`.
+- **v0.15.5**: Interactive `ytcs config` wizard, tree-style CLI output.
 
 ## 📞 Support
 

@@ -120,6 +120,14 @@ pub enum YtcsError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
+    /// `--non-interactive` was set but the run reached a point that would
+    /// otherwise prompt on stdin (unresolved metadata, an ambiguous playlist
+    /// URL, a missing dependency, or an available yt-dlp update). Reported
+    /// with a distinct exit code (2) so scripts/CI can tell "needs a human"
+    /// apart from a plain failure (1).
+    #[error("Input required: {0}")]
+    InputRequired(String),
+
     /// Installation error for dependencies.
     #[error("Installation error: {0}")]
     InstallError(String),

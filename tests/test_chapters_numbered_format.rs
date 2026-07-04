@@ -14,12 +14,13 @@ fn test_numbered_format_basic() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
-    // Note: to_title_case capitalizes every word (including minor words like "of")
-    assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
+    // Titles are kept verbatim (used for ID3/display tags); only filenames go
+    // through sanitize_title/title-casing.
+    assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
     assert_eq!(chapters[0].start_time, 0.0);
-    assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
+    assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
     assert_eq!(chapters[1].start_time, 4.0 * 60.0 + 24.0);
-    assert_eq!(chapters[2].title, "The Ritual Of The Octagonal Chamber");
+    assert_eq!(chapters[2].title, "The Ritual of the Octagonal Chamber");
     assert_eq!(chapters[2].start_time, 11.0 * 60.0 + 1.0);
 }
 
@@ -35,19 +36,19 @@ fn test_numbered_format_with_parentheses_in_title() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 3);
-    // Note: to_title_case capitalizes every word (including minor words and text in parentheses)
+    // Titles are kept verbatim, exactly as written in the description.
     assert_eq!(
         chapters[0].title,
-        "Colors At The Bottom Of The Gesture (instrumental)"
+        "Colors at the Bottom of the Gesture (Instrumental)"
     );
     assert_eq!(
         chapters[1].title,
-        "Mirror Against The Firmament (suite In Three Parts)"
+        "Mirror Against the Firmament (Suite in Three Parts)"
     );
     assert_eq!(
         chapters[2].title,
-        "Architects Of Inner Time (part Ii_ The Awakening)"
-    ); // Note: colons are replaced with underscore
+        "Architects of Inner Time (Part II: The Awakening)"
+    );
 }
 
 #[test]
@@ -129,8 +130,10 @@ fn test_standard_format_still_works() {
 }
 
 #[test]
-fn test_numbered_format_sanitization() {
-    // Verify that special characters are properly sanitized
+fn test_numbered_format_title_preserved_filename_sanitized() {
+    // The parsed title (used for ID3/display tags) keeps special characters
+    // as written; only the filename (via Chapter::sanitize_title) needs to be
+    // filesystem-safe.
     let description = r#"
 1 - Track: With Colon (0:00)
 2 - Track/With/Slash (3:00)
@@ -142,10 +145,14 @@ fn test_numbered_format_sanitization() {
     let chapters = parse_chapters_from_description(description, duration).unwrap();
 
     assert_eq!(chapters.len(), 4);
-    // Colons, slashes, backslashes, and pipes should be replaced
-    // Note: to_title_case treats underscores as part of words, so only first char is capitalized
-    assert_eq!(chapters[0].title, "Track_ With Colon");
-    assert_eq!(chapters[1].title, "Track_with_slash");
-    assert_eq!(chapters[2].title, "Track_with_backslash");
-    assert_eq!(chapters[3].title, "Track_with_pipe");
+    assert_eq!(chapters[0].title, "Track: With Colon");
+    assert_eq!(chapters[1].title, "Track/With/Slash");
+    assert_eq!(chapters[2].title, "Track\\With\\Backslash");
+    assert_eq!(chapters[3].title, "Track|With|Pipe");
+
+    // Colons, slashes, backslashes, and pipes must still be replaced in filenames.
+    assert_eq!(chapters[0].sanitize_title(), "Track_ With Colon");
+    assert_eq!(chapters[1].sanitize_title(), "Track_with_slash");
+    assert_eq!(chapters[2].sanitize_title(), "Track_with_backslash");
+    assert_eq!(chapters[3].sanitize_title(), "Track_with_pipe");
 }

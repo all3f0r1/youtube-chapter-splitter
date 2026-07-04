@@ -143,8 +143,20 @@ pub fn is_outdated_error(stderr: &str) -> bool {
 
 /// Prompts user to update yt-dlp and performs the update if accepted.
 ///
+/// `interval_days` is `Config::ytdlp_update_interval_days`: if an update was
+/// already attempted more recently than that, the prompt is skipped so a run
+/// of consecutive failing downloads doesn't ask to update yt-dlp every time.
+///
 /// Returns `true` if update was performed, `false` otherwise.
-pub fn prompt_and_update_ytdlp() -> Result<bool> {
+pub fn prompt_and_update_ytdlp(interval_days: u64) -> Result<bool> {
+    if !should_check_for_update(interval_days) {
+        log::debug!(
+            "Skipping yt-dlp update prompt: checked within the last {} day(s)",
+            interval_days
+        );
+        return Ok(false);
+    }
+
     // Check current version
     let version_info = get_ytdlp_version();
 

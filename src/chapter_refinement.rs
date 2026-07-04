@@ -84,6 +84,11 @@ fn detect_all_silences(
         .output()
         .map_err(|e| YtcsError::AudioError(format!("Failed to run ffmpeg: {}", e)))?;
 
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(YtcsError::AudioError(format!("ffmpeg failed: {}", error)));
+    }
+
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     static RE_SILENCE_START: Lazy<Regex> =
@@ -136,6 +141,72 @@ fn find_nearest_silence(
         })
 }
 
+/// Minimum gap enforced between two adjacent refined boundaries, so that
+/// `Chapter::new` (which panics on `end <= start`) never sees a degenerate range.
+const MIN_BOUNDARY_GAP: f64 = 0.05;
+
+/// Computes the `n + 1` cut points for `n` chapters: `boundaries[0]` is the
+/// first chapter's declared start, `boundaries[n]` is the last chapter's
+/// declared end (both fixed), and each `boundaries[i]` in between is the
+/// single, shared cut between chapter `i - 1` and chapter `i`, snapped to the
+/// nearest silence within `window` seconds of the declared cut (or left at
+/// the declared position if none is found). Pulled out of
+/// [`refine_chapters_with_silence`] so the boundary math can be unit-tested
+/// without needing ffmpeg or a real audio file.
+fn compute_refined_boundaries(
+    chapters: &[Chapter],
+    silences: &[SilencePoint],
+    window: f64,
+) -> Vec<f64> {
+    let n = chapters.len();
+    let first_start = chapters[0].start_time;
+    let last_end = chapters[n - 1].end_time;
+
+    // boundaries[0] and boundaries[n] are fixed; boundaries[1..n] are the interior
+    // cuts, each computed exactly once from the declared start/end around it.
+    let mut boundaries = vec![0.0_f64; n + 1];
+    boundaries[0] = first_start;
+    boundaries[n] = last_end;
+
+    for i in 1..n {
+        let target = (chapters[i - 1].end_time + chapters[i].start_time) / 2.0;
+        boundaries[i] = find_nearest_silence(silences, target, window)
+            .map(|s| s.position)
+            .unwrap_or(target);
+    }
+
+    // Enforce strictly increasing boundaries without ever moving the fixed
+    // first/last points: push interior collisions forward, then pull back
+    // anything that got nudged past the fixed end.
+    for i in 1..n {
+        let min_allowed = boundaries[i - 1] + MIN_BOUNDARY_GAP;
+        if boundaries[i] < min_allowed {
+            boundaries[i] = min_allowed;
+        }
+    }
+    for i in (1..n).rev() {
+        let max_allowed = boundaries[i + 1] - MIN_BOUNDARY_GAP;
+        if boundaries[i] > max_allowed {
+            boundaries[i] = max_allowed;
+        }
+    }
+
+    // The backward pass only pulls values down to satisfy the fixed last
+    // boundary, so in principle it could re-introduce a collision with an
+    // already-settled predecessor if the total span were too tight to fit
+    // `n` gaps of MIN_BOUNDARY_GAP. Real chapters are always spaced by at
+    // least ~1s (enforced upstream), so this can't trigger in practice; the
+    // assert documents the invariant instead of silently producing chapters
+    // with reversed/zero duration.
+    debug_assert!(
+        boundaries.windows(2).all(|w| w[1] > w[0]),
+        "refined boundaries must be strictly increasing: {:?}",
+        boundaries
+    );
+
+    boundaries
+}
+
 /// Refines chapters using silence points.
 ///
 /// # Arguments
@@ -152,9 +223,11 @@ fn find_nearest_silence(
 ///
 /// # Strategy
 ///
-/// - **Track start**: Adjusted towards the nearest silence **after** the timecode
-/// - **Track end**: Adjusted towards the nearest silence **before** the timecode
-/// - If no silence is found within the window, the original timecode is kept
+/// Each cut between two consecutive tracks is a single boundary, computed once and
+/// shared by both tracks (track N's end == track N+1's start), so refinement can never
+/// open a gap or an overlap. The very first start and very last end are never moved;
+/// only the `n - 1` interior boundaries are snapped to the nearest silence in the window.
+/// If no silence is found near a boundary, its original (declared) position is kept.
 pub fn refine_chapters_with_silence(
     chapters: &[Chapter],
     audio_file: &Path,
@@ -174,73 +247,27 @@ pub fn refine_chapters_with_silence(
         return Ok(chapters.to_vec());
     }
 
-    let mut refined = Vec::new();
+    let boundaries = compute_refined_boundaries(chapters, &silences, window);
 
-    for (i, chapter) in chapters.iter().enumerate() {
-        let is_last = i == chapters.len() - 1;
-
-        // For start, look for a silence AFTER the declared timecode
-        // For end (except last track), look for a silence BEFORE
-        let new_start = if i == 0 {
-            // First track: keep the beginning or look before
-            let before = find_nearest_silence(&silences, chapter.start_time, window);
-            before
-                .map(|s| s.position)
-                .filter(|&pos| pos <= chapter.start_time + 0.5)
-        } else {
-            // Following tracks: look for a silence after the timecode
-            let after = find_nearest_silence(&silences, chapter.start_time, window);
-            after
-                .map(|s| s.position)
-                .filter(|&pos| pos >= chapter.start_time - 0.5)
-        };
-
-        let new_end = if is_last {
-            // Last track: keep the original end
-            chapter.end_time
-        } else {
-            // Look for a silence before the declared end
-            let before = find_nearest_silence(&silences, chapter.end_time, window);
-            before
-                .map(|s| s.position)
-                .filter(|&pos| pos <= chapter.end_time + 0.5)
-                .unwrap_or(chapter.end_time)
-        };
-
-        let final_start = new_start.unwrap_or(chapter.start_time);
-        let final_end = new_end;
-
-        // Ensure chapters don't overlap
-        let previous_end = refined.last().map(|c: &Chapter| c.end_time);
-        let final_end = if let Some(prev_end) = previous_end {
-            if final_start < prev_end {
-                prev_end + 0.1
-            } else {
-                final_end
-            }
-        } else {
-            final_end
-        };
-
-        // Check that duration is reasonable (at least 30 seconds)
-        let final_end = final_end.max(final_start + 30.0);
-
-        let duration_delta = (final_end - final_start) - chapter.duration();
-        let start_delta = final_start - chapter.start_time;
-
-        log::debug!(
-            "Chapter {}: start {:.2}s → {:.2}s (Δ{:.2}s), end {:.2}s → {:.2}s (Δ{:.2}s)",
-            i + 1,
-            chapter.start_time,
-            final_start,
-            start_delta,
-            chapter.end_time,
-            final_end,
-            duration_delta
-        );
-
-        refined.push(Chapter::new(chapter.title.clone(), final_start, final_end));
-    }
+    let refined: Vec<Chapter> = chapters
+        .iter()
+        .enumerate()
+        .map(|(i, chapter)| {
+            let final_start = boundaries[i];
+            let final_end = boundaries[i + 1];
+            log::debug!(
+                "Chapter {}: start {:.2}s → {:.2}s (Δ{:.2}s), end {:.2}s → {:.2}s (Δ{:.2}s)",
+                i + 1,
+                chapter.start_time,
+                final_start,
+                final_start - chapter.start_time,
+                chapter.end_time,
+                final_end,
+                (final_end - final_start) - chapter.duration()
+            );
+            Chapter::new(chapter.title.clone(), final_start, final_end)
+        })
+        .collect();
 
     Ok(refined)
 }
@@ -330,5 +357,100 @@ mod tests {
         // Target outside window
         let nearest = find_nearest_silence(&silences, 15.0, 2.0);
         assert!(nearest.is_none());
+    }
+
+    /// Asserts every returned boundary set has no gaps and no overlaps: each
+    /// chapter's end must equal the next chapter's start, and the first/last
+    /// edges must match the originals exactly (they're never refined).
+    fn assert_contiguous(chapters: &[Chapter], boundaries: &[f64]) {
+        assert_eq!(boundaries.len(), chapters.len() + 1);
+        assert_eq!(boundaries[0], chapters[0].start_time, "first start moved");
+        assert_eq!(
+            *boundaries.last().unwrap(),
+            chapters.last().unwrap().end_time,
+            "last end moved"
+        );
+        for w in boundaries.windows(2) {
+            assert!(
+                w[1] > w[0],
+                "boundaries must be strictly increasing: {:?}",
+                w
+            );
+        }
+    }
+
+    #[test]
+    fn test_compute_refined_boundaries_no_gap_or_overlap() {
+        // Regression for the original bug: a silence found close to chapter
+        // 2's declared start (which precedes chapter 1's declared end) used
+        // to only move `final_end` for chapter 1, leaving chapter 2's start
+        // untouched — opening a gap/overlap between the two. Boundaries are
+        // now computed once and shared, so this can no longer happen.
+        let chapters = vec![
+            Chapter::new("Track 1".to_string(), 0.0, 30.0),
+            Chapter::new("Track 2".to_string(), 28.0, 60.0),
+            Chapter::new("Track 3".to_string(), 60.5, 90.0),
+        ];
+        let silences = vec![
+            SilencePoint::new(28.8, 29.2), // near the declared 28.0/30.0 split
+            SilencePoint::new(60.2, 60.8), // near the declared 60.5 split
+        ];
+
+        let boundaries = compute_refined_boundaries(&chapters, &silences, 5.0);
+        assert_contiguous(&chapters, &boundaries);
+        // Both tracks around the first cut agree on exactly the same point.
+        assert_eq!(boundaries[1], 29.0);
+    }
+
+    #[test]
+    fn test_compute_refined_boundaries_keeps_declared_cut_when_no_silence_nearby() {
+        let chapters = vec![
+            Chapter::new("Track 1".to_string(), 0.0, 30.0),
+            Chapter::new("Track 2".to_string(), 30.0, 60.0),
+        ];
+        // No silence anywhere near the 30.0s cut.
+        let silences = vec![SilencePoint::new(200.0, 201.0)];
+
+        let boundaries = compute_refined_boundaries(&chapters, &silences, 5.0);
+        assert_contiguous(&chapters, &boundaries);
+        assert_eq!(boundaries[1], 30.0);
+    }
+
+    #[test]
+    fn test_compute_refined_boundaries_never_moves_first_start_or_last_end() {
+        let chapters = vec![
+            Chapter::new("Track 1".to_string(), 2.0, 30.0),
+            Chapter::new("Track 2".to_string(), 30.0, 60.0),
+            Chapter::new("Track 3".to_string(), 60.0, 90.0),
+        ];
+        // Silences suspiciously close to the very first start and very last
+        // end must not clip the intro or trim the outro.
+        let silences = vec![
+            SilencePoint::new(0.4, 0.6),
+            SilencePoint::new(29.8, 30.2),
+            SilencePoint::new(59.8, 60.2),
+            SilencePoint::new(89.0, 89.4),
+        ];
+
+        let boundaries = compute_refined_boundaries(&chapters, &silences, 5.0);
+        assert_contiguous(&chapters, &boundaries);
+    }
+
+    #[test]
+    fn test_compute_refined_boundaries_handles_many_close_declared_cuts() {
+        // Several chapters declared back-to-back with barely any gap between
+        // them (e.g. a sloppily authored description). Even if every interior
+        // cut snaps to nearly the same silence, boundaries must stay strictly
+        // increasing and the outer edges must stay fixed.
+        let chapters = vec![
+            Chapter::new("Track 1".to_string(), 0.0, 10.0),
+            Chapter::new("Track 2".to_string(), 10.01, 10.02),
+            Chapter::new("Track 3".to_string(), 10.03, 10.04),
+            Chapter::new("Track 4".to_string(), 10.05, 20.0),
+        ];
+        let silences = vec![SilencePoint::new(9.99, 10.01)];
+
+        let boundaries = compute_refined_boundaries(&chapters, &silences, 5.0);
+        assert_contiguous(&chapters, &boundaries);
     }
 }

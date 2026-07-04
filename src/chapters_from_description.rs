@@ -5,7 +5,6 @@
 
 use crate::chapters::{Chapter, parse_timestamp};
 use crate::error::{Result, YtcsError};
-use crate::utils;
 use regex::Regex;
 
 /// Parses chapters from a video description.
@@ -84,11 +83,10 @@ pub fn parse_chapters_from_description(
             if let Ok(start_time) = parse_timestamp(timestamp_str) {
                 // Check that timestamp is within video duration
                 if start_time < video_duration {
-                    // Clean the title
-                    let clean_title = utils::sanitize_title(title);
-                    if !clean_title.is_empty() {
-                        chapters_data.push((start_time, clean_title));
-                    }
+                    // Keep the original title as-is: it's used for ID3/display tags.
+                    // Filesystem sanitization happens separately, only when
+                    // building the output filename (see Chapter::sanitize_title).
+                    chapters_data.push((start_time, title.to_string()));
                 }
             }
         }
@@ -110,11 +108,8 @@ pub fn parse_chapters_from_description(
                 if let Ok(start_time) = parse_timestamp(timestamp_str) {
                     // Check that timestamp is within video duration
                     if start_time < video_duration {
-                        // Clean the title
-                        let clean_title = utils::sanitize_title(title);
-                        if !clean_title.is_empty() {
-                            chapters_data.push((start_time, clean_title));
-                        }
+                        // Keep the original title as-is (see comment above).
+                        chapters_data.push((start_time, title.to_string()));
                     }
                 }
             }
@@ -238,14 +233,16 @@ Tracklist:
 "#;
         let chapters = parse_chapters_from_description(description, 3600.0).unwrap();
         assert_eq!(chapters.len(), 12);
-        // Note: to_title_case capitalizes every word (including minor words like "of")
-        assert_eq!(chapters[0].title, "The Cornerstone Of Some Dream");
+        // Titles are kept verbatim (as written in the description) for use as
+        // ID3/display tags; filesystem sanitization only applies to filenames
+        // via Chapter::sanitize_title, not to the stored title itself.
+        assert_eq!(chapters[0].title, "The Cornerstone of Some Dream");
         assert_eq!(chapters[0].start_time, 0.0);
-        assert_eq!(chapters[1].title, "Architects Of Inner Time (part I)");
+        assert_eq!(chapters[1].title, "Architects of Inner Time (Part I)");
         assert_eq!(chapters[1].start_time, 264.0); // 4:24
         assert_eq!(
             chapters[11].title,
-            "Architects Of Inner Time (part Ii_ The Awakening)"
+            "Architects of Inner Time (Part II: The Awakening)"
         );
         assert_eq!(chapters[11].start_time, 3102.0); // 51:42
     }

@@ -51,6 +51,12 @@ struct Cli {
     /// Use existing `temp_audio.*` in the album folder if present instead of downloading
     #[arg(long)]
     skip_download: bool,
+
+    /// Never read from stdin; fail instead of prompting (playlist choice, missing
+    /// artist/album, dependency install, yt-dlp update). Exit code 2 means a
+    /// prompt was needed; exit code 1 is any other error.
+    #[arg(long)]
+    non_interactive: bool,
 }
 
 #[derive(Subcommand)]
@@ -74,7 +80,11 @@ fn is_playlist_only_page(url: &str) -> bool {
         && !u.contains("watch?v=")
 }
 
-fn resolve_video_urls(raw: &str, cfg: &config::Config) -> Result<Vec<String>> {
+fn resolve_video_urls(
+    raw: &str,
+    cfg: &config::Config,
+    non_interactive: bool,
+) -> Result<Vec<String>> {
     use config::PlaylistBehavior;
     let cookies = cfg.cookies_from_browser.as_deref();
 
@@ -106,6 +116,14 @@ fn resolve_video_urls(raw: &str, cfg: &config::Config) -> Result<Vec<String>> {
             Ok(info.videos.iter().map(|v| v.url.clone()).collect())
         }
         PlaylistBehavior::Ask => {
+            if non_interactive {
+                return Err(YtcsError::InputRequired(
+                    "playlist_behavior is 'ask' but this URL includes a playlist; set \
+                     playlist_behavior to video_only or playlist_only (ytcs config), or drop \
+                     --non-interactive."
+                        .to_string(),
+                ));
+            }
             eprintln!(
                 "{}",
                 "This URL includes a playlist. Download all videos? (y/n)".bold()
@@ -137,7 +155,11 @@ fn track_progress_callback(track_number: usize, total_tracks: usize, title: &str
     ui::print_track_progress(track_number, total_tracks, title, duration);
 }
 
-fn handle_missing_dependencies(e: YtcsError, behavior: &config::AutoInstallBehavior) -> Result<()> {
+fn handle_missing_dependencies(
+    e: YtcsError,
+    behavior: &config::AutoInstallBehavior,
+    non_interactive: bool,
+) -> Result<()> {
     let missing = match &e {
         YtcsError::MissingTools(m) => *m,
         _ => return Err(e),
@@ -158,6 +180,13 @@ fn handle_missing_dependencies(e: YtcsError, behavior: &config::AutoInstallBehav
     match behavior {
         config::AutoInstallBehavior::Never => Err(e),
         config::AutoInstallBehavior::Always => install_all(),
+        config::AutoInstallBehavior::Prompt if non_interactive => {
+            Err(YtcsError::InputRequired(format!(
+                "{}\ndependency_auto_install is 'prompt'; set it to 'always' or 'never' (ytcs \
+                 config), or drop --non-interactive.",
+                e
+            )))
+        }
         config::AutoInstallBehavior::Prompt => {
             eprintln!(
                 "{}",
@@ -266,6 +295,13 @@ fn process_single_video(
     };
 
     if artist == "Unknown Artist" && cli.artist.is_none() {
+        if cli.non_interactive {
+            return Err(YtcsError::InputRequired(format!(
+                "Could not determine the artist for \"{}\"; pass --artist (and --album if \
+                 needed), or drop --non-interactive.",
+                video_info.title
+            )));
+        }
         let (input_artist, input_album) = ui::prompt_metadata(
             &video_info.title,
             &artist,
@@ -279,6 +315,13 @@ fn process_single_video(
         && cli.album.is_none()
         && !utils::clean_folder_name(&video_info.title).contains(" - ")
     {
+        if cli.non_interactive {
+            return Err(YtcsError::InputRequired(format!(
+                "Could not determine the album for \"{}\"; pass --album (and --artist if \
+                 needed), or drop --non-interactive.",
+                video_info.title
+            )));
+        }
         let (input_artist, input_album) = ui::prompt_metadata(&video_info.title, &artist, &album);
         artist = input_artist;
         album = input_album;
@@ -336,7 +379,10 @@ fn process_single_video(
     ui::print_audio_section_header();
     let ext = app_config.audio_format.extension();
     let temp_audio = output_dir.join(format!("temp_audio.{ext}"));
-    let download_opts = YtdlpDownloadOpts::from(app_config);
+    let download_opts = YtdlpDownloadOpts {
+        non_interactive: cli.non_interactive,
+        ..YtdlpDownloadOpts::from(app_config)
+    };
 
     let audio_file = if cli.skip_download {
         let p = temp_audio.clone();
@@ -444,7 +490,9 @@ fn process_single_video(
 
     ui::print_splitting_complete();
 
-    std::fs::remove_file(&audio_file).ok();
+    if !cli.skip_download {
+        std::fs::remove_file(&audio_file).ok();
+    }
 
     ui::print_final_result(&output_dir);
 
@@ -454,7 +502,12 @@ fn process_single_video(
 fn main() {
     if let Err(e) = run() {
         eprintln!("{} {}", "✗".red().bold(), format!("{}", e).red());
-        std::process::exit(1);
+        let exit_code = if matches!(e, YtcsError::InputRequired(_)) {
+            2
+        } else {
+            1
+        };
+        std::process::exit(exit_code);
     }
 }
 
@@ -481,10 +534,10 @@ fn run() -> Result<()> {
     ui::print_header();
 
     if let Err(e) = downloader::check_dependencies() {
-        handle_missing_dependencies(e, &app_config.dependency_auto_install)?;
+        handle_missing_dependencies(e, &app_config.dependency_auto_install, cli.non_interactive)?;
     }
 
-    let video_urls = resolve_video_urls(url, &app_config)?;
+    let video_urls = resolve_video_urls(url, &app_config, cli.non_interactive)?;
 
     if cli.dry_run {
         return run_dry_run(&video_urls, &cli, &app_config);

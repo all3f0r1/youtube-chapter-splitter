@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.12] - 2026-07-04
+
+### Fixed
+- Chapter-refinement boundaries (`refine_chapters_with_silence`) are now computed once per cut and shared by the two adjacent tracks, so a track's end always equals the next track's start — the previous per-side computation could open a gap or an overlap between tracks, and additionally forced a 30s minimum duration that could make it worse.
+- `--skip-download` no longer deletes the reused `temp_audio.<ext>` after splitting; the cleanup now only runs when this run actually downloaded the file.
+- `split_audio_by_chapters` validates every output path (filename-template collisions, existing files vs. `overwrite_existing`) before running any ffmpeg process, and writes each track to a temp file that is renamed into place only after encoding and tagging succeed. A failure partway through a batch (or a stale target from a previous run) can no longer leave earlier tracks silently overwritten or corrupted, and a re-run with `overwrite_existing = false` no longer fails on the first already-finished track.
+- `detect_silence_chapters` and the refinement pass's silence detection now check ffmpeg's exit status; a codec/filter failure is reported as an `ffmpeg failed` error instead of being misreported as "No silence detected".
+- Chapter titles parsed from video descriptions are kept verbatim for ID3/display tags; only the generated filename goes through `sanitize_title`/title-casing (previously the sanitized, title-cased form was stored as the title itself).
+
+### Added
+- `--non-interactive` CLI flag: fails instead of prompting on stdin for an ambiguous playlist URL (`playlist_behavior = ask`), an undetectable artist/album, a missing dependency (`dependency_auto_install = prompt`), or a yt-dlp update. Exit code `2` distinguishes "needed input" from any other error (`1`).
+- `Config::validate()`, called after loading `config.toml` and before saving from the wizard: rejects an out-of-range `audio_quality`, non-positive `max_retries`/`refine_silence_window`/`refine_min_silence`, non-finite `refine_noise_db`, and empty or path-separator-containing `filename_format`/`directory_format`.
+- `ytdlp_update_interval_days` (previously read from config but never used outside it) now actually throttles the yt-dlp update prompt via `ytdlp_helper::should_check_for_update`.
+
+### Changed
+- CI: `cargo clippy` now runs with `-D warnings` instead of `-W clippy::all`, so lint warnings fail the build.
+- Release workflow: the GitHub Release is now only published after every platform binary has built successfully (previously it was created up front, so a failed build could leave a public, empty/partial release). The changelog's "Full Changelog" comparison link no longer resolves to `vX...vX` on a tag push.
+- README synced with the current version, Rust edition (2024, 1.85+), module list, and playlist/exit-code documentation.
+
 ## [0.15.11] - 2026-04-29
 
 ### Fixed

@@ -260,7 +260,64 @@ impl Config {
         let config: Config = toml::from_str(&content)
             .map_err(|e| YtcsError::ConfigError(format!("Failed to parse config: {}", e)))?;
 
+        config.validate()?;
         Ok(config)
+    }
+
+    /// Validates field values that serde's type system can't enforce on its own.
+    ///
+    /// The interactive wizard already rejects bad input at entry time, but a
+    /// hand-edited `config.toml` bypasses the wizard entirely — this is the one
+    /// place both paths funnel through before the config is used.
+    pub fn validate(&self) -> Result<()> {
+        if ![128, 192, 320].contains(&self.audio_quality) {
+            return Err(YtcsError::ConfigError(format!(
+                "audio_quality must be 128, 192, or 320 (kbps), got {}",
+                self.audio_quality
+            )));
+        }
+        if self.max_retries == 0 {
+            return Err(YtcsError::ConfigError(
+                "max_retries must be a positive integer".to_string(),
+            ));
+        }
+        if !self.refine_silence_window.is_finite() || self.refine_silence_window <= 0.0 {
+            return Err(YtcsError::ConfigError(
+                "refine_silence_window must be a positive number of seconds".to_string(),
+            ));
+        }
+        if !self.refine_min_silence.is_finite() || self.refine_min_silence <= 0.0 {
+            return Err(YtcsError::ConfigError(
+                "refine_min_silence must be a positive number of seconds".to_string(),
+            ));
+        }
+        if !self.refine_noise_db.is_finite() {
+            return Err(YtcsError::ConfigError(
+                "refine_noise_db must be a finite number".to_string(),
+            ));
+        }
+        Self::validate_template("filename_format", &self.filename_format)?;
+        Self::validate_template("directory_format", &self.directory_format)?;
+        Ok(())
+    }
+
+    /// A format template must produce a single path component: non-empty and
+    /// free of path separators (otherwise it could silently create unexpected
+    /// nested directories, or collapse to `..`-like traversal on user input).
+    fn validate_template(field_name: &str, template: &str) -> Result<()> {
+        if template.trim().is_empty() {
+            return Err(YtcsError::ConfigError(format!(
+                "{} must not be empty",
+                field_name
+            )));
+        }
+        if template.contains('/') || template.contains('\\') {
+            return Err(YtcsError::ConfigError(format!(
+                "{} must not contain path separators ('/' or '\\'): {:?}",
+                field_name, template
+            )));
+        }
+        Ok(())
     }
 
     /// Save configuration to file
@@ -711,6 +768,7 @@ pub fn run_interactive_config_wizard() -> Result<()> {
         })?;
     }
 
+    config.validate()?;
     config.save()?;
     println!();
     println!("✓ Configuration saved to {}", path.display());

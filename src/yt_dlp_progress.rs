@@ -24,6 +24,10 @@ pub struct YtdlpDownloadOpts {
     pub socket_timeout_secs: u64,
     pub retries: u32,
     pub ytdlp_auto_update_on_failure: bool,
+    pub ytdlp_update_interval_days: u64,
+    /// Set from the CLI `--non-interactive` flag (not part of `Config`); when
+    /// true, an outdated-yt-dlp failure is reported instead of prompting.
+    pub non_interactive: bool,
 }
 
 impl Default for YtdlpDownloadOpts {
@@ -34,6 +38,8 @@ impl Default for YtdlpDownloadOpts {
             socket_timeout_secs: 300,
             retries: 3,
             ytdlp_auto_update_on_failure: true,
+            ytdlp_update_interval_days: 1,
+            non_interactive: false,
         }
     }
 }
@@ -46,6 +52,8 @@ impl From<&crate::config::Config> for YtdlpDownloadOpts {
             socket_timeout_secs: c.download_timeout,
             retries: c.max_retries,
             ytdlp_auto_update_on_failure: c.ytdlp_auto_update,
+            ytdlp_update_interval_days: c.ytdlp_update_interval_days,
+            non_interactive: false,
         }
     }
 }
@@ -306,6 +314,15 @@ pub fn download_audio_with_progress(
             {
                 // Check if error is due to outdated yt-dlp
                 if ytdlp_helper::is_outdated_error(e) {
+                    if opts_clone.non_interactive {
+                        progress_bar.abandon();
+                        return Err(YtcsError::InputRequired(format!(
+                            "{} yt-dlp appears outdated; run `yt-dlp -U` manually, or drop \
+                             --non-interactive.",
+                            e
+                        )));
+                    }
+
                     progress_bar.abandon();
 
                     println!();
@@ -316,7 +333,9 @@ pub fn download_audio_with_progress(
                             .bold()
                     );
 
-                    match ytdlp_helper::prompt_and_update_ytdlp() {
+                    match ytdlp_helper::prompt_and_update_ytdlp(
+                        opts_clone.ytdlp_update_interval_days,
+                    ) {
                         Ok(true) => {
                             // Update successful, retry download
                             println!();

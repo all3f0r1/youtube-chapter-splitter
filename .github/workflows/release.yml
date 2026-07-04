@@ -11,11 +11,11 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    name: Create GitHub Release
+  prepare-release:
+    name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
-      release_tag: ${{ steps.version.outputs.tag }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,27 +40,26 @@ jobs:
           VERSION="${TAG#v}"
           awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md \
             | sed '/^[[:space:]]*$/d' > release_notes.md
-          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | head -1 || true)
+          # Exclude the tag being released itself: on a tag-triggered push it
+          # already exists in `git tag` (checkout fetched all tags), so without
+          # this filter PREV_TAG would resolve to TAG and produce a vX...vX
+          # (empty) comparison link.
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | grep -vx "$TAG" | head -1 || true)
           if [ -n "$PREV_TAG" ]; then
             echo "" >> release_notes.md
             echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}" >> release_notes.md
           fi
           cat release_notes.md
 
-      - name: Create release with changelog
-        uses: softprops/action-gh-release@v1
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          body_path: release_notes.md
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: release-notes
+          path: release_notes.md
 
   build-release:
     name: Build and Release
-    needs: create-release
+    needs: prepare-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -139,52 +138,63 @@ jobs:
             shasum -a 256 "${{ env.ARCHIVE_NAME }}" | cut -d ' ' -f 1 > "${{ env.ARCHIVE_NAME }}.sha256"
           fi
 
-      - name: Upload release archive
-        uses: softprops/action-gh-release@v1
+      - name: Upload release asset
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.create-release.outputs.release_tag }}
-          files: |
+          name: release-asset-${{ matrix.target }}
+          path: |
             ${{ env.ARCHIVE_PATH }}
             ${{ env.ARCHIVE_PATH }}.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  create-checksums:
-    name: Create checksums file
-    needs: [create-release, build-release]
+  publish-release:
+    name: Publish GitHub Release
+    # Only reachable once every matrix leg of build-release has succeeded, so a
+    # failed binary build can no longer leave a public, empty/partial release.
+    needs: [prepare-release, build-release]
     runs-on: ubuntu-latest
     steps:
-      - name: Download release assets
-        uses: robinraju/release-downloader@v1.9
+      - name: Download release notes
+        uses: actions/download-artifact@v4
         with:
-          tag: ${{ needs.create-release.outputs.release_tag }}
-          fileName: "*.sha256"
+          name: release-notes
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-asset-*
+          path: dist
+          merge-multiple: true
 
       - name: Combine checksums
         run: |
-          TAG="${{ needs.create-release.outputs.release_tag }}"
-          echo "# SHA256 Checksums for ${TAG}" > SHA256SUMS.txt
-          echo "" >> SHA256SUMS.txt
-          for file in *.sha256; do
+          TAG="${{ needs.prepare-release.outputs.tag }}"
+          echo "# SHA256 Checksums for ${TAG}" > dist/SHA256SUMS.txt
+          echo "" >> dist/SHA256SUMS.txt
+          for file in dist/*.sha256; do
             if [ -f "$file" ]; then
-              basename="${file%.sha256}"
+              basename="$(basename "${file%.sha256}")"
               checksum=$(cat "$file")
-              echo "$checksum  $basename" >> SHA256SUMS.txt
+              echo "$checksum  $basename" >> dist/SHA256SUMS.txt
             fi
           done
-          cat SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
 
-      - name: Upload combined checksums
+      - name: Create release with binaries and changelog
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ needs.create-release.outputs.release_tag }}
-          files: SHA256SUMS.txt
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          name: ${{ needs.prepare-release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: release_notes.md
+          draft: false
+          files: |
+            dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-crates-io:
     name: Publish to crates.io
-    needs: build-release
+    needs: publish-release
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
